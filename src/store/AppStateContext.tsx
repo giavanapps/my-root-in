@@ -930,12 +930,16 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const updateMasterAccount = (email: string, pass: string) => {
+    setIsLoading(true); // Set isLoading to true immediately to lock routing during async Firestore fetch
     setMasterEmail(email);
     setMasterPassword(pass);
   };
 
   const deleteMasterAccount = (onComplete: () => void) => {
     // Reset state completely
+    setMasterEmail('');
+    setMasterPassword('');
+    setIsLoading(false);
     setProfiles([]);
     setActiveProfileId('');
     setRoutine([]);
