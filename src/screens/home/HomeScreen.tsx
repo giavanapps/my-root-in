@@ -496,7 +496,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
     deleteRoutineItem,
     updateRoutineItemTime,
     isPremium,
-    setPremiumStatus
+    setPremiumStatus,
+    regularityScore
   } = useAppState();
 
   const [showHealthDetail, setShowHealthDetail] = useState(false);
@@ -514,6 +515,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
   // Premium and Scanner Modals active states
   const [showPaywall, setShowPaywall] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [showPremiumHealthModal, setShowPremiumHealthModal] = useState(false);
+  const [showSosSuccessModal, setShowSosSuccessModal] = useState(false);
 
   if (!activeProfile) {
     return (
@@ -525,10 +528,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
 
   const handleSosPress = () => {
     triggerSosBooster();
-    setSosSuccessMessage('Protocole SOS Booster 14 jours planifié dans le calendrier ! 🩺🚀');
-    setTimeout(() => {
-      setSosSuccessMessage('');
-    }, 4000);
+    setShowHealthDetail(false);
+    setShowSosSuccessModal(true);
   };
 
   const isLight = themeMode === 'light';
@@ -1044,15 +1045,50 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
             </Text>
 
             {/* Global circular representation */}
-            <View style={styles.smallGaugeWrapper}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={[styles.smallGaugeWrapper, { alignItems: 'center', alignSelf: 'center', marginBottom: 20 }]}
+              onPress={() => {
+                setShowHealthDetail(false);
+                if (!isPremium) {
+                  setShowPaywall(true);
+                } else {
+                  setShowPremiumHealthModal(true);
+                }
+              }}
+            >
               <View style={[styles.smallGaugeCircle, { borderColor: colors.primary, backgroundColor: isLight ? 'rgba(229, 169, 130, 0.04)' : 'rgba(229, 169, 130, 0.03)' }]}>
                 <Text style={[styles.smallGaugeScore, { color: customText }]}>{activeProfile.healthScore}%</Text>
                 <Text style={[styles.smallGaugeLabel, { color: customTextSec }]}>Santé Globale</Text>
               </View>
-            </View>
+              <Text style={{ fontSize: 9, color: colors.primary, fontWeight: '800', marginTop: 6, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                {isPremium ? '📊 Voir Rapport IA ➔' : '🔒 Rapport premium IA (Bloqué) ➔'}
+              </Text>
+            </TouchableOpacity>
 
             {/* Horizontal sub-gauges: Hydration, Nutrition, Scalp */}
-            <View style={styles.subGaugesContainer}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={[
+                styles.subGaugesContainer,
+                {
+                  borderWidth: 1,
+                  borderColor: customBorder,
+                  borderRadius: 20,
+                  padding: 14,
+                  marginBottom: 16,
+                  backgroundColor: isLight ? '#FAFBFC' : 'rgba(255, 255, 255, 0.01)'
+                }
+              ]}
+              onPress={() => {
+                setShowHealthDetail(false);
+                if (!isPremium) {
+                  setShowPaywall(true);
+                } else {
+                  setShowPremiumHealthModal(true);
+                }
+              }}
+            >
               {/* Gauge 1: Hydratation */}
               <View style={styles.horizontalGaugeWrapper}>
                 <View style={styles.gaugeLabelRow}>
@@ -1085,11 +1121,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                   <View style={[styles.gaugeFill, { width: `${activeProfile.scalp}%`, backgroundColor: colors.secondary }]} />
                 </View>
               </View>
-            </View>
+              
+              <Text style={{ fontSize: 9, color: colors.primary, fontWeight: '800', textAlign: 'center', marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                {isPremium ? '📊 Analyse de l\'évolution des jauges ➔' : '🔒 Historique d\'évolution (Bloqué) ➔'}
+              </Text>
+            </TouchableOpacity>
 
             {/* 📈 Advanced Health Analytics Chart (Premium Feature preview / active) */}
             <TouchableOpacity
-              activeOpacity={isPremium ? 1 : 0.8}
+              activeOpacity={0.8}
               style={{
                 borderWidth: 1,
                 borderColor: isPremium ? customBorder : 'rgba(230, 198, 135, 0.25)',
@@ -1099,15 +1139,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                 marginBottom: 16,
               }}
               onPress={() => {
+                setShowHealthDetail(false);
                 if (!isPremium) {
-                  setShowHealthDetail(false);
                   setShowPaywall(true);
+                } else {
+                  setShowPremiumHealthModal(true);
                 }
               }}
             >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <Text style={{ fontSize: 13, fontWeight: 'bold', color: isPremium ? colors.primary : colors.accent }}>
-                  {isPremium ? '📈 Historique de Régularité & Progrès' : '🔒 Graphique d\'Historique Pro (Premium)'}
+                  {isPremium ? '📈 Historique de Régularité de Soins' : '🔒 Historique de Régularité Pro (Premium)'}
                 </Text>
                 {!isPremium && (
                   <Text style={{ fontSize: 8, fontWeight: 'bold', color: colors.accent, backgroundColor: 'rgba(230, 198, 135, 0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
@@ -1115,30 +1157,49 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                   </Text>
                 )}
               </View>
+              
+              <Text style={{ fontSize: 10, color: customTextSec, marginBottom: 8, lineHeight: 14 }}>
+                Ce graphique mesure ton niveau de complétion des soins planifiés. 100% signifie que tu as réalisé tous tes soins prévus à temps. 50% signifie que la moitié a été complétée.
+              </Text>
 
-              {/* Simulated Neon Chart */}
-              <View style={{ flexDirection: 'row', height: 75, alignItems: 'flex-end', paddingBottom: 4, paddingTop: 4 }}>
-                <View style={{ width: 24, justifyContent: 'space-between', height: '100%', paddingBottom: 14 }}>
-                  <Text style={{ color: colors.textMuted, fontSize: 7, fontWeight: 'bold' }}>100</Text>
-                  <Text style={{ color: colors.textMuted, fontSize: 7, fontWeight: 'bold' }}>50</Text>
+              {/* Simulated Neon Chart with Y-Axis Percentage and gridlines */}
+              <View style={{ flexDirection: 'row', height: 95, alignItems: 'flex-end', paddingBottom: 4, paddingTop: 4, position: 'relative' }}>
+                
+                {/* Horizontal Gridlines for visual reference */}
+                <View style={{ position: 'absolute', left: 34, right: 0, height: 1, backgroundColor: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)', bottom: 80 }} />
+                <View style={{ position: 'absolute', left: 34, right: 0, height: 1, backgroundColor: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)', bottom: 44 }} />
+                <View style={{ position: 'absolute', left: 34, right: 0, height: 1, backgroundColor: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)', bottom: 8 }} />
+
+                {/* Y-Axis Legend */}
+                <View style={{ width: 34, justifyContent: 'space-between', height: '100%', paddingBottom: 14, paddingRight: 6, zIndex: 2 }}>
+                  <Text style={{ color: colors.textMuted, fontSize: 8, fontWeight: 'bold', textAlign: 'right' }}>100%</Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 8, fontWeight: 'bold', textAlign: 'right' }}>50%</Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 8, fontWeight: 'bold', textAlign: 'right' }}>0%</Text>
                 </View>
-                <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: '100%' }}>
+                
+                {/* Columns */}
+                <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: '100%', zIndex: 2 }}>
                   {[
-                    { w: 'S1', s: 58 },
-                    { w: 'S3', s: 64 },
-                    { w: 'S5', s: 70 },
-                    { w: 'S7', s: 76 },
-                    { w: 'S9', s: activeProfile.healthScore },
+                    { w: 'Sem 1', s: 58 },
+                    { w: 'Sem 3', s: 64 },
+                    { w: 'Sem 5', s: 70 },
+                    { w: 'Sem 7', s: 76 },
+                    { w: 'Sem 9', s: regularityScore },
                   ].map((d, index) => (
                     <View key={index} style={{ alignItems: 'center', flex: 1 }}>
-                      <View style={{ height: 45, width: 8, backgroundColor: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)', borderRadius: 4, justifyContent: 'flex-end', overflow: 'hidden' }}>
-                        <View style={{ height: `${d.s}%`, width: '100%', backgroundColor: colors.secondary, borderRadius: 4 }} />
+                      <View style={{ height: 60, width: 12, backgroundColor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)', borderRadius: 6, justifyContent: 'flex-end', overflow: 'hidden' }}>
+                        <View style={{ height: `${d.s}%`, width: '100%', backgroundColor: colors.secondary, borderRadius: 6 }} />
                       </View>
-                      <Text style={{ color: colors.textMuted, fontSize: 7, marginTop: 2, fontWeight: 'bold' }}>{d.w}</Text>
+                      <Text style={{ color: colors.textMuted, fontSize: 8, marginTop: 4, fontWeight: 'bold' }}>{d.w}</Text>
+                      <Text style={{ fontSize: 8, color: customText, fontWeight: 'bold', marginTop: 2 }}>{d.s}%</Text>
                     </View>
                   ))}
                 </View>
               </View>
+              
+              <Text style={{ fontSize: 8, color: customTextSec, textAlign: 'center', marginTop: 6, fontStyle: 'italic' }}>
+                💡 Sem = Semaine de routine • Les jours sans soins (repos) ne pénalisent pas le score. {isPremium ? '[Clique pour ton Rapport IA ➔]' : '[Réservé aux membres Premium ➔]'}
+              </Text>
             </TouchableOpacity>
 
             {/* Success SOS alert feedback */}
@@ -1683,6 +1744,151 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
         visible={showScanner}
         onClose={() => setShowScanner(false)}
       />
+
+      {/* 📊 Premium Health Report Modal */}
+      <Modal
+        visible={showPremiumHealthModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowPremiumHealthModal(false)}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: isLight ? 'rgba(0, 0, 0, 0.4)' : colors.overlay }]}>
+          <View style={[styles.detailCard, { backgroundColor: customCard, borderColor: customBorder, maxWidth: 440 }]}>
+            <View style={styles.detailHeader}>
+              <Text style={[styles.detailTitle, { color: colors.primary, fontSize: 18 }]}>📊 Rapport Capillaire Premium IA</Text>
+              <TouchableOpacity 
+                style={[styles.closeDetailIcon, { backgroundColor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)' }]} 
+                onPress={() => setShowPremiumHealthModal(false)}
+              >
+                <Text style={[styles.closeDetailIconText, { color: customTextSec }]}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 11, color: customTextSec, marginBottom: 16 }}>
+              Analyse prédictive et historique personnalisé de ta couronne.
+            </Text>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 380, marginBottom: 16 }}>
+              {/* Streaks and Progression */}
+              <View style={{ backgroundColor: 'rgba(92, 138, 107, 0.06)', borderWidth: 1, borderColor: 'rgba(92, 138, 107, 0.2)', borderRadius: 16, padding: 14, marginBottom: 16 }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.secondary, marginBottom: 4 }}>📈 Progression Globale : +34%</Text>
+                <Text style={{ fontSize: 11, color: customText, lineHeight: 16 }}>
+                  Ta régularité moyenne a augmenté de 12 points ce mois-ci. Tes cuticules retiennent mieux l'eau grâce à tes scellages assidus !
+                </Text>
+              </View>
+
+              {/* Personal Capillary Diagnostic IA Breakdown */}
+              <Text style={{ fontSize: 12, fontWeight: '800', color: customText, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                🤖 Recommandations IA Root'in :
+              </Text>
+              <Text style={{ fontSize: 11.5, color: customText, fontStyle: 'italic', lineHeight: 18, marginBottom: 16, backgroundColor: isLight ? '#F7F8FA' : 'rgba(255,255,255,0.02)', padding: 12, borderRadius: 12, borderWidth: 0.5, borderColor: customBorder }}>
+                "Tes cheveux <Text style={{ fontWeight: 'bold' }}>{activeProfile.diagnostic.texture.toLowerCase()}</Text> à <Text style={{ fontWeight: 'bold' }}>porosité {activeProfile.diagnostic.porosity?.toLowerCase() || 'moyenne'}</Text> et épaisseur <Text style={{ fontWeight: 'bold' }}>{activeProfile.diagnostic.thickness.toLowerCase()}</Text> présentent un équilibre optimal. Le gel d'aloe vera couplé à l'huile de carapate a scellé l'hydratation durablement sans boucher tes écailles. Maintiens ce protocole mensuel de clarification pour éviter toute accumulation !"
+              </Text>
+
+              {/* Weekly recommended Ingredients */}
+              <Text style={{ fontSize: 12, fontWeight: '800', color: customText, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                🌿 Tes 3 Ingrédients Vedettes de la semaine :
+              </Text>
+              <View style={{ gap: 8, marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)', padding: 10, borderRadius: 10, borderWidth: 0.5, borderColor: customBorder }}>
+                  <Text style={{ fontSize: 20, marginRight: 10 }}>🌿</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: customText }}>Gel d'Aloe Vera Bio Pur</Text>
+                    <Text style={{ fontSize: 10, color: customTextSec }}>Humectant léger parfait pour abreuver la fibre sans l'alourdir.</Text>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)', padding: 10, borderRadius: 10, borderWidth: 0.5, borderColor: customBorder }}>
+                  <Text style={{ fontSize: 20, marginRight: 10 }}>🌰</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: customText }}>Huile de Carapate</Text>
+                    <Text style={{ fontSize: 10, color: customTextSec }}>Fortifie les tempes et prévient la casse des pointes de type {activeProfile.diagnostic.texture.toLowerCase()}.</Text>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)', padding: 10, borderRadius: 10, borderWidth: 0.5, borderColor: customBorder }}>
+                  <Text style={{ fontSize: 20, marginRight: 10 }}>🍯</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: customText }}>Miel Pur Organique</Text>
+                    <Text style={{ fontSize: 10, color: customTextSec }}>Agent adoucissant puissant qui referme les écailles après clarification.</Text>
+                  </View>
+                </View>
+              </View>
+            </ScrollView>
+
+            <Button
+              title="Fermer le Rapport IA"
+              onPress={() => setShowPremiumHealthModal(false)}
+              variant="secondary"
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* 🆘 SOS Booster Confirmation Modal */}
+      <Modal
+        visible={showSosSuccessModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowSosSuccessModal(false)}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: 'rgba(11, 13, 23, 0.85)' }]}>
+          <View style={[styles.detailCard, { backgroundColor: customCard, borderColor: colors.danger, borderWidth: 1.5, maxWidth: 440 }]}>
+            <View style={{ alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 42, marginBottom: 8 }}>🆘</Text>
+              <Text style={{ fontSize: 18, fontWeight: '900', color: colors.danger, textAlign: 'center' }}>
+                SOS Booster 14J Déclenché !
+              </Text>
+              <Text style={{ fontSize: 11, color: customTextSec, textAlign: 'center', marginTop: 4 }}>
+                Le protocole de soins intensifs a été planifié avec succès dans ton calendrier.
+              </Text>
+            </View>
+
+            {/* Protocol Day by Day Preview List */}
+            <View style={{
+              backgroundColor: isLight ? '#FFF5F5' : 'rgba(217, 83, 79, 0.05)',
+              borderColor: 'rgba(217, 83, 79, 0.15)',
+              borderWidth: 1,
+              borderRadius: 16,
+              padding: 14,
+              marginBottom: 16,
+              gap: 8
+            }}>
+              <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.danger, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>
+                📋 Aperçu du Protocole Intensif :
+              </Text>
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontSize: 11, color: customText }}><Text style={{ fontWeight: 'bold', color: colors.danger }}>• J+1 :</Text> Clarification Détox Bentonite 🔬</Text>
+                <Text style={{ fontSize: 11, color: customText }}><Text style={{ fontWeight: 'bold', color: colors.danger }}>• J+3 :</Text> Lavage Co-Wash + Masque Miel 🍯</Text>
+                <Text style={{ fontSize: 11, color: customText }}><Text style={{ fontWeight: 'bold', color: colors.danger }}>• J+5 :</Text> Soin sans rinçage hydratant 💧</Text>
+                <Text style={{ fontSize: 11, color: customText }}><Text style={{ fontWeight: 'bold', color: colors.danger }}>• J+7 :</Text> Bain aux Huiles Chaudes Coco/Karité 🌿</Text>
+                <Text style={{ fontSize: 11, color: customText }}><Text style={{ fontWeight: 'bold', color: colors.danger }}>• J+10 :</Text> Soin Reconstructeur Protéines (Force) 💪</Text>
+                <Text style={{ fontSize: 11, color: customText }}><Text style={{ fontWeight: 'bold', color: colors.danger }}>• J+14 :</Text> Brume scellée à l'Argan ⚡</Text>
+              </View>
+            </View>
+
+            <Text style={{ fontSize: 10.5, color: customTextSec, textAlign: 'center', marginBottom: 20, lineHeight: 15 }}>
+              💡 Les soins ont été programmés à partir de demain pour laisser respirer tes cheveux aujourd'hui. Rends-toi sur l'onglet calendrier pour les consulter ou modifier leurs heures de rappel individuelles.
+            </Text>
+
+            <View style={{ gap: 8 }}>
+              <Button
+                title="📅 Ouvrir mon Calendrier"
+                onPress={() => {
+                  setShowSosSuccessModal(false);
+                  if (onNavigateToCalendar) onNavigateToCalendar();
+                }}
+                variant="primary"
+              />
+              <Button
+                title="Compris ✓"
+                onPress={() => setShowSosSuccessModal(false)}
+                variant="outline"
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
