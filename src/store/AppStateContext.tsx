@@ -349,8 +349,8 @@ const generateRoutineCalendar = (profileId: string, diagnostic: HairDiagnostic, 
 export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Theme & Master Account credentials
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
-  const [masterEmail, setMasterEmail] = useState('amandine.maitre@myrootin.com');
-  const [masterPassword, setMasterPassword] = useState('Secret123!');
+  const [masterEmail, setMasterEmail] = useState('');
+  const [masterPassword, setMasterPassword] = useState('');
 
   // Pre-configured Profiles
   const [profiles, setProfiles] = useState<Profile[]>([]);
