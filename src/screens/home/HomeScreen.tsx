@@ -740,7 +740,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
               )}
             </View>
             <Text style={[styles.scannerWidgetDesc, { color: customTextSec }]} numberOfLines={2}>
-              Scanne tes produits et analyse la compatibilité INCI pour tes {activeProfile.diagnostic.texture.toLowerCase()} !
+              Scanne tes produits et analyse la compatibilité INCI pour tes cheveux !
             </Text>
           </View>
           <View style={styles.scannerWidgetRight}>
