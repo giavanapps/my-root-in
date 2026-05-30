@@ -542,11 +542,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
                     onPress={() => handleSelectAvatar(item.id)}
                   >
                     {avatarImageMap[item.id] ? (
-                      <Image
-                        source={avatarImageMap[item.id]}
-                        style={{ width: 60, height: 60, borderRadius: 30 }}
-                        resizeMode="contain"
-                      />
+                      <View style={{ width: 60, height: 60, borderRadius: 30, overflow: 'hidden' }}>
+                        <Image
+                          source={avatarImageMap[item.id]}
+                          style={{ width: '100%', height: '100%' }}
+                          resizeMode="contain"
+                        />
+                      </View>
                     ) : (
                       <Text style={styles.gridEmoji}>👤</Text>
                     )}

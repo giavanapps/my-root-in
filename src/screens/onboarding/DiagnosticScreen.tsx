@@ -266,16 +266,18 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
                 return (
                   <TouchableOpacity
                     key={item.id}
-                    style={[styles.avatarItem, isSelected && styles.avatarItemActive]}
+                    style={[styles.avatarItem, isSelected && styles.avatarItemActive, { justifyContent: 'center', alignItems: 'center' }]}
                     onPress={() => setSelectedAvatar(item.id)}
                     activeOpacity={0.8}
                   >
                     {avatarImageMap[item.id] ? (
-                      <Image
-                        source={avatarImageMap[item.id]}
-                        style={{ width: 72, height: 72, borderRadius: 36 }}
-                        resizeMode="contain"
-                      />
+                      <View style={{ width: 72, height: 72, borderRadius: 36, overflow: 'hidden' }}>
+                        <Image
+                          source={avatarImageMap[item.id]}
+                          style={{ width: '100%', height: '100%' }}
+                          resizeMode="contain"
+                        />
+                      </View>
                     ) : (
                       <Text style={styles.avatarEmojiText}>👤</Text>
                     )}
