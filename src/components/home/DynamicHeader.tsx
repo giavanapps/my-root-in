@@ -30,7 +30,7 @@ export const DynamicHeader: React.FC<DynamicHeaderProps> = ({ onPriorityPress })
       <View style={styles.topRow}>
         <View style={styles.welcomeWrapper}>
           <Text style={[styles.greetingText, { color: customTextSec }]}>Bonjour,</Text>
-          <Text style={[styles.nameText, { color: customText }]}>{activeProfile.name} {activeProfile.avatar}</Text>
+          <Text style={[styles.nameText, { color: customText }]}>{activeProfile.name}</Text>
           {/* Dynamic Color-Coded Consistency Score */}
           {(() => {
             let scoreColor = colors.secondary; // green (>= 85)
