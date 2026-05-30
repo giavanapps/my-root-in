@@ -78,6 +78,8 @@ interface AppStateContextType {
   lastFeedbackReason: string;
   showCareSummary: boolean;
   regularityScore: number;
+  isPremium: boolean;
+  setPremiumStatus: (status: boolean) => void;
   addProfile: (
     name: string,
     diagnostic: HairDiagnostic,
@@ -352,6 +354,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [masterEmail, setMasterEmail] = useState('');
   const [masterPassword, setMasterPassword] = useState('');
 
+  // Premium status state
+  const [isPremium, setIsPremium] = useState<boolean>(false);
+
   // Pre-configured Profiles
   const [profiles, setProfiles] = useState<Profile[]>([]);
 
@@ -392,6 +397,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           if (data.logs) setLogs(data.logs);
           if (data.activeProfileId) setActiveProfileId(data.activeProfileId);
           if (data.themeMode) setThemeMode(data.themeMode);
+          if (data.isPremium !== undefined) setIsPremium(data.isPremium);
         } else {
           // Document does not exist in Cloud, initialize it with current local state
           await setDoc(docRef, {
@@ -401,6 +407,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             profiles,
             routine,
             logs,
+            isPremium,
             updatedAt: new Date().toISOString()
           });
         }
@@ -427,6 +434,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           profiles,
           routine,
           logs,
+          isPremium,
           updatedAt: new Date().toISOString()
         }, { merge: true });
       } catch (error) {
@@ -435,7 +443,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     syncToFirestore();
-  }, [profiles, routine, logs, activeProfileId, themeMode, isLoading, masterEmail]);
+  }, [profiles, routine, logs, activeProfileId, themeMode, isLoading, masterEmail, isPremium]);
 
   // Derived active properties
   const activeProfile = profiles.find(p => p.id === activeProfileId);
@@ -944,6 +952,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setActiveProfileId('');
     setRoutine([]);
     setLogs([]);
+    setIsPremium(false);
     onComplete(); // callback to redirect to auth screen
   };
 
@@ -968,6 +977,8 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       lastFeedbackReason,
       showCareSummary,
       regularityScore,
+      isPremium,
+      setPremiumStatus: setIsPremium,
       addProfile,
       selectProfile,
       completeTodayAction,

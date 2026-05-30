@@ -9,6 +9,8 @@ import { CatchUpCard } from '../../components/home/CatchUpCard';
 import { FeaturedAdvice } from '../../components/home/FeaturedAdvice';
 import { Button } from '../../components/common/Button';
 import { TimePickerModal } from '../../components/common/TimePickerModal';
+import { PremiumPaywallModal } from '../../components/premium/PremiumPaywallModal';
+import { ProductScannerModal } from '../../components/premium/ProductScannerModal';
 
 interface CareGuide {
   title: string;
@@ -492,7 +494,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
     completeTodayAction,
     toggleRoutineCompleted,
     deleteRoutineItem,
-    updateRoutineItemTime
+    updateRoutineItemTime,
+    isPremium,
+    setPremiumStatus
   } = useAppState();
 
   const [showHealthDetail, setShowHealthDetail] = useState(false);
@@ -506,6 +510,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
   const [selectedGuideCategory, setSelectedGuideCategory] = useState<string>('');
   const [selectedCareId, setSelectedCareId] = useState<string>('');
   const [showTimePicker, setShowTimePicker] = useState(false);
+  
+  // Premium and Scanner Modals active states
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
 
   if (!activeProfile) {
     return (
@@ -702,6 +710,43 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
 
         {/* Ephemeral catch-up block (conditional) */}
         <CatchUpCard />
+
+        {/* 🔍 Premium Product Scanner Widget Card */}
+        <TouchableOpacity
+          style={[styles.scannerWidgetCard, { backgroundColor: customCard, borderColor: customBorder }]}
+          activeOpacity={0.8}
+          onPress={() => {
+            if (isPremium) {
+              setShowScanner(true);
+            } else {
+              setShowPaywall(true);
+            }
+          }}
+        >
+          <View style={styles.scannerWidgetLeft}>
+            <Text style={styles.scannerWidgetEmoji}>🔍</Text>
+          </View>
+          <View style={styles.scannerWidgetCenter}>
+            <View style={styles.scannerWidgetTitleRow}>
+              <Text style={[styles.scannerWidgetTitle, { color: customText }]}>Scanner Capillaire IA</Text>
+              {isPremium ? (
+                <View style={styles.proBadgeActive}>
+                  <Text style={styles.proBadgeActiveText}>PREMIUM</Text>
+                </View>
+              ) : (
+                <View style={styles.proBadgeLocked}>
+                  <Text style={styles.proBadgeLockedText}>PRO</Text>
+                </View>
+              )}
+            </View>
+            <Text style={[styles.scannerWidgetDesc, { color: customTextSec }]} numberOfLines={2}>
+              Scanne tes produits et analyse la compatibilité INCI pour tes {activeProfile.diagnostic.texture.toLowerCase()} !
+            </Text>
+          </View>
+          <View style={styles.scannerWidgetRight}>
+            <Text style={[styles.scannerWidgetArrow, { color: colors.primary }]}>➔</Text>
+          </View>
+        </TouchableOpacity>
 
         {/* Curated recommendation card */}
         <FeaturedAdvice 
@@ -1510,6 +1555,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
           </View>
         </View>
       </Modal>
+
+      {/* 💎 Premium Paywall Modal Overlay */}
+      <PremiumPaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+      />
+
+      {/* 🔍 Product Scanner Modal Overlay */}
+      <ProductScannerModal
+        visible={showScanner}
+        onClose={() => setShowScanner(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -2237,5 +2294,82 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     transform: [{ scale: 1.5 }],
+  },
+  // Scanner widget styles
+  scannerWidgetCard: {
+    marginHorizontal: 24,
+    marginTop: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  scannerWidgetLeft: {
+    marginRight: 14,
+    backgroundColor: 'rgba(229, 169, 130, 0.12)',
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scannerWidgetEmoji: {
+    fontSize: 24,
+  },
+  scannerWidgetCenter: {
+    flex: 1,
+  },
+  scannerWidgetTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 8,
+  },
+  scannerWidgetTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  proBadgeLocked: {
+    backgroundColor: 'rgba(230, 198, 135, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 0.5,
+    borderColor: colors.accent,
+  },
+  proBadgeLockedText: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: colors.accent,
+  },
+  proBadgeActive: {
+    backgroundColor: 'rgba(118, 160, 138, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 0.5,
+    borderColor: colors.secondary,
+  },
+  proBadgeActiveText: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: colors.secondary,
+  },
+  scannerWidgetDesc: {
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  scannerWidgetRight: {
+    marginLeft: 8,
+  },
+  scannerWidgetArrow: {
+    fontSize: 15,
+    fontWeight: 'bold',
   },
 });
