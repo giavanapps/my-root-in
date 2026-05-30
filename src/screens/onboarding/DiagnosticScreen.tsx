@@ -273,15 +273,12 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
                     {avatarImageMap[item.id] ? (
                       <Image
                         source={avatarImageMap[item.id]}
-                        style={{ width: 64, height: 64, borderRadius: 32, marginBottom: 6 }}
+                        style={{ width: 72, height: 72, borderRadius: 36 }}
                         resizeMode="contain"
                       />
                     ) : (
                       <Text style={styles.avatarEmojiText}>👤</Text>
                     )}
-                    <Text style={[styles.avatarLabelText, isSelected && styles.avatarLabelActive]}>
-                      {item.label}
-                    </Text>
                   </TouchableOpacity>
                 );
               })}

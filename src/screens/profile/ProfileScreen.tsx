@@ -544,15 +544,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
                     {avatarImageMap[item.id] ? (
                       <Image
                         source={avatarImageMap[item.id]}
-                        style={{ width: 48, height: 48, borderRadius: 24, marginBottom: 4 }}
+                        style={{ width: 60, height: 60, borderRadius: 30 }}
                         resizeMode="contain"
                       />
                     ) : (
                       <Text style={styles.gridEmoji}>👤</Text>
                     )}
-                    <Text style={styles.gridLabel} numberOfLines={1}>
-                      {item.label}
-                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
