@@ -100,7 +100,7 @@ export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visibl
                   <Text style={[styles.planPrice, styles.highlightText]}>39,99 € / an</Text>
                 </View>
                 <Text style={[styles.planPeriod, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                  Soit 3,33 €/mois • Économise 33% • 7 jours d'essai gratuit
+                  Soit 3,33 €/mois • Économise 44% • 7 jours d'essai gratuit
                 </Text>
               </TouchableOpacity>
 
@@ -113,7 +113,7 @@ export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visibl
               >
                 <View style={styles.planHeader}>
                   <Text style={[styles.planTitle, isDark ? styles.textLight : styles.textDark]}>Mensuel</Text>
-                  <Text style={[styles.planPrice, isDark ? styles.textLight : styles.textDark]}>4,99 € / mois</Text>
+                  <Text style={[styles.planPrice, isDark ? styles.textLight : styles.textDark]}>5,99 € / mois</Text>
                 </View>
                 <Text style={[styles.planPeriod, isDark ? styles.textMutedDark : styles.textMutedLight]}>
                   Annulable à tout moment • 7 jours d'essai gratuit
