@@ -1478,10 +1478,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
             ) : (
               <ScrollView contentContainerStyle={styles.articlesListContainer} showsVerticalScrollIndicator={false}>
                 {(() => {
-                  const filtered = libraryArticles.filter(art => 
-                    art.category === activeAdviceTab && 
-                    art.tags.includes(activeProfile.diagnostic.texture)
-                  );
+                  const filtered = libraryArticles.filter(art => {
+                    // Category match
+                    if (art.category !== activeAdviceTab) {
+                      return false;
+                    }
+                    // Strict texture match
+                    if (!art.tags.includes(activeProfile.diagnostic.texture)) {
+                      return false;
+                    }
+                    // Strict porosity match
+                    const articlePorosityTags = art.tags.filter(t => t === 'Faible' || t === 'Moyenne' || t === 'Forte');
+                    if (articlePorosityTags.length > 0) {
+                      if (activeProfile.diagnostic.porosity === null || !articlePorosityTags.includes(activeProfile.diagnostic.porosity)) {
+                        return false;
+                      }
+                    } else if (activeProfile.diagnostic.porosity === null) {
+                      // If user skipped porosity, filter out porosity-specific articles
+                      if (art.tags.includes('Faible') || art.tags.includes('Moyenne') || art.tags.includes('Forte')) {
+                        return false;
+                      }
+                    }
+                    return true;
+                  });
                   if (filtered.length === 0) {
                     return (
                       <View style={styles.emptyArticlesBox}>

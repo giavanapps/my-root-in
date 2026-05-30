@@ -280,11 +280,22 @@ export const FeaturedAdvice: React.FC<FeaturedAdviceProps> = ({ onSeeAllPress, o
   // Filter mock articles:
   // We strictly require that the article contains the user's hair texture tag to be shown
   const baseFiltered = mockArticles.filter(art => {
+    // 1. Strict texture match
     if (!art.tags.includes(diag.texture)) {
       return false;
     }
-    if (isPorosityNull) {
-      return !art.tags.includes('Faible') && !art.tags.includes('Forte') && !art.tags.includes('Moyenne');
+    
+    // 2. Strict porosity match
+    const articlePorosityTags = art.tags.filter(t => t === 'Faible' || t === 'Moyenne' || t === 'Forte');
+    if (articlePorosityTags.length > 0) {
+      if (diag.porosity === null || !articlePorosityTags.includes(diag.porosity)) {
+        return false;
+      }
+    } else if (isPorosityNull) {
+      // If user skipped porosity, filter out porosity-specific articles
+      if (art.tags.includes('Faible') || art.tags.includes('Moyenne') || art.tags.includes('Forte')) {
+        return false;
+      }
     }
     return true;
   });
@@ -309,10 +320,26 @@ export const FeaturedAdvice: React.FC<FeaturedAdviceProps> = ({ onSeeAllPress, o
   let finalArticles = availableArticles;
   if (finalArticles.length === 0) {
     finalArticles = mockArticles.filter(art => {
-      if (diag.texture !== 'Locksés') {
-        return !art.tags.includes('Locksés');
+      // Filter out wrong locks
+      if (diag.texture !== 'Locksés' && art.tags.includes('Locksés')) {
+        return false;
       }
-      return art.tags.includes('Locksés');
+      if (diag.texture === 'Locksés' && !art.tags.includes('Locksés')) {
+        return false;
+      }
+      
+      // Filter out wrong porosity
+      const articlePorosityTags = art.tags.filter(t => t === 'Faible' || t === 'Moyenne' || t === 'Forte');
+      if (articlePorosityTags.length > 0) {
+        if (diag.porosity === null || !articlePorosityTags.includes(diag.porosity)) {
+          return false;
+        }
+      } else if (isPorosityNull) {
+        if (art.tags.includes('Faible') || art.tags.includes('Moyenne') || art.tags.includes('Forte')) {
+          return false;
+        }
+      }
+      return true;
     });
   }
 
