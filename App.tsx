@@ -19,15 +19,26 @@ function MainApp() {
   const [isEditingDiagnostic, setIsEditingDiagnostic] = useState(false);
   const [autoOpenCalendarModal, setAutoOpenCalendarModal] = useState(false);
 
-  const { themeMode, activeProfile } = useAppState();
+  const { themeMode, activeProfile, profiles, isLoading, masterEmail } = useAppState();
 
-  // Automatically skip to home screen if a profile was loaded from Firestore on login
+  // Automatically handle routing after login / fetch completes
   useEffect(() => {
-    if (activeProfile && currentScreen === 'auth') {
-      setCurrentScreen('home');
-      setActiveTab('dashboard');
+    // We only route automatically when:
+    // 1. The user is currently on the 'auth' screen
+    // 2. We have successfully set a masterEmail (meaning they submitted login)
+    // 3. The Firestore fetch has completed (isLoading is false)
+    if (currentScreen === 'auth' && masterEmail && !isLoading) {
+      if (profiles.length > 0) {
+        // Existing user: redirect directly to home dashboard!
+        setCurrentScreen('home');
+        setActiveTab('dashboard');
+      } else {
+        // New user or no profiles: redirect to diagnostic onboarding!
+        setCurrentScreen('diagnostic');
+        setTempUserName('Utilisateur');
+      }
     }
-  }, [activeProfile, currentScreen]);
+  }, [profiles, isLoading, masterEmail, currentScreen]);
 
   const navigateToDiagnostic = (userName: string) => {
     setTempUserName(userName);

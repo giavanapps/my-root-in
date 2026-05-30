@@ -35,8 +35,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onNavigateToDiagnostic }
     setError('');
     // Sync email and password into global master state
     updateMasterAccount(email, password);
-    // Save account & proceed to diagnostic
-    onNavigateToDiagnostic(isSignUp ? name : 'Utilisateur');
+    
+    if (isSignUp) {
+      // Proceed to diagnostic onboarding with their name
+      onNavigateToDiagnostic(name);
+    }
+    // For logins (isSignUp === false), we do NOT immediately navigate.
+    // Instead, App.tsx will detect when isLoading becomes false and redirect accordingly.
   };
 
   const customBg = isLight ? '#F5F6FA' : colors.background;

@@ -72,6 +72,7 @@ interface AppStateContextType {
   catchUpTask: RoutineItem | null;
   themeMode: 'dark' | 'light';
   masterEmail: string;
+  isLoading: boolean;
   lastValidatedCare: { category: string; date: string } | null;
   lastFeedbackDelta: number;
   lastFeedbackReason: string;
@@ -957,6 +958,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       catchUpTask,
       themeMode,
       masterEmail,
+      isLoading,
       lastValidatedCare,
       lastFeedbackDelta,
       lastFeedbackReason,
