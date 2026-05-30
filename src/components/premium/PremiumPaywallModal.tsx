@@ -1,38 +1,68 @@
-import React from 'react';
-import { StyleSheet, View, Text, Modal, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, View, Text, Modal, TouchableOpacity, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { colors, borderRadius, spacing } from '../../theme/colors';
 import { useAppState } from '../../store/AppStateContext';
 
 interface PremiumPaywallModalProps {
   visible: boolean;
   onClose: () => void;
+  onOpenScanner?: () => void; // Optional callback to trigger scanner from paywall
 }
 
-export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visible, onClose }) => {
-  const { themeMode, setPremiumStatus } = useAppState();
+export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visible, onClose, onOpenScanner }) => {
+  const { themeMode, setPremiumStatus, isPremium, triggerSosBooster, activeProfile } = useAppState();
   const isDark = themeMode === 'dark';
+
+  const [activePreview, setActivePreview] = useState<'scanner' | 'sos' | 'health' | null>(null);
+  const [sosPlanned, setSosPlanned] = useState(false);
 
   const handleSimulatePurchase = () => {
     setPremiumStatus(true);
-    onClose();
+  };
+
+  const handleFeatureClick = (type: 'scanner' | 'sos' | 'health') => {
+    setActivePreview(type);
+    setSosPlanned(false);
+  };
+
+  const handlePlanSosFromPreview = () => {
+    triggerSosBooster();
+    setSosPlanned(true);
+    setTimeout(() => {
+      setSosPlanned(false);
+      setActivePreview(null);
+      onClose();
+    }, 2500);
   };
 
   const benefits = [
     {
+      type: 'scanner' as const,
       icon: '🔍',
       title: 'Scanner Capillaire IA (INCI)',
-      desc: 'Scanne la liste des ingrédients de n\'importe quel produit et découvre sa compatibilité avec ta texture et porosité.',
+      desc: 'Scanne la liste des ingrédients de n\'importe quel produit et découvre sa compatibilité avec ta texture et porosité. [Clique pour tester/prévisualiser ➔]',
     },
     {
+      type: 'sos' as const,
       icon: '🚨',
       title: 'SOS Booster Illimité',
-      desc: 'Accès sans limites aux protocoles d\'urgence intensifs en cas de casse importante ou sécheresse extrême.',
+      desc: 'Accès sans limites aux protocoles d\'urgence intensifs en cas de casse importante ou sécheresse extrême. [Clique pour tester/prévisualiser ➔]',
     },
     {
+      type: 'health' as const,
       icon: '📈',
       title: 'Suivi de Santé Avancé',
-      desc: 'Historique illimité de l\'évolution de tes jauges d\'hydratation, nutrition et régularité.',
+      desc: 'Historique illimité de l\'évolution de tes jauges d\'hydratation, nutrition et régularité. [Clique pour tester/prévisualiser ➔]',
     },
+  ];
+
+  const chartData = [
+    { week: 'Sem 1', score: 62 },
+    { week: 'Sem 3', score: 68 },
+    { week: 'Sem 5', score: 72 },
+    { week: 'Sem 7', score: 78 },
+    { week: 'Sem 9', score: 85 },
+    { week: 'Sem 11', score: 92 },
   ];
 
   return (
@@ -51,7 +81,12 @@ export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visibl
           <View style={styles.accentBar} />
 
           <View style={styles.header}>
-            <Text style={styles.badge}>💎 MODE PREMIUM</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.badge}>💎 MODE PREMIUM</Text>
+              {isPremium && (
+                <Text style={styles.premiumActiveBadge}>ACTIF ✓</Text>
+              )}
+            </View>
             <Text style={[styles.title, isDark ? styles.textLight : styles.textDark]}>
               Débloque ton Coach Root'in Premium 🌿
             </Text>
@@ -62,25 +97,165 @@ export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visibl
 
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
             {/* Benefits List */}
+            <Text style={[styles.sectionSubtitle, isDark ? styles.textLight : styles.textDark]}>
+              ✨ Clique sur une option ci-dessous pour y accéder :
+            </Text>
+
             {benefits.map((b, i) => (
-              <View 
+              <TouchableOpacity 
                 key={i} 
                 style={[
                   styles.benefitCard,
-                  isDark ? styles.benefitCardDark : styles.benefitCardLight
+                  isDark ? styles.benefitCardDark : styles.benefitCardLight,
+                  activePreview === b.type && styles.benefitCardSelected
                 ]}
+                activeOpacity={0.7}
+                onPress={() => handleFeatureClick(b.type)}
               >
                 <Text style={styles.benefitIcon}>{b.icon}</Text>
                 <View style={styles.benefitTextContainer}>
                   <Text style={[styles.benefitTitle, isDark ? styles.textLight : styles.textDark]}>
                     {b.title}
                   </Text>
-                  <Text style={[styles.benefitDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                  <Text style={[styles.benefitDesc, activePreview === b.type ? styles.highlightText : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
                     {b.desc}
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
+
+            {/* INTERACTIVE PREVIEW PANEL */}
+            {activePreview && (
+              <View style={[
+                styles.previewContainer,
+                isDark ? styles.previewContainerDark : styles.previewContainerLight
+              ]}>
+                
+                {/* 🔍 SCANNER PREVIEW */}
+                {activePreview === 'scanner' && (
+                  <View>
+                    <Text style={styles.previewTitle}>🔍 Prévisualisation : Analyseur d'ingrédients IA</Text>
+                    <Text style={[styles.previewDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                      Scannez l'arrière d'un flacon ou recherchez un code-barres. Notre IA analyse la liste INCI et la compare à vos cheveux {activeProfile?.diagnostic?.texture.toLowerCase()}.
+                    </Text>
+
+                    {/* Simulated Viewfinder */}
+                    <View style={styles.simulatedViewfinder}>
+                      <View style={styles.viewfinderLaser} />
+                      <Text style={styles.viewfinderText}>Mélange Moringa & Carbomer detecté...</Text>
+                      <Text style={styles.viewfinderBadge}>COMPATIBLE À 92% (LOCKS) ✓</Text>
+                    </View>
+
+                    {isPremium ? (
+                      <TouchableOpacity 
+                        style={styles.previewButton}
+                        onPress={() => {
+                          setActivePreview(null);
+                          onClose();
+                          if (onOpenScanner) onOpenScanner();
+                        }}
+                      >
+                        <Text style={styles.previewButtonText}>Ouvrir le Scanner Réel maintenant 🚀</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={styles.lockedCallout}>
+                        <Text style={styles.lockedCalloutText}>
+                          🔒 Pour débloquer l'analyse INCI réelle sur tous tes flacons, abonne-toi ci-dessous ou clique sur le bouton secret "Activer Root'in Premium 🔑" en bas de page !
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                {/* 🚨 SOS BOOSTER PREVIEW */}
+                {activePreview === 'sos' && (
+                  <View>
+                    <Text style={styles.previewTitle}>🚨 Prévisualisation : SOS Booster 14 Jours</Text>
+                    <Text style={[styles.previewDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                      Un protocole d'urgence intensif planifié automatiquement dans votre calendrier en cas de casse importante ou d'assèchement extrême.
+                    </Text>
+
+                    {/* Protocol Steps Preview */}
+                    <View style={styles.protocolPreviewBox}>
+                      <Text style={styles.protocolStepText}>🔬 Jour 1 : Clarification Détox Bentonite</Text>
+                      <Text style={styles.protocolStepText}>🍯 Jour 3 : Masque Hydratation Profonde & Miel</Text>
+                      <Text style={styles.protocolStepText}>🌿 Jour 7 : Bain aux Huiles Chaudes Coco/Karité</Text>
+                      <Text style={styles.protocolStepText}>💪 Jour 10 : Soin Reconstructeur Protéines (Force)</Text>
+                    </View>
+
+                    {sosPlanned ? (
+                      <View style={styles.sosSuccessIndicator}>
+                        <ActivityIndicator size="small" color="#5C8A6B" style={{ marginRight: 8 }} />
+                        <Text style={styles.sosSuccessText}>SOS Booster planifié avec succès ! 🩺🚀</Text>
+                      </View>
+                    ) : isPremium ? (
+                      <TouchableOpacity 
+                        style={[styles.previewButton, { backgroundColor: colors.danger }]}
+                        onPress={handlePlanSosFromPreview}
+                      >
+                        <Text style={[styles.previewButtonText, { color: '#FFFFFF' }]}>🆘 Planifier le Protocole SOS 14J</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={styles.lockedCallout}>
+                        <Text style={styles.lockedCalloutText}>
+                          🔒 Pour pouvoir planifier ce protocole de secours en 1 clic dans ton calendrier, abonne-toi ci-dessous ou clique sur le bouton secret "Activer Root'in Premium 🔑" en bas de page !
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                {/* 📈 HEALTH HISTORY PREVIEW */}
+                {activePreview === 'health' && (
+                  <View>
+                    <Text style={styles.previewTitle}>📈 Prévisualisation : Suivi de Santé Avancé</Text>
+                    <Text style={[styles.previewDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                      Graphique interactif d'analyse de progression. Visualise en temps réel comment ta régularité de soins augmente ta santé capillaire globale.
+                    </Text>
+
+                    {/* Beautiful Neon Chart representation */}
+                    <View style={styles.chartWrapper}>
+                      <View style={styles.chartYAxis}>
+                        <Text style={styles.chartAxisLabel}>100%</Text>
+                        <Text style={styles.chartAxisLabel}>50%</Text>
+                        <Text style={styles.chartAxisLabel}>0%</Text>
+                      </View>
+                      
+                      <View style={styles.chartGrid}>
+                        {chartData.map((data, index) => (
+                          <View key={index} style={styles.chartColumn}>
+                            <View style={[styles.chartBarTrack]}>
+                              <View style={[styles.chartBarFill, { height: `${data.score}%` }]} />
+                            </View>
+                            <Text style={styles.chartAxisXText}>{data.week}</Text>
+                            <Text style={styles.chartBarValueText}>{data.score}%</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+
+                    <Text style={styles.chartAiAdvice}>
+                      🤖 <Text style={{ fontWeight: 'bold' }}>Analyse IA :</Text> Progression de +30 points. Ton cuir chevelu est équilibré, tes fourches ont diminué de 15%. Continue !
+                    </Text>
+
+                    {!isPremium && (
+                      <View style={styles.lockedCallout}>
+                        <Text style={styles.lockedCalloutText}>
+                          🔒 Pour débloquer l'accès à tes graphiques et ton historique complet, abonne-toi ci-dessous ou clique sur le bouton secret "Activer Root'in Premium 🔑" en bas de page !
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                <TouchableOpacity 
+                  style={styles.closePreviewButton}
+                  onPress={() => setActivePreview(null)}
+                >
+                  <Text style={styles.closePreviewButtonText}>✕ Fermer cette prévisualisation</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Pricing Section */}
             <View style={styles.pricingSection}>
@@ -122,35 +297,43 @@ export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visibl
             </View>
 
             {/* Simulated Buy Button */}
-            <TouchableOpacity 
-              style={styles.subscribeButton} 
-              activeOpacity={0.9}
-              onPress={handleSimulatePurchase}
-            >
-              <Text style={styles.subscribeButtonText}>Commencer mon essai de 7 jours 🚀</Text>
-            </TouchableOpacity>
-
-            {/* Developer Secret Bypass Section */}
-            <View style={[
-              styles.devSection,
-              isDark ? styles.devSectionDark : styles.devSectionLight
-            ]}>
-              <Text style={styles.devTitle}>🛠️ Espace de Test Collaborateurs</Text>
-              <Text style={styles.devDesc}>
-                Simule instantanément un achat premium pour débloquer Firestore local et Vercel en 1 clic.
-              </Text>
+            {!isPremium ? (
               <TouchableOpacity 
-                style={styles.devButton} 
-                activeOpacity={0.8}
+                style={styles.subscribeButton} 
+                activeOpacity={0.9}
                 onPress={handleSimulatePurchase}
               >
-                <Text style={styles.devButtonText}>🔑 Activer Root'in Premium</Text>
+                <Text style={styles.subscribeButtonText}>Commencer mon essai de 7 jours 🚀</Text>
               </TouchableOpacity>
-            </View>
+            ) : (
+              <View style={styles.premiumActiveFooter}>
+                <Text style={styles.premiumActiveFooterText}>🎉 Tu es déjà membre Premium Root'in !</Text>
+              </View>
+            )}
+
+            {/* Developer Secret Bypass Section */}
+            {!isPremium && (
+              <View style={[
+                styles.devSection,
+                isDark ? styles.devSectionDark : styles.devSectionLight
+              ]}>
+                <Text style={styles.devTitle}>🛠️ Espace de Test Collaborateurs</Text>
+                <Text style={styles.devDesc}>
+                  Simule instantanément un achat premium pour débloquer Firestore local et Vercel en 1 clic.
+                </Text>
+                <TouchableOpacity 
+                  style={styles.devButton} 
+                  activeOpacity={0.8}
+                  onPress={handleSimulatePurchase}
+                >
+                  <Text style={styles.devButtonText}>🔑 Activer Root'in Premium</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             <TouchableOpacity style={styles.cancelButton} onPress={onClose} activeOpacity={0.7}>
               <Text style={[styles.cancelButtonText, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                Plus tard
+                Retour à l'application
               </Text>
             </TouchableOpacity>
           </ScrollView>
@@ -170,7 +353,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: borderRadius.lg,
     borderTopRightRadius: borderRadius.lg,
     paddingTop: spacing.md,
-    maxHeight: '92%',
+    height: '94%',
     shadowOffset: { width: 0, height: -10 },
     shadowOpacity: 0.35,
     shadowRadius: 15,
@@ -202,7 +385,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   badge: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: 'bold',
     color: colors.accent,
     backgroundColor: 'rgba(230, 198, 135, 0.15)',
@@ -210,19 +393,35 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.sm,
     overflow: 'hidden',
-    marginBottom: spacing.xs,
+  },
+  premiumActiveBadge: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    backgroundColor: colors.secondary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    overflow: 'hidden',
   },
   title: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
     textAlign: 'center',
+    marginTop: spacing.xs,
     marginBottom: spacing.xs,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 12,
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 16,
     paddingHorizontal: spacing.sm,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    marginBottom: spacing.sm,
+    marginTop: spacing.xs,
   },
   scroll: {
     paddingHorizontal: spacing.lg,
@@ -246,6 +445,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7F8FA',
     borderColor: 'rgba(0, 0, 0, 0.03)',
   },
+  benefitCardSelected: {
+    borderColor: colors.primary,
+    borderWidth: 1.5,
+    backgroundColor: 'rgba(229, 169, 130, 0.03)',
+  },
   benefitIcon: {
     fontSize: 24,
     marginRight: spacing.md,
@@ -254,16 +458,205 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   benefitTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     marginBottom: 2,
   },
   benefitDesc: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 11,
+    lineHeight: 15,
   },
+  // INTERACTIVE PREVIEWS styles
+  previewContainer: {
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    marginTop: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  previewContainerDark: {
+    backgroundColor: 'rgba(255, 255, 255, 0.01)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  previewContainerLight: {
+    backgroundColor: 'rgba(0, 0, 0, 0.01)',
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+  },
+  previewTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: colors.primary,
+    marginBottom: 4,
+  },
+  previewDesc: {
+    fontSize: 11,
+    lineHeight: 15,
+    marginBottom: spacing.md,
+  },
+  simulatedViewfinder: {
+    backgroundColor: '#000000',
+    height: 120,
+    borderRadius: borderRadius.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    marginBottom: spacing.md,
+  },
+  viewfinderLaser: {
+    position: 'absolute',
+    left: '5%',
+    width: '90%',
+    height: 2,
+    backgroundColor: '#76A08A',
+    top: 60,
+  },
+  viewfinderText: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 11,
+    zIndex: 2,
+  },
+  viewfinderBadge: {
+    color: '#76A08A',
+    fontWeight: 'bold',
+    fontSize: 12,
+    marginTop: spacing.xs,
+    zIndex: 2,
+  },
+  protocolPreviewBox: {
+    backgroundColor: 'rgba(118, 160, 138, 0.05)',
+    borderRadius: borderRadius.sm,
+    padding: spacing.md,
+    borderColor: 'rgba(118, 160, 138, 0.15)',
+    borderWidth: 1,
+    marginBottom: spacing.md,
+    gap: 6,
+  },
+  protocolStepText: {
+    fontSize: 12,
+    color: colors.secondary,
+    fontWeight: '600',
+  },
+  sosSuccessIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.md,
+    backgroundColor: 'rgba(92, 138, 107, 0.1)',
+    borderRadius: borderRadius.sm,
+    borderColor: '#5C8A6B',
+    borderWidth: 1,
+  },
+  sosSuccessText: {
+    color: '#5C8A6B',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  previewButton: {
+    backgroundColor: colors.primary,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    alignItems: 'center',
+  },
+  previewButtonText: {
+    color: '#0B0D17',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  lockedCallout: {
+    backgroundColor: 'rgba(230, 198, 135, 0.08)',
+    borderColor: 'rgba(230, 198, 135, 0.2)',
+    borderWidth: 1,
+    borderRadius: borderRadius.sm,
+    padding: spacing.sm,
+  },
+  lockedCalloutText: {
+    color: colors.accent,
+    fontSize: 11,
+    lineHeight: 15,
+    textAlign: 'center',
+  },
+  // ADVANCED HEALTH CHART styles
+  chartWrapper: {
+    flexDirection: 'row',
+    height: 120,
+    alignItems: 'flex-end',
+    paddingBottom: spacing.sm,
+    paddingTop: spacing.xs,
+    marginBottom: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  chartYAxis: {
+    width: 32,
+    justifyContent: 'space-between',
+    height: '100%',
+    paddingBottom: 22,
+  },
+  chartAxisLabel: {
+    color: colors.textMuted,
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+  chartGrid: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: '100%',
+  },
+  chartColumn: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  chartBarTrack: {
+    height: 70,
+    width: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 7,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  chartBarFill: {
+    width: '100%',
+    backgroundColor: colors.secondary,
+    borderRadius: 7,
+  },
+  chartAxisXText: {
+    color: colors.textMuted,
+    fontSize: 8,
+    marginTop: spacing.xs,
+    fontWeight: 'bold',
+  },
+  chartBarValueText: {
+    fontSize: 8,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  chartAiAdvice: {
+    fontSize: 11,
+    color: '#76A08A',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    lineHeight: 14,
+  },
+  closePreviewButton: {
+    alignSelf: 'center',
+    paddingVertical: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  closePreviewButtonText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  // PRICING CARDS styles
   pricingSection: {
-    marginTop: spacing.md,
+    marginTop: spacing.lg,
     gap: spacing.sm,
   },
   planCard: {
@@ -305,11 +698,11 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   planTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
   },
   planPrice: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
   },
   planPeriod: {
@@ -331,6 +724,20 @@ const styles = StyleSheet.create({
     color: '#0B0D17',
     fontSize: 15,
     fontWeight: 'bold',
+  },
+  premiumActiveFooter: {
+    backgroundColor: 'rgba(118, 160, 138, 0.15)',
+    borderWidth: 1,
+    borderColor: colors.secondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  premiumActiveFooterText: {
+    color: colors.secondary,
+    fontWeight: 'bold',
+    fontSize: 14,
   },
   devSection: {
     marginTop: spacing.lg,
@@ -380,7 +787,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   highlightText: {

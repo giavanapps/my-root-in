@@ -1579,6 +1579,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
       <PremiumPaywallModal
         visible={showPaywall}
         onClose={() => setShowPaywall(false)}
+        onOpenScanner={() => setShowScanner(true)}
       />
 
       {/* 🔍 Product Scanner Modal Overlay */}
