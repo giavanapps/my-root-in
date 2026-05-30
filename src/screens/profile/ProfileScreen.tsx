@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, TextInput, Switch, Modal, Alert, Dimensions, SafeAreaView, Platform, Linking } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, TextInput, Switch, Modal, Alert, Dimensions, SafeAreaView, Platform, Linking, Image } from 'react-native';
 import { colors, borderRadius } from '../../theme/colors';
 import { useAppState, Profile } from '../../store/AppStateContext';
 import { NotificationService } from '../../store/NotificationService';
 import { Button } from '../../components/common/Button';
-import { avatarList } from '../onboarding/DiagnosticScreen';
+import { avatarList, avatarImageMap } from '../onboarding/DiagnosticScreen';
 import { TimePickerModal } from '../../components/common/TimePickerModal';
 
 const { width } = Dimensions.get('window');
@@ -186,7 +186,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
                   setNotifTone(p.notifications?.tone ?? 'Motivant');
                 }}
               >
-                <Text style={styles.profileAvatarEmoji}>{p.avatar}</Text>
+                {avatarImageMap[p.avatar] ? (
+                  <Image
+                    source={avatarImageMap[p.avatar]}
+                    style={styles.profileAvatarEmoji}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <Text style={styles.profileAvatarEmoji}>{p.avatar}</Text>
+                )}
                 <Text style={[styles.profileAvatarName, isActive && styles.profileAvatarNameActive]} numberOfLines={1}>
                   {p.name.split(' ')[0]}
                 </Text>
@@ -201,7 +209,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
         {/* 🌿 ACTIVE HAIR PROFILE CARD (Fiche d'identité capillaire) */}
         <View style={[styles.identityCard, { backgroundColor: customCard, borderColor: customBorder }]}>
           <View style={styles.identityHeader}>
-            <Text style={styles.identityEmoji}>{activeProfile.avatar}</Text>
+            {avatarImageMap[activeProfile.avatar] ? (
+              <Image
+                source={avatarImageMap[activeProfile.avatar]}
+                style={{ width: 70, height: 70, borderRadius: 35, marginRight: 16 }}
+                resizeMode="contain"
+              />
+            ) : (
+              <Text style={styles.identityEmoji}>{activeProfile.avatar}</Text>
+            )}
             <View>
               <Text style={[styles.identityName, { color: customText }]}>{activeProfile.name}</Text>
               <Text style={styles.identitySub}>Identité capillaire active</Text>
@@ -256,7 +272,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
                           setShowAvatarPicker(true);
                         }}
                       >
-                        <Text style={styles.profileManageAvatarEmoji}>{p.avatar}</Text>
+                        {avatarImageMap[p.avatar] ? (
+                          <Image
+                            source={avatarImageMap[p.avatar]}
+                            style={{ width: 44, height: 44, borderRadius: 22 }}
+                            resizeMode="contain"
+                          />
+                        ) : (
+                          <Text style={styles.profileManageAvatarEmoji}>{p.avatar}</Text>
+                        )}
                         <Text style={styles.changeAvatarSmallText}>🎭 Modifier</Text>
                       </TouchableOpacity>
 
@@ -513,11 +537,22 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
               <View style={styles.avatarGrid}>
                 {avatarList.map(item => (
                   <TouchableOpacity
-                    key={item.char}
+                    key={item.id}
                     style={styles.avatarGridItem}
-                    onPress={() => handleSelectAvatar(item.char)}
+                    onPress={() => handleSelectAvatar(item.id)}
                   >
-                    <Text style={styles.gridEmoji}>{item.char}</Text>
+                    {avatarImageMap[item.id] ? (
+                      <Image
+                        source={avatarImageMap[item.id]}
+                        style={{ width: 48, height: 48, borderRadius: 24, marginBottom: 4 }}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <Text style={styles.gridEmoji}>👤</Text>
+                    )}
+                    <Text style={styles.gridLabel} numberOfLines={1}>
+                      {item.label}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>

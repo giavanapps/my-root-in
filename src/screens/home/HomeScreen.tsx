@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Modal, SafeAreaView, ActivityIndicator, Platform, Image } from 'react-native';
 import { colors, borderRadius } from '../../theme/colors';
 import { useAppState } from '../../store/AppStateContext';
+import { avatarImageMap } from '../onboarding/DiagnosticScreen';
 import { DynamicHeader } from '../../components/home/DynamicHeader';
 import { CircularGauge } from '../../components/common/CircularGauge';
 import { QuickAction } from '../../components/home/QuickAction';
@@ -626,13 +627,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                     setShowHealthDetail(false);
                   }}
                 >
-                  <Text style={[
-                    styles.profileAvatarEmoji, 
-                    { backgroundColor: customCard },
-                    isActive && { borderColor: colors.primary }
-                  ]}>
-                    {p.avatar}
-                  </Text>
+                  {avatarImageMap[p.avatar] ? (
+                    <Image
+                      source={avatarImageMap[p.avatar]}
+                      style={[
+                        styles.profileAvatarEmoji,
+                        { backgroundColor: customCard },
+                        isActive && { borderColor: colors.primary }
+                      ]}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <Text style={[
+                      styles.profileAvatarEmoji, 
+                      { backgroundColor: customCard },
+                      isActive && { borderColor: colors.primary }
+                    ]}>
+                      {p.avatar}
+                    </Text>
+                  )}
                   <Text style={[
                     styles.profileAvatarName, 
                     isActive && styles.profileAvatarNameActive,

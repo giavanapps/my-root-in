@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TextInput, ScrollView, TouchableOpacity, SafeAreaView, Dimensions } from 'react-native';
+import { StyleSheet, View, Text, TextInput, ScrollView, TouchableOpacity, SafeAreaView, Dimensions, Image } from 'react-native';
 import { colors } from '../../theme/colors';
 import { Button } from '../../components/common/Button';
 import { HairDiagnostic, useAppState } from '../../store/AppStateContext';
@@ -13,27 +13,34 @@ interface DiagnosticScreenProps {
   isEditing?: boolean;
 }
 
+export const avatarImageMap: { [key: string]: any } = {
+  avatar_1: require('../../../assets/avatars/avatar_1.png'),
+  avatar_2: require('../../../assets/avatars/avatar_2.png'),
+  avatar_3: require('../../../assets/avatars/avatar_3.png'),
+  avatar_4: require('../../../assets/avatars/avatar_4.png'),
+  avatar_5: require('../../../assets/avatars/avatar_5.png'),
+  avatar_6: require('../../../assets/avatars/avatar_6.png'),
+  avatar_7: require('../../../assets/avatars/avatar_7.png'),
+  avatar_8: require('../../../assets/avatars/avatar_8.png'),
+  avatar_9: require('../../../assets/avatars/avatar_9.png'),
+  avatar_10: require('../../../assets/avatars/avatar_10.png'),
+  avatar_11: require('../../../assets/avatars/avatar_11.png'),
+  avatar_12: require('../../../assets/avatars/avatar_12.png'),
+};
+
 export const avatarList = [
-  // Options Afro-texturées & Tresses
-  { char: '👩🏾‍🦱', label: 'Afro Volumineux' },
-  { char: '👱🏾‍♀️', label: 'Tresses & Braids' },
-  { char: '👳🏾‍♀️', label: 'Foulard protecteur' },
-  { char: '🧔🏾‍♂️', label: 'Homme Tresses / Locks' },
-  { char: '🦁', label: 'Lion Locksé (Homme)' },
-  { char: '👨🏾‍🦱', label: 'Afro Court' },
-  { char: '👨🏿‍🦲', label: 'Buzzcut rase' },
-
-  // Options Bouclées / Métissées / Blanches
-  { char: '👩🏽‍🦱', label: 'Boucles Brunes' },
-  { char: '👩🏽‍🦰', label: 'Ondulations rousses' },
-  { char: '👨🏽‍🦱', label: 'Boucles serrées' },
-  { char: '👨🏽', label: 'Court Ondulé' },
-
-  // Options Claires / Blanches
-  { char: '👩🏼‍🦱', label: 'Boucles Blondes' },
-  { char: '👩🏻‍🦱', label: 'Ondulations Claires' },
-  { char: '👩🏿‍🦱', label: 'Femme Tresses Longues' },
-  { char: '👩🏻', label: 'Femme Blanche Lisse Brun' },
+  { id: 'avatar_1', label: 'Afro Doré' },
+  { id: 'avatar_2', label: 'Tresses Perlées' },
+  { id: 'avatar_3', label: 'Locks Sublimes' },
+  { id: 'avatar_4', label: 'Afro Court' },
+  { id: 'avatar_5', label: 'Locks Homme' },
+  { id: 'avatar_6', label: 'Court Ondulé' },
+  { id: 'avatar_7', label: 'Foulard Chic' },
+  { id: 'avatar_8', label: 'Boucles Ambrées' },
+  { id: 'avatar_9', label: 'Tresses Longues' },
+  { id: 'avatar_10', label: 'Double Chignons' },
+  { id: 'avatar_11', label: 'Locks Colorées' },
+  { id: 'avatar_12', label: 'Frangette Crépue' },
 ];
 
 export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, onFinishDiagnostic, isEditing = false }) => {
@@ -52,7 +59,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
 
   const [profileName, setProfileName] = useState(isEditing && activeProfile ? activeProfile.name : (userName || ''));
   const [nameError, setNameError] = useState('');
-  const [selectedAvatar, setSelectedAvatar] = useState(isEditing && activeProfile ? activeProfile.avatar : '👩🏾‍🦱');
+  const [selectedAvatar, setSelectedAvatar] = useState(isEditing && activeProfile ? activeProfile.avatar : 'avatar_1');
 
   const [texture, setTexture] = useState<HairDiagnostic['texture']>(
     isEditing && activeProfile ? activeProfile.diagnostic.texture : 'Crépus'
@@ -82,7 +89,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
     } else {
       setProfileName(userName || '');
       setNameError('');
-      setSelectedAvatar('👩🏾‍🦱');
+      setSelectedAvatar('avatar_1');
     }
   }, [userName, isEditing, activeProfile]);
 
@@ -255,15 +262,26 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
 
             <View style={styles.avatarGrid}>
               {avatarList.map(item => {
-                const isSelected = selectedAvatar === item.char;
+                const isSelected = selectedAvatar === item.id;
                 return (
                   <TouchableOpacity
-                    key={item.char}
+                    key={item.id}
                     style={[styles.avatarItem, isSelected && styles.avatarItemActive]}
-                    onPress={() => setSelectedAvatar(item.char)}
+                    onPress={() => setSelectedAvatar(item.id)}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.avatarEmojiText}>{item.char}</Text>
+                    {avatarImageMap[item.id] ? (
+                      <Image
+                        source={avatarImageMap[item.id]}
+                        style={{ width: 64, height: 64, borderRadius: 32, marginBottom: 6 }}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <Text style={styles.avatarEmojiText}>👤</Text>
+                    )}
+                    <Text style={[styles.avatarLabelText, isSelected && styles.avatarLabelActive]}>
+                      {item.label}
+                    </Text>
                   </TouchableOpacity>
                 );
               })}
@@ -274,7 +292,14 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
         {/* Step 3: Texture */}
         {step === 3 && (
           <View style={styles.stepCard}>
-            <Text style={styles.welcomeText}>Profil : {profileName} {selectedAvatar}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <Text style={styles.welcomeText}>Profil : {profileName} </Text>
+              {avatarImageMap[selectedAvatar] ? (
+                <Image source={avatarImageMap[selectedAvatar]} style={{ width: 22, height: 22, borderRadius: 11 }} resizeMode="contain" />
+              ) : (
+                <Text style={styles.welcomeText}>{selectedAvatar}</Text>
+              )}
+            </View>
             <Text style={styles.title}>Quelle est la forme ou texture principale de vos cheveux ?</Text>
             <Text style={styles.subtitle}>Sélectionnez l'option qui correspond le mieux à votre nature de cheveux.</Text>
             
