@@ -184,6 +184,76 @@ const mockArticles: Article[] = [
     bgEmoji: '🌀',
     snippet: 'Enroulez chaque mèche autour de votre index pour sculpter des anglaises régulières qui durent des jours.',
     content: 'Les "finger coils" (boucles au doigt) permettent de sculpter des boucles spirales ultra-définies et régulières. Sur cheveux propres et bien hydratés, séparez votre chevelure en petites sections. Appliquez une noisette de gelée ou de crème coiffante sur une mèche d\'un centimètre de large. Saisissez la mèche à la racine et enroulez-la fermement autour de votre index jusqu\'aux pointes. Relâchez délicatement. Laissez sécher à l\'air libre ou au diffuseur sans y toucher. Vos spirales tiendront jusqu\'à une semaine complète !'
+  },
+  {
+    id: 'a18',
+    title: 'La méthode du Pre-Poo protecteur 🛡️',
+    category: 'Soins',
+    readTime: '4 min read',
+    tags: ['Crépus', 'Frisés', 'Bouclés', 'Casse'],
+    bgEmoji: '🛡️',
+    snippet: 'Protégez vos longueurs du dessèchement en appliquant un bain d\'huile ou un masque tiède avant votre shampoing.',
+    content: 'Le "Pre-Poo" (soin avant-shampoing) est une étape cruciale pour les cheveux crépus et très secs. Le shampoing, même doux, retire une partie des huiles naturelles du cheveu lors du lavage. En appliquant un mélange d\'huiles fluides (comme l\'olive ou l\'amande douce) ou un masque hydratant sur cheveux humides 30 minutes avant votre shampoing, vous créez un bouclier protecteur. Vos cuticules sont préservées, et vos longueurs restent douces et hydratées après le rinçage !'
+  },
+  {
+    id: 'a19',
+    title: 'Le séchage au Stretching tiède 📏',
+    category: 'Soins',
+    readTime: '4 min read',
+    tags: ['Crépus', 'Frisés', 'Épais', 'Casse'],
+    bgEmoji: '📏',
+    snippet: 'Étirez vos longueurs en douceur avec de l\'air tiède et vos doigts pour limiter les nœuds et la casse sans fer.',
+    content: 'Les cheveux crépus ont tendance à s\'emmêler énormément en séchant en raison de leur forme spirale serrée. Pour éviter la formation de "nœuds de fée" et réduire le shrinkage sans agresser la fibre, utilisez la méthode du stretching à l\'air tiède. Séparez vos cheveux humides en 4 sections, appliquez votre leave-in, étirez délicatement une mèche vers le bas et passez le sèche-cheveux muni d\'un embout concentrateur sur température tiède (vitesse minimale). Vos cheveux seront étirés, souples et faciles à coiffer !'
+  },
+  {
+    id: 'a20',
+    title: 'La méthode d\'hydratation L.O.B. 🧈',
+    category: 'Soins',
+    readTime: '5 min read',
+    tags: ['Crépus', 'Épais', 'Forte'],
+    bgEmoji: '🧈',
+    snippet: 'Liquid, Oil, Butter : la superposition idéale pour sceller l\'hydratation des cheveux crépus très denses.',
+    content: 'Pour les textures de type 4C ou les cheveux de porosité forte très denses, la méthode classique L.O.C. peut être insuffisante. La méthode L.O.B. (Liquid, Oil, Butter) est la solution ultime. Étape 1 : Liquid (L) - Vaporisez de l\'eau ou une brume hydratante. Étape 2 : Oil (O) - Appliquez une fine couche d\'huile végétale (comme l\'avocat ou l\'argan). Étape 3 : Butter (B) - Scellez le tout avec un beurre végétal dense (comme le beurre de karité ou de mangue) pour emprisonner l\'hydratation et adoucir la fibre en profondeur.'
+  },
+  {
+    id: 'a21',
+    title: 'Le shampoing doux hebdomadaire 🧴',
+    category: 'Soins',
+    readTime: '3 min read',
+    tags: ['Crépus', 'Frisés', 'Bouclés', 'Ondulés', 'Raides'],
+    bgEmoji: '🧴',
+    snippet: 'Nettoyez en profondeur sans décaper grâce à une formule douce enrichie en glycérine végétale ou en miel.',
+    content: 'Les cheveux crépus nécessitent des shampoings doux qui éliminent le sébum et les résidus de beurres coiffants sans décaper la cuticule. Privilégiez des formules enrichies en glycérine végétale ou en miel, qui nettoient tout en maintenant l\'hydratation de la fibre. Lavez toujours en insistant sur le cuir chevelu en mouvements circulaires et laissez couler la mousse sur les longueurs sans frotter les pointes entre elles pour éviter la casse.'
+  },
+  {
+    id: 'a22',
+    title: 'Le Beurre de Karité brut protecteur 🧈',
+    category: 'Ingrédients',
+    readTime: '4 min read',
+    tags: ['Crépus', 'Frisés', 'Épais', 'Forte'],
+    bgEmoji: '🧈',
+    snippet: 'Riche en vitamines, le beurre de karité nourrit intensément, assouplit la fibre et protège des agressions.',
+    content: 'Le beurre de karité brut non raffiné est l\'allié historique des cheveux crépus et frisés. Composé d\'acides gras essentiels, il forme un film protecteur imperméable autour du cheveu, retenant l\'hydratation pendant plusieurs jours. Il est également idéal pour nourrir les pointes sèches et prévenir les fourches. Faites fondre une noisette de beurre de karité dans le creux de vos mains avant de l\'appliquer sur vos longueurs pour sceller votre lait capillaire.'
+  },
+  {
+    id: 'a23',
+    title: 'Démêler les nœuds de fée sans couper 🧚‍♀️',
+    category: 'Problèmes fréquents',
+    readTime: '4 min read',
+    tags: ['Crépus', 'Frisés', 'Fins', 'Casse'],
+    bgEmoji: '🧚‍♀️',
+    snippet: 'Ces micro-nœuds qui se forment sur une seule mèche peuvent être évités grâce à des coiffures protectrices.',
+    content: 'Les "nœuds de fée" (micro-nœuds individuels) sont très fréquents sur les cheveux crépus et fins. Ils se forment lorsque le cheveu s\'enroule sur lui-même en séchant. Pour les éviter, veillez à ne jamais laisser vos cheveux sécher à l\'air libre sans être étirés (faites des tresses ou des nattes). Si un nœud est déjà formé, appliquez une goutte d\'huile glissante (comme le brocoli ou le jojoba) et essayez de faire glisser délicatement le nœud avec une épingle à cheveux plutôt que de couper immédiatement !'
+  },
+  {
+    id: 'a24',
+    title: 'La méthode des Bantu Knots 🌀',
+    category: 'Tutos gestuels',
+    readTime: '4 min read',
+    tags: ['Crépus', 'Frisés', 'Bouclés', 'Épais', 'Moyens'],
+    bgEmoji: '🌀',
+    snippet: 'Enroulez vos mèches sur elles-mêmes en petits nœuds pour obtenir des ondulations rebondies sans chaleur.',
+    content: 'Les Bantu Knots sont une coiffure protectrice ancestrale qui permet de créer des boucles serrées et rebondies sans chaleur. Sur cheveux humides et nourris avec une crème coiffante, séparez votre chevelure en sections carrées. Enroulez une section sur elle-même de la racine aux pointes, puis torsadez-la autour de sa base pour former un petit chignon serré. Fixez avec un élastique ou une pince. Laissez sécher complètement (de préférence toute la nuit sous un bonnet en satin) puis déroulez délicatement avec un peu d\'huile sur vos doigts.'
   }
 ];
 
