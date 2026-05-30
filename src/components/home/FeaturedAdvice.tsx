@@ -208,8 +208,11 @@ export const FeaturedAdvice: React.FC<FeaturedAdviceProps> = ({ onSeeAllPress, o
   const isPorosityNull = diag.porosity === null;
 
   // Filter mock articles:
-  // If porosity is null, we exclude highly specialized porosity articles and offer a simplified safety filter article.
+  // We strictly require that the article contains the user's hair texture tag to be shown
   const baseFiltered = mockArticles.filter(art => {
+    if (!art.tags.includes(diag.texture)) {
+      return false;
+    }
     if (isPorosityNull) {
       return !art.tags.includes('Faible') && !art.tags.includes('Forte') && !art.tags.includes('Moyenne');
     }
@@ -223,7 +226,7 @@ export const FeaturedAdvice: React.FC<FeaturedAdviceProps> = ({ onSeeAllPress, o
       title: '🚨 Routine de sécurité : Sans sulfates ni silicones',
       category: 'Ingrédients' as const,
       readTime: '3 min read',
-      tags: ['Ingrédients', 'Sans Sulfate', 'Soin Sain'],
+      tags: [diag.texture, 'Ingrédients', 'Sans Sulfate', 'Soin Sain'],
       snippet: 'Porosité non définie. Par sécurité, nous filtrons uniquement les sulfates asséchants et les silicones insolubles pour préserver votre fibre capillaire.',
       bgEmoji: '🛡️',
       content: 'Votre porosité n\'étant pas définie, notre algorithme applique un principe de précaution strict : exclusion des sulfates de lavage agressifs (qui assèchent dramatiquement le cortex) et rejet des silicones insolubles (qui étouffent le cheveu). Nous vous recommandons vivement de faire le test de porosité via le bandeau orange en haut de l\'écran pour affiner votre profil !',
@@ -232,12 +235,23 @@ export const FeaturedAdvice: React.FC<FeaturedAdviceProps> = ({ onSeeAllPress, o
 
   const activeTags = [diag.texture, diag.porosity, diag.activeStyle, ...diag.sensitivity];
   
+  // Safe articles fallback: If strict filtering leaves us with nothing, use mockArticles excluding locks for non-locks users (and vice versa)
+  let finalArticles = availableArticles;
+  if (finalArticles.length === 0) {
+    finalArticles = mockArticles.filter(art => {
+      if (diag.texture !== 'Locksés') {
+        return !art.tags.includes('Locksés');
+      }
+      return art.tags.includes('Locksés');
+    });
+  }
+
   // Find article with the highest tag match count, fallback to first
-  const matchedArticle = availableArticles.reduce((best, current) => {
+  const matchedArticle = finalArticles.reduce((best, current) => {
     const currentMatches = current.tags.filter(tag => activeTags.includes(tag as any)).length;
     const bestMatches = best.tags.filter(tag => activeTags.includes(tag as any)).length;
     return currentMatches > bestMatches ? current : best;
-  }, availableArticles[0]);
+  }, finalArticles[0]);
 
   return (
     <View style={styles.container}>

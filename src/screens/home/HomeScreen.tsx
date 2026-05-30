@@ -1359,7 +1359,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
             ) : (
               <ScrollView contentContainerStyle={styles.articlesListContainer} showsVerticalScrollIndicator={false}>
                 {(() => {
-                  const filtered = libraryArticles.filter(art => art.category === activeAdviceTab);
+                  const filtered = libraryArticles.filter(art => 
+                    art.category === activeAdviceTab && 
+                    art.tags.includes(activeProfile.diagnostic.texture)
+                  );
                   if (filtered.length === 0) {
                     return (
                       <View style={styles.emptyArticlesBox}>
