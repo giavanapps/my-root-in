@@ -1087,6 +1087,60 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
               </View>
             </View>
 
+            {/* 📈 Advanced Health Analytics Chart (Premium Feature preview / active) */}
+            <TouchableOpacity
+              activeOpacity={isPremium ? 1 : 0.8}
+              style={{
+                borderWidth: 1,
+                borderColor: isPremium ? customBorder : 'rgba(230, 198, 135, 0.25)',
+                backgroundColor: isPremium ? (isLight ? '#FAFBFC' : 'rgba(255,255,255,0.01)') : 'rgba(230, 198, 135, 0.04)',
+                borderRadius: 16,
+                padding: 14,
+                marginBottom: 16,
+              }}
+              onPress={() => {
+                if (!isPremium) {
+                  setShowHealthDetail(false);
+                  setShowPaywall(true);
+                }
+              }}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Text style={{ fontSize: 13, fontWeight: 'bold', color: isPremium ? colors.primary : colors.accent }}>
+                  {isPremium ? '📈 Historique de Régularité & Progrès' : '🔒 Graphique d\'Historique Pro (Premium)'}
+                </Text>
+                {!isPremium && (
+                  <Text style={{ fontSize: 8, fontWeight: 'bold', color: colors.accent, backgroundColor: 'rgba(230, 198, 135, 0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                    DÉBLOQUER
+                  </Text>
+                )}
+              </View>
+
+              {/* Simulated Neon Chart */}
+              <View style={{ flexDirection: 'row', height: 75, alignItems: 'flex-end', paddingBottom: 4, paddingTop: 4 }}>
+                <View style={{ width: 24, justifyContent: 'space-between', height: '100%', paddingBottom: 14 }}>
+                  <Text style={{ color: colors.textMuted, fontSize: 7, fontWeight: 'bold' }}>100</Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 7, fontWeight: 'bold' }}>50</Text>
+                </View>
+                <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: '100%' }}>
+                  {[
+                    { w: 'S1', s: 58 },
+                    { w: 'S3', s: 64 },
+                    { w: 'S5', s: 70 },
+                    { w: 'S7', s: 76 },
+                    { w: 'S9', s: activeProfile.healthScore },
+                  ].map((d, index) => (
+                    <View key={index} style={{ alignItems: 'center', flex: 1 }}>
+                      <View style={{ height: 45, width: 8, backgroundColor: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)', borderRadius: 4, justifyContent: 'flex-end', overflow: 'hidden' }}>
+                        <View style={{ height: `${d.s}%`, width: '100%', backgroundColor: colors.secondary, borderRadius: 4 }} />
+                      </View>
+                      <Text style={{ color: colors.textMuted, fontSize: 7, marginTop: 2, fontWeight: 'bold' }}>{d.w}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </TouchableOpacity>
+
             {/* Success SOS alert feedback */}
             {sosSuccessMessage ? (
               <View style={styles.sosAlertBox}>
@@ -1094,26 +1148,68 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
               </View>
             ) : null}
 
-            {/* Conditional SOS Booster button if score < 40% */}
-            {activeProfile.healthScore < 40 ? (
+            {/* SOS Booster Section (Premium & Non-Premium states) */}
+            {isPremium ? (
               <View style={styles.sosSection}>
-                <View style={styles.sosWarningBox}>
-                  <Text style={styles.sosWarningText}>
-                    ⚠️ Note inférieure à 40% ! Vos cheveux ont besoin d'aide immédiate.
-                  </Text>
-                </View>
+                {activeProfile.healthScore < 40 && (
+                  <View style={styles.sosWarningBox}>
+                    <Text style={styles.sosWarningText}>
+                      ⚠️ Note inférieure à 40% ! Vos cheveux ont besoin d'aide immédiate.
+                    </Text>
+                  </View>
+                )}
                 <Button
-                  title="🆘 Activer le SOS Booster 14J"
+                  title="🆘 Déclencher le SOS Booster 14J"
                   onPress={handleSosPress}
-                  variant="danger"
+                  variant={activeProfile.healthScore < 40 ? "danger" : "primary"}
                   style={styles.sosButton}
                 />
               </View>
             ) : (
-              <View style={[styles.sosHealthyBox, { backgroundColor: isLight ? 'rgba(92, 138, 107, 0.05)' : 'rgba(92, 138, 107, 0.06)', borderColor: isLight ? 'rgba(92, 138, 107, 0.15)' : 'rgba(92, 138, 107, 0.15)' }]}>
-                <Text style={[styles.sosHealthyText, { color: customTextSec }]}>
-                  ✨ Vos cheveux sont dans la zone de sécurité. Continuez votre routine pour maintenir cet équilibre !
-                </Text>
+              <View style={styles.sosSection}>
+                {activeProfile.healthScore < 40 ? (
+                  <View style={styles.sosSection}>
+                    <View style={styles.sosWarningBox}>
+                      <Text style={styles.sosWarningText}>
+                        ⚠️ Note inférieure à 40% ! Vos cheveux ont besoin d'aide immédiate.
+                      </Text>
+                    </View>
+                    <Button
+                      title="🔒 Débloquer SOS Booster 14J (Premium)"
+                      onPress={() => {
+                        setShowHealthDetail(false);
+                        setShowPaywall(true);
+                      }}
+                      variant="danger"
+                      style={styles.sosButton}
+                    />
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: 'rgba(230, 198, 135, 0.04)',
+                      borderColor: 'rgba(230, 198, 135, 0.25)',
+                      borderWidth: 1,
+                      borderRadius: 14,
+                      padding: 12,
+                      alignItems: 'center',
+                      marginBottom: 16,
+                      width: '100%'
+                    }}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      setShowHealthDetail(false);
+                      setShowPaywall(true);
+                    }}
+                  >
+                    <Text style={{ color: colors.accent, fontWeight: '800', fontSize: 12 }}>
+                      🔒 Activer le SOS Booster 14J (Premium)
+                    </Text>
+                    <Text style={{ color: customTextSec, fontSize: 10, marginTop: 2, textAlign: 'center' }}>
+                      Planifie à tout moment des protocoles intensifs de secours capillaire.
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
