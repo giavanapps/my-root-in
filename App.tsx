@@ -1,20 +1,224 @@
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { colors } from './src/theme/colors';
+import { AppStateProvider, useAppState } from './src/store/AppStateContext';
+import { AuthScreen } from './src/screens/onboarding/AuthScreen';
+import { DiagnosticScreen } from './src/screens/onboarding/DiagnosticScreen';
+import { HomeScreen } from './src/screens/home/HomeScreen';
+import { ProfileScreen } from './src/screens/profile/ProfileScreen';
+import { CalendarScreen } from './src/screens/calendar/CalendarScreen';
+
+type ActiveScreen = 'auth' | 'diagnostic' | 'home';
+type ActiveTab = 'dashboard' | 'calendar' | 'profile';
+
+function MainApp() {
+  const [currentScreen, setCurrentScreen] = useState<ActiveScreen>('auth');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [tempUserName, setTempUserName] = useState('');
+  const [isEditingDiagnostic, setIsEditingDiagnostic] = useState(false);
+  const [autoOpenCalendarModal, setAutoOpenCalendarModal] = useState(false);
+
+  const { themeMode, activeProfile } = useAppState();
+
+  // Automatically skip to home screen if a profile was loaded from Firestore on login
+  useEffect(() => {
+    if (activeProfile && currentScreen === 'auth') {
+      setCurrentScreen('home');
+      setActiveTab('dashboard');
+    }
+  }, [activeProfile, currentScreen]);
+
+  const navigateToDiagnostic = (userName: string) => {
+    setTempUserName(userName);
+    setIsEditingDiagnostic(false);
+    setCurrentScreen('diagnostic');
+  };
+
+  const finishDiagnostic = () => {
+    setCurrentScreen('home');
+    setActiveTab('dashboard'); // reset to dashboard on complete
+  };
+
+  const logout = () => {
+    setCurrentScreen('auth');
+  };
+
+  const isLight = themeMode === 'light';
+  const appBackground = isLight ? '#F5F6FA' : colors.background;
+  const barBackground = isLight ? '#FFFFFF' : colors.card;
+  const barBorder = isLight ? 'rgba(0, 0, 0, 0.08)' : colors.cardBorder;
+  const activeTextColor = colors.primary;
+  const inactiveTextColor = isLight ? '#888D9F' : colors.textSecondary;
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: appBackground }]}>
+      <StatusBar 
+        style={isLight ? 'dark' : 'light'} 
+      />
+      
+      <View style={styles.screenWrapper}>
+        {currentScreen === 'auth' && (
+          <AuthScreen onNavigateToDiagnostic={navigateToDiagnostic} />
+        )}
+        
+        {currentScreen === 'diagnostic' && (
+          <DiagnosticScreen 
+            userName={tempUserName} 
+            isEditing={isEditingDiagnostic}
+            onFinishDiagnostic={finishDiagnostic} 
+          />
+        )}
+        
+        {currentScreen === 'home' && (
+          <View style={styles.homeTabWrapper}>
+            {/* Active Tab View */}
+            <View style={styles.tabContentWrapper}>
+              {activeTab === 'dashboard' && (
+                <HomeScreen 
+                  onAddProfilePress={() => {
+                    setTempUserName('');
+                    setIsEditingDiagnostic(false);
+                    setCurrentScreen('diagnostic');
+                  }}
+                  onLogoutPress={logout}
+                  onNavigateToCalendar={() => {
+                    setAutoOpenCalendarModal(true);
+                    setActiveTab('calendar');
+                  }}
+                />
+              )}
+              {activeTab === 'calendar' && (
+                <CalendarScreen 
+                  autoOpenAddModal={autoOpenCalendarModal}
+                  onCloseAutoOpen={() => setAutoOpenCalendarModal(false)}
+                />
+              )}
+              {activeTab === 'profile' && (
+                <ProfileScreen 
+                  onRefireDiagnostic={() => {
+                    setIsEditingDiagnostic(true);
+                    setCurrentScreen('diagnostic');
+                  }}
+                  onLogoutPress={logout}
+                />
+              )}
+            </View>
+
+            {/* Custom Premium Bottom Navigation Bar */}
+            <View style={[
+              styles.bottomTabBar, 
+              { 
+                backgroundColor: barBackground,
+                borderColor: barBorder
+              }
+            ]}>
+              {/* Tab 1: Accueil */}
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                style={styles.tabItem} 
+                onPress={() => setActiveTab('dashboard')}
+              >
+                <Text style={[styles.tabIcon, { opacity: activeTab === 'dashboard' ? 1 : 0.6 }]}>
+                  🏠
+                </Text>
+                <Text style={[
+                  styles.tabLabel, 
+                  { color: activeTab === 'dashboard' ? activeTextColor : inactiveTextColor }
+                ]}>
+                  Accueil
+                </Text>
+              </TouchableOpacity>
+
+              {/* Tab 2: Calendrier */}
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                style={styles.tabItem} 
+                onPress={() => setActiveTab('calendar')}
+              >
+                <Text style={[styles.tabIcon, { opacity: activeTab === 'calendar' ? 1 : 0.6 }]}>
+                  📅
+                </Text>
+                <Text style={[
+                  styles.tabLabel, 
+                  { color: activeTab === 'calendar' ? activeTextColor : inactiveTextColor }
+                ]}>
+                  Calendrier
+                </Text>
+              </TouchableOpacity>
+
+              {/* Tab 3: Mon Profil */}
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                style={styles.tabItem} 
+                onPress={() => setActiveTab('profile')}
+              >
+                <Text style={[styles.tabIcon, { opacity: activeTab === 'profile' ? 1 : 0.6 }]}>
+                  👤
+                </Text>
+                <Text style={[
+                  styles.tabLabel, 
+                  { color: activeTab === 'profile' ? activeTextColor : inactiveTextColor }
+                ]}>
+                  Mon Profil
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </View>
+    </SafeAreaView>
+  );
+}
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <AppStateProvider>
+      <MainApp />
+    </AppStateProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+  },
+  screenWrapper: {
+    flex: 1,
+  },
+  homeTabWrapper: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  tabContentWrapper: {
+    flex: 1,
+  },
+  bottomTabBar: {
+    flexDirection: 'row',
+    height: 70,
+    borderTopWidth: 1,
+    justifyContent: 'space-around',
     alignItems: 'center',
+    paddingBottom: 10,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  tabItem: {
     justifyContent: 'center',
+    alignItems: 'center',
+    flex: 1,
+    height: '100%',
+  },
+  tabIcon: {
+    fontSize: 22,
+    marginBottom: 4,
+  },
+  tabLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });
