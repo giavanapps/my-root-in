@@ -22,25 +22,17 @@ export const avatarImageMap: { [key: string]: any } = {
   avatar_6: require('../../../assets/avatars/avatar_6.png'),
   avatar_7: require('../../../assets/avatars/avatar_7.png'),
   avatar_8: require('../../../assets/avatars/avatar_8.png'),
-  avatar_9: require('../../../assets/avatars/avatar_9.png'),
-  avatar_10: require('../../../assets/avatars/avatar_10.png'),
-  avatar_11: require('../../../assets/avatars/avatar_11.png'),
-  avatar_12: require('../../../assets/avatars/avatar_12.png'),
 };
 
 export const avatarList = [
-  { id: 'avatar_1', label: 'Afro Doré' },
-  { id: 'avatar_2', label: 'Tresses Perlées' },
-  { id: 'avatar_3', label: 'Locks Sublimes' },
-  { id: 'avatar_4', label: 'Afro Court' },
-  { id: 'avatar_5', label: 'Locks Homme' },
-  { id: 'avatar_6', label: 'Court Ondulé' },
-  { id: 'avatar_7', label: 'Foulard Chic' },
-  { id: 'avatar_8', label: 'Boucles Ambrées' },
-  { id: 'avatar_9', label: 'Tresses Longues' },
-  { id: 'avatar_10', label: 'Double Chignons' },
-  { id: 'avatar_11', label: 'Locks Colorées' },
-  { id: 'avatar_12', label: 'Frangette Crépue' },
+  { id: 'avatar_1' },
+  { id: 'avatar_2' },
+  { id: 'avatar_3' },
+  { id: 'avatar_4' },
+  { id: 'avatar_5' },
+  { id: 'avatar_6' },
+  { id: 'avatar_7' },
+  { id: 'avatar_8' },
 ];
 
 export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, onFinishDiagnostic, isEditing = false }) => {
