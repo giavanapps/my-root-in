@@ -90,6 +90,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   const [isSearchingBarcode, setIsSearchingBarcode] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [showScanTip, setShowScanTip] = useState(false);
 
   // Animation laser
   const laserAnim = useRef(new Animated.Value(0)).current;
@@ -137,6 +138,21 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   }, [scanStep, scannerMode, isCameraActive]);
 
   useEffect(() => {
+    let tipTimer: any = null;
+    if (scannerMode === 'barcode' && isCameraActive && visible && scanStep === 'idle') {
+      setShowScanTip(false);
+      tipTimer = setTimeout(() => {
+        setShowScanTip(true);
+      }, 7000); // Conseil affiché après 7 secondes d'attente active
+    } else {
+      setShowScanTip(false);
+    }
+    return () => {
+      if (tipTimer) clearTimeout(tipTimer);
+    };
+  }, [scannerMode, isCameraActive, visible, scanStep]);
+
+  useEffect(() => {
     let active = true;
     let scannerInstance: any = null;
 
@@ -161,7 +177,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
         }
 
         try {
-          const { Html5Qrcode } = require('html5-qrcode');
+          const { Html5Qrcode, Html5QrcodeSupportedFormats } = require('html5-qrcode');
           const html5QrCode = new Html5Qrcode(elementId);
           scannerInstance = html5QrCode;
           html5QrCodeRef.current = html5QrCode;
@@ -169,7 +185,16 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
           const config = {
             fps: 15,
             qrbox: { width: 220, height: 140 },
-            aspectRatio: 1.0
+            aspectRatio: 1.0,
+            formatsToSupport: [
+              Html5QrcodeSupportedFormats.EAN_13,
+              Html5QrcodeSupportedFormats.EAN_8,
+              Html5QrcodeSupportedFormats.UPC_A,
+              Html5QrcodeSupportedFormats.UPC_E
+            ],
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true
+            }
           };
 
           await html5QrCode.start(
@@ -404,6 +429,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     setScannerMode(null);
     setIsCameraActive(true);
     setCameraError(null);
+    setShowScanTip(false);
     setScanStep('idle');
   };
 
@@ -648,6 +674,14 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                           </Animated.View>
                         </View>
                       </View>
+
+                      {showScanTip && (
+                        <View style={styles.scanTipCard}>
+                          <Text style={styles.scanTipText}>
+                            💡 Astuce : Éloigne un peu ton produit (environ 15-20 cm) pour faire la mise au point, et assure-toi que le code-barres est bien éclairé et sans reflet.
+                          </Text>
+                        </View>
+                      )}
 
                       <TouchableOpacity
                         style={[styles.toggleManualButton, isDark ? styles.toggleManualButtonDark : styles.toggleManualButtonLight]}
@@ -1530,5 +1564,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     lineHeight: 16,
+  },
+  scanTipCard: {
+    backgroundColor: 'rgba(229, 169, 130, 0.08)',
+    borderColor: 'rgba(229, 169, 130, 0.15)',
+    borderWidth: 1,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+  },
+  scanTipText: {
+    color: colors.primary,
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: 'center',
+    fontWeight: 'bold',
   },
 });
