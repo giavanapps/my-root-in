@@ -135,9 +135,23 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
     );
   };
 
-  const handleSaveNotifications = () => {
+  const handleSaveNotifications = async () => {
+    if (notifEnabled) {
+      const status = await NotificationService.requestPermissions();
+      if (status !== 'granted') {
+        if (Platform.OS === 'web') {
+          window.alert("Note : Les notifications ne sont pas autorisées sur cet appareil.");
+        } else {
+          Alert.alert("Permission requise", "Les notifications ne sont pas autorisées par votre appareil. Activez-les dans les réglages système pour recevoir les alertes de soins.");
+        }
+      }
+    }
     updateNotificationsSetting(notifEnabled, notifTime, notifTone);
-    Alert.alert('Notifications sauvegardées', 'Vos réglages ont été mis à jour.');
+    if (Platform.OS === 'web') {
+      window.alert('Notifications sauvegardées : Vos réglages ont été mis à jour.');
+    } else {
+      Alert.alert('Notifications sauvegardées', 'Vos réglages ont été mis à jour.');
+    }
   };
 
   const handleSaveAccount = () => {

@@ -9,6 +9,7 @@ interface DatePickerModalProps {
   onClose: () => void;
   onSave: (date: string) => void;
   title?: string;
+  useNativeModal?: boolean;
 }
 
 export const DatePickerModal: React.FC<DatePickerModalProps> = ({
@@ -16,7 +17,8 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
   initialDate,
   onClose,
   onSave,
-  title = "Choisir la date du soin 📅"
+  title = "Choisir la date du soin 📅",
+  useNativeModal = true
 }) => {
   const { themeMode } = useAppState();
   const isLight = themeMode === 'light';
@@ -68,109 +70,132 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
 
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-  return (
-    <Modal
-      visible={visible}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <View style={[styles.overlay, { backgroundColor: customOverlay }]}>
-        <View style={[styles.card, { backgroundColor: customCard, borderColor: customBorder }]}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={[styles.titleText, { color: customText }]}>{title}</Text>
-            <TouchableOpacity onPress={onClose} style={[styles.closeIcon, { backgroundColor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)' }]}>
-              <Text style={{ color: customTextSec, fontWeight: '700' }}>✕</Text>
-            </TouchableOpacity>
-          </View>
+  const modalContent = (
+    <View style={[
+      styles.overlay, 
+      { backgroundColor: customOverlay },
+      !useNativeModal && { 
+        position: 'absolute', 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        bottom: 0, 
+        zIndex: 99999,
+        width: '100%',
+        height: '100%'
+      }
+    ]}>
+      <View style={[styles.card, { backgroundColor: customCard, borderColor: customBorder }]}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={[styles.titleText, { color: customText }]}>{title}</Text>
+          <TouchableOpacity onPress={onClose} style={[styles.closeIcon, { backgroundColor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)' }]}>
+            <Text style={{ color: customTextSec, fontWeight: '700' }}>✕</Text>
+          </TouchableOpacity>
+        </View>
 
-          {/* Quick Year Selection */}
-          <View style={styles.yearRow}>
-            {[2026, 2027].map(year => {
-              const isSelected = selectedYear === year;
-              return (
-                <TouchableOpacity
-                  key={year}
-                  onPress={() => setSelectedYear(year)}
-                  style={[
-                    styles.yearBtn,
-                    { backgroundColor: customBtnBg, borderColor: isSelected ? colors.primary : customBorder },
-                    isSelected && { backgroundColor: 'rgba(229, 169, 130, 0.12)' }
-                  ]}
-                >
-                  <Text style={{ fontSize: 13, color: isSelected ? colors.primary : customText, fontWeight: '800' }}>
-                    {year}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+        {/* Quick Year Selection */}
+        <View style={styles.yearRow}>
+          {[2026, 2027].map(year => {
+            const isSelected = selectedYear === year;
+            return (
+              <TouchableOpacity
+                key={year}
+                onPress={() => setSelectedYear(year)}
+                style={[
+                  styles.yearBtn,
+                  { backgroundColor: customBtnBg, borderColor: isSelected ? colors.primary : customBorder },
+                  isSelected && { backgroundColor: 'rgba(229, 169, 130, 0.12)' }
+                ]}
+              >
+                <Text style={{ fontSize: 13, color: isSelected ? colors.primary : customText, fontWeight: '800' }}>
+                  {year}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
-          {/* Scrollable Months selection */}
-          <Text style={[styles.sectionHeader, { color: customTextSec }]}>Mois :</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.monthsScroll}
-            style={styles.monthsWrapper}
-          >
-            {monthsFrench.map((m, idx) => {
-              const isSelected = selectedMonth === idx;
-              return (
-                <TouchableOpacity
-                  key={m}
-                  onPress={() => setSelectedMonth(idx)}
-                  style={[
-                    styles.monthBtn,
-                    { backgroundColor: customBtnBg, borderColor: isSelected ? colors.primary : 'transparent' },
-                    isSelected && { backgroundColor: 'rgba(229, 169, 130, 0.15)' }
-                  ]}
-                >
-                  <Text style={{ fontSize: 11, color: isSelected ? colors.primary : customTextSec, fontWeight: '700' }}>
-                    {m.substring(0, 4)}.
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+        {/* Scrollable Months selection */}
+        <Text style={[styles.sectionHeader, { color: customTextSec }]}>Mois :</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.monthsScroll}
+          style={styles.monthsWrapper}
+        >
+          {monthsFrench.map((m, idx) => {
+            const isSelected = selectedMonth === idx;
+            return (
+              <TouchableOpacity
+                key={m}
+                onPress={() => setSelectedMonth(idx)}
+                style={[
+                  styles.monthBtn,
+                  { backgroundColor: customBtnBg, borderColor: isSelected ? colors.primary : 'transparent' },
+                  isSelected && { backgroundColor: 'rgba(229, 169, 130, 0.15)' }
+                ]}
+              >
+                <Text style={{ fontSize: 11, color: isSelected ? colors.primary : customTextSec, fontWeight: '700' }}>
+                  {m.substring(0, 4)}.
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
 
-          {/* Grid of Days (1-31) */}
-          <Text style={[styles.sectionHeader, { color: customTextSec, marginTop: 12 }]}>Jour :</Text>
-          <View style={styles.daysGrid}>
-            {daysArray.map(day => {
-              const isSelected = selectedDay === day;
-              return (
-                <TouchableOpacity
-                  key={day}
-                  onPress={() => setSelectedDay(day)}
-                  style={[
-                    styles.dayCell,
-                    { 
-                      backgroundColor: isLight ? '#F9F9FB' : 'rgba(255,255,255,0.02)', 
-                      borderColor: isSelected ? colors.primary : 'transparent' 
-                    },
-                    isSelected && { backgroundColor: 'rgba(229, 169, 130, 0.2)' }
-                  ]}
-                >
-                  <Text style={{ fontSize: 12, color: isSelected ? colors.primary : customText, fontWeight: isSelected ? '900' : '600' }}>
-                    {day}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+        {/* Grid of Days (1-31) */}
+        <Text style={[styles.sectionHeader, { color: customTextSec, marginTop: 12 }]}>Jour :</Text>
+        <View style={styles.daysGrid}>
+          {daysArray.map(day => {
+            const isSelected = selectedDay === day;
+            return (
+              <TouchableOpacity
+                key={day}
+                onPress={() => setSelectedDay(day)}
+                style={[
+                  styles.dayCell,
+                  { 
+                    backgroundColor: isLight ? '#F9F9FB' : 'rgba(255,255,255,0.02)', 
+                    borderColor: isSelected ? colors.primary : 'transparent' 
+                  },
+                  isSelected && { backgroundColor: 'rgba(229, 169, 130, 0.2)' }
+                ]}
+              >
+                <Text style={{ fontSize: 12, color: isSelected ? colors.primary : customText, fontWeight: isSelected ? '900' : '600' }}>
+                  {day}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
-          {/* Validation */}
-          <View style={styles.actionRow}>
-            <TouchableOpacity onPress={handleSave} style={styles.saveBtn}>
-              <Text style={styles.saveBtnText}>Valider la date 📅</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Validation */}
+        <View style={styles.actionRow}>
+          <TouchableOpacity onPress={handleSave} style={styles.saveBtn}>
+            <Text style={styles.saveBtnText}>Valider la date 📅</Text>
+          </TouchableOpacity>
         </View>
       </View>
-    </Modal>
+    </View>
   );
+
+  if (!visible) return null;
+
+  if (useNativeModal) {
+    return (
+      <Modal
+        visible={visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={onClose}
+      >
+        {modalContent}
+      </Modal>
+    );
+  }
+
+  return modalContent;
 };
 
 const styles = StyleSheet.create({

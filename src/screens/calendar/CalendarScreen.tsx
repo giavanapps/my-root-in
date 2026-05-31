@@ -931,29 +931,31 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
                 style={styles.modalBtnHalf}
               />
             </View>
-
-            {/* ⏰ MANUAL TIME PICKER OVERLAY */}
-            <TimePickerModal
-              visible={showManualTimePicker}
-              initialTime={manualReminderTime}
-              onClose={() => setShowManualTimePicker(false)}
-              onSave={(time) => {
-                setManualReminderTime(time);
-              }}
-              title="Rappel Soin Personnalisé ⏰"
-            />
-
-            {/* 📅 DATE PICKER OVERLAY */}
-            <DatePickerModal
-              visible={showDatePicker}
-              initialDate={customDateStr}
-              onClose={() => setShowDatePicker(false)}
-              onSave={(date) => {
-                setCustomDateStr(date);
-              }}
-              title="Date du soin libre 📅"
-            />
           </View>
+
+          {/* ⏰ MANUAL TIME PICKER OVERLAY */}
+          <TimePickerModal
+            visible={showManualTimePicker}
+            initialTime={manualReminderTime}
+            onClose={() => setShowManualTimePicker(false)}
+            onSave={(time) => {
+              setManualReminderTime(time);
+            }}
+            title="Rappel Soin Personnalisé ⏰"
+            useNativeModal={false}
+          />
+
+          {/* 📅 DATE PICKER OVERLAY */}
+          <DatePickerModal
+            visible={showDatePicker}
+            initialDate={customDateStr}
+            onClose={() => setShowDatePicker(false)}
+            onSave={(date) => {
+              setCustomDateStr(date);
+            }}
+            title="Date du soin libre 📅"
+            useNativeModal={false}
+          />
         </View>
       </Modal>
 
@@ -1077,20 +1079,21 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
                 style={{ flex: 1 }}
               />
             </View>
-
-            {/* ⏰ INDIVIDUAL TIME PICKER OVERLAY */}
-            {activeCareItem && (
-              <TimePickerModal
-                visible={showTimePicker}
-                initialTime={activeCareItem.reminderTime || activeProfile.notifications.time || '08:30'}
-                onClose={() => setShowTimePicker(false)}
-                onSave={(time) => {
-                  updateRoutineItemTime(activeCareItem.id, time);
-                }}
-                title={`Heure du rappel : ${activeCareItem.category} ⏰`}
-              />
-            )}
           </View>
+
+          {/* ⏰ INDIVIDUAL TIME PICKER OVERLAY */}
+          {activeCareItem && (
+            <TimePickerModal
+              visible={showTimePicker}
+              initialTime={activeCareItem.reminderTime || activeProfile.notifications.time || '08:30'}
+              onClose={() => setShowTimePicker(false)}
+              onSave={(time) => {
+                updateRoutineItemTime(activeCareItem.id, time);
+              }}
+              title={`Heure du rappel : ${activeCareItem.category} ⏰`}
+              useNativeModal={false}
+            />
+          )}
         </View>
       </Modal>
     </View>

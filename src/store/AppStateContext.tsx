@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { NotificationService } from './NotificationService';
 import { db } from './firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 // Types
@@ -375,11 +376,37 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const [logs, setLogs] = useState<ActionLog[]>([]);
 
+  // Startup session lock to prevent race conditions
+  const [isSavedCredentialsLoaded, setIsSavedCredentialsLoaded] = useState(false);
+
   // Firestore loading/sync locks to prevent race conditions during initialization
   const [isLoading, setIsLoading] = useState(true);
 
+  // 0. Load saved credentials from local storage on app startup to persist session
+  useEffect(() => {
+    const loadSavedCredentials = async () => {
+      try {
+        const savedEmail = await AsyncStorage.getItem('masterEmail');
+        const savedPassword = await AsyncStorage.getItem('masterPassword');
+        if (savedEmail) {
+          setMasterEmail(savedEmail);
+          if (savedPassword) {
+            setMasterPassword(savedPassword);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading saved credentials from AsyncStorage:", error);
+      } finally {
+        setIsSavedCredentialsLoaded(true);
+      }
+    };
+    loadSavedCredentials();
+  }, []);
+
   // 1. Load entire account data from Firestore when masterEmail changes
   useEffect(() => {
+    if (!isSavedCredentialsLoaded) return; // Wait until stored credentials check completes!
+
     const loadFromFirestore = async () => {
       if (!masterEmail) {
         setIsLoading(false);
@@ -419,7 +446,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     loadFromFirestore();
-  }, [masterEmail]);
+  }, [masterEmail, isSavedCredentialsLoaded]);
 
   // 2. Automatically sync all local state changes back to Firestore
   useEffect(() => {
@@ -937,13 +964,25 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setThemeMode(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
-  const updateMasterAccount = (email: string, pass: string) => {
+  const updateMasterAccount = async (email: string, pass: string) => {
     setIsLoading(true); // Set isLoading to true immediately to lock routing during async Firestore fetch
     setMasterEmail(email);
     setMasterPassword(pass);
+    try {
+      await AsyncStorage.setItem('masterEmail', email);
+      await AsyncStorage.setItem('masterPassword', pass);
+    } catch (e) {
+      console.error("Error saving credentials to AsyncStorage:", e);
+    }
   };
 
-  const deleteMasterAccount = (onComplete: () => void) => {
+  const deleteMasterAccount = async (onComplete: () => void) => {
+    try {
+      await AsyncStorage.removeItem('masterEmail');
+      await AsyncStorage.removeItem('masterPassword');
+    } catch (e) {
+      console.error("Error removing credentials from AsyncStorage:", e);
+    }
     // Reset state completely
     setMasterEmail('');
     setMasterPassword('');
