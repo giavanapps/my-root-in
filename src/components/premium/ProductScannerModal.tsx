@@ -79,6 +79,11 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   const [scanStep, setScanStep] = useState<'idle' | 'scanning' | 'result'>('idle');
   const [selectedProduct, setSelectedProduct] = useState<MockProduct | null>(null);
 
+  // Vrai scan IA states
+  const [isAnalyzingReal, setIsAnalyzingReal] = useState(false);
+  const [realProductAnalysis, setRealProductAnalysis] = useState<any>(null);
+  const [realProductError, setRealProductError] = useState<string | null>(null);
+
   // Animation laser
   const laserAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -132,8 +137,71 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     }, 2500);
   };
 
+  const handleRealScanPress = () => {
+    if (typeof document === 'undefined') return;
+
+    // Créer un élément input caché de type fichier
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment'; // Demande l'appareil photo arrière sur mobile
+
+    input.onchange = async (e: any) => {
+      const file = e.target.files[0];
+      if (file) {
+        // Lancer l'étape de scan
+        setSelectedProduct(null);
+        setRealProductAnalysis(null);
+        setRealProductError(null);
+        setIsAnalyzingReal(true);
+        setScanStep('scanning');
+
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const base64Data = reader.result as string;
+          try {
+            // Appel à notre API Route sécurisée sur Vercel
+            const response = await fetch('/api/scan', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                image: base64Data,
+                texture: activeProfile?.diagnostic?.texture || 'Crépus',
+                porosity: activeProfile?.diagnostic?.porosity || 'Moyenne'
+              })
+            });
+
+            if (!response.ok) {
+              const errData = await response.json();
+              throw new Error(errData.error || errData.details || 'Erreur lors de l\'analyse');
+            }
+
+            const result = await response.json();
+            setRealProductAnalysis(result);
+            setScanStep('result');
+          } catch (err: any) {
+            console.error('Scan failed:', err);
+            const errMsg = err.message || 'Impossible d\'analyser cette photo. Vérifie ta connexion ou ta clé d\'API Gemini.';
+            setRealProductError(errMsg);
+            setScanStep('idle');
+            alert(`Désolé, l'analyse a échoué : ${errMsg}`);
+          } finally {
+            setIsAnalyzingReal(false);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+    input.click();
+  };
+
   const handleReset = () => {
     setSelectedProduct(null);
+    setRealProductAnalysis(null);
+    setRealProductError(null);
+    setIsAnalyzingReal(false);
     setScanStep('idle');
   };
 
@@ -231,6 +299,26 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
           {/* IDLE STEP - CHOOSE PRODUCT */}
           {scanStep === 'idle' && (
             <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+              
+              {/* 📷 BOUTON SCANNER RÉEL */}
+              <TouchableOpacity
+                style={styles.realScanButton}
+                activeOpacity={0.8}
+                onPress={handleRealScanPress}
+              >
+                <Text style={styles.realScanButtonIcon}>📷</Text>
+                <View style={styles.realScanButtonTextContainer}>
+                  <Text style={styles.realScanButtonTitle}>Prendre un produit en photo</Text>
+                  <Text style={styles.realScanButtonSubtitle}>Analyse moléculaire de la liste d'ingrédients</Text>
+                </View>
+              </TouchableOpacity>
+
+              <View style={styles.separatorContainer}>
+                <View style={[styles.separatorLine, isDark ? styles.separatorLineDark : styles.separatorLineLight]} />
+                <Text style={[styles.separatorText, isDark ? styles.textMutedDark : styles.textMutedLight]}>OU SIMULER AVEC UN PRODUIT</Text>
+                <View style={[styles.separatorLine, isDark ? styles.separatorLineDark : styles.separatorLineLight]} />
+              </View>
+
               <Text style={[styles.introText, isDark ? styles.textMutedDark : styles.textMutedLight]}>
                 Sélectionne le produit que tu possèdes pour lancer la simulation du scanner laser IA et recevoir ton rapport de compatibilité personnalisé :
               </Text>
@@ -263,9 +351,11 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
           )}
 
           {/* SCANNING STEP - ANIMATED CAMERA */}
-          {scanStep === 'scanning' && selectedProduct && (
+          {scanStep === 'scanning' && (selectedProduct || isAnalyzingReal) && (
             <View style={styles.scannerWrapper}>
-              <Text style={styles.scannerPrompt}>Cadre la liste des ingrédients INCI</Text>
+              <Text style={styles.scannerPrompt}>
+                {isAnalyzingReal ? "Analyse de ta photo en cours..." : "Cadre la liste des ingrédients INCI"}
+              </Text>
               
               {/* Simulated Camera Viewfinder */}
               <View style={styles.viewfinder}>
@@ -288,41 +378,60 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
 
                 {/* Product scanned label */}
                 <View style={styles.scanningProductLabel}>
-                  <Text style={styles.scanningProductBrand}>{selectedProduct.brand}</Text>
-                  <Text style={styles.scanningProductName}>{selectedProduct.name}</Text>
+                  <Text style={styles.scanningProductBrand}>
+                    {isAnalyzingReal ? "SCANNER IA HAUTE PRÉCISION" : (selectedProduct?.brand)}
+                  </Text>
+                  <Text style={styles.scanningProductName}>
+                    {isAnalyzingReal ? "Extraction de la formule moléculaire..." : (selectedProduct?.name)}
+                  </Text>
                   <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
                 </View>
               </View>
 
               <Text style={[styles.scannerHint, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                Analyse moléculaire de la formule en cours avec l'IA Root'in...
+                {isAnalyzingReal 
+                  ? "Lecture des ingrédients INCI et diagnostic personnalisé..."
+                  : "Analyse moléculaire de la formule en cours avec l'IA Root'in..."}
               </Text>
             </View>
           )}
 
           {/* RESULT STEP - IA REPORT COMPATIBILITY */}
-          {scanStep === 'result' && selectedProduct && (() => {
-            const report = getCompatibilityAnalysis(selectedProduct);
+          {scanStep === 'result' && (selectedProduct || realProductAnalysis) && (() => {
+            const isReal = !!realProductAnalysis;
+            const report = isReal ? realProductAnalysis : getCompatibilityAnalysis(selectedProduct!);
+            const displayBrand = isReal ? realProductAnalysis.brand : selectedProduct?.brand;
+            const displayName = isReal ? realProductAnalysis.name : selectedProduct?.name;
+            const displayImage = isReal 
+              ? 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop' 
+              : selectedProduct?.image;
+
+            const scoreColor = report.color || (
+              report.score >= 80 ? colors.success :
+              report.score >= 50 ? colors.warning :
+              colors.danger
+            );
+
             return (
               <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
                 
                 {/* Product Summary Header */}
                 <View style={[styles.resultProductHeader, isDark ? styles.resultProductHeaderDark : styles.resultProductHeaderLight]}>
-                  <Image source={{ uri: selectedProduct.image }} style={styles.resultProductImage} />
+                  <Image source={{ uri: displayImage }} style={styles.resultProductImage} />
                   <View style={styles.resultProductInfo}>
-                    <Text style={styles.resultProductBrand}>{selectedProduct.brand}</Text>
-                    <Text style={[styles.resultProductName, isDark ? styles.textLight : styles.textDark]}>{selectedProduct.name}</Text>
+                    <Text style={styles.resultProductBrand}>{displayBrand}</Text>
+                    <Text style={[styles.resultProductName, isDark ? styles.textLight : styles.textDark]}>{displayName}</Text>
                   </View>
                 </View>
 
                 {/* Compatibility Score Widget */}
                 <View style={[styles.scoreCard, isDark ? styles.scoreCardDark : styles.scoreCardLight]}>
-                  <View style={[styles.scoreRing, { borderColor: report.color }]}>
-                    <Text style={[styles.scoreNumber, { color: report.color }]}>{report.score}%</Text>
+                  <View style={[styles.scoreRing, { borderColor: scoreColor }]}>
+                    <Text style={[styles.scoreNumber, { color: scoreColor }]}>{report.score}%</Text>
                     <Text style={styles.scoreLabel}>COMPATIBLE</Text>
                   </View>
                   <View style={styles.scoreTextContainer}>
-                    <Text style={[styles.scoreTitle, { color: report.color }]}>{report.title}</Text>
+                    <Text style={[styles.scoreTitle, { color: scoreColor }]}>{report.title}</Text>
                     <Text style={[styles.scoreDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
                       Basé sur ton profil : <Text style={styles.boldText}>{activeProfile?.diagnostic?.texture || 'Crépus'}</Text> & porosité <Text style={styles.boldText}>{activeProfile?.diagnostic?.porosity || 'Inconnue'}</Text>
                     </Text>
@@ -342,10 +451,10 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                   <Text style={[styles.sectionTitle, isDark ? styles.textLight : styles.textDark]}>Analyse des Ingrédients (INCI)</Text>
 
                   {/* Beneficial Ingredients (Green) */}
-                  {selectedProduct.inciReport.good.length > 0 && (
+                  {report.inciReport?.good?.length > 0 && (
                     <View style={styles.ingredientGroup}>
                       <Text style={[styles.groupTitle, { color: colors.success }]}>🌿 Ingrédients bénéfiques :</Text>
-                      {selectedProduct.inciReport.good.map((ing, idx) => (
+                      {report.inciReport.good.map((ing: string, idx: number) => (
                         <View key={idx} style={styles.ingredientItem}>
                           <Text style={styles.bulletPoint}>•</Text>
                           <Text style={[styles.ingredientName, isDark ? styles.textLight : styles.textDark]}>{ing}</Text>
@@ -355,10 +464,10 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                   )}
 
                   {/* Neutral Ingredients */}
-                  {selectedProduct.inciReport.neutral.length > 0 && (
+                  {report.inciReport?.neutral?.length > 0 && (
                     <View style={styles.ingredientGroup}>
                       <Text style={[styles.groupTitle, isDark ? styles.textLight : styles.textDark]}>⚪ Ingrédients neutres :</Text>
-                      {selectedProduct.inciReport.neutral.map((ing, idx) => (
+                      {report.inciReport.neutral.map((ing: string, idx: number) => (
                         <View key={idx} style={styles.ingredientItem}>
                           <Text style={styles.bulletPoint}>•</Text>
                           <Text style={[styles.ingredientName, isDark ? styles.textLight : styles.textDark]}>{ing}</Text>
@@ -368,10 +477,10 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                   )}
 
                   {/* Avoid Ingredients (Red) */}
-                  {selectedProduct.inciReport.avoid.length > 0 && (
+                  {report.inciReport?.avoid?.length > 0 && (
                     <View style={styles.ingredientGroup}>
                       <Text style={[styles.groupTitle, { color: colors.danger }]}>⚠️ Éléments problématiques ou suspectés :</Text>
-                      {selectedProduct.inciReport.avoid.map((ing, idx) => (
+                      {report.inciReport.avoid.map((ing: string, idx: number) => (
                         <View key={idx} style={styles.ingredientItem}>
                           <Text style={styles.bulletPoint}>•</Text>
                           <Text style={[styles.ingredientName, isDark ? styles.textLight : styles.textDark]}>{ing}</Text>
@@ -773,5 +882,58 @@ const styles = StyleSheet.create({
   },
   textMutedLight: {
     color: '#6E728C',
+  },
+  realScanButton: {
+    flexDirection: 'row',
+    backgroundColor: '#76A08A',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    borderWidth: 1.5,
+    borderColor: '#8DB8A1',
+    shadowColor: '#76A08A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  realScanButtonIcon: {
+    fontSize: 28,
+    marginRight: spacing.md,
+  },
+  realScanButtonTextContainer: {
+    flex: 1,
+  },
+  realScanButtonTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  realScanButtonSubtitle: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  separatorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: spacing.md,
+  },
+  separatorLine: {
+    flex: 1,
+    height: 1,
+  },
+  separatorLineDark: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  separatorLineLight: {
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  separatorText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    marginHorizontal: spacing.md,
+    letterSpacing: 1,
   },
 });
