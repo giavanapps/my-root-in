@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, Modal, TouchableOpacity, ScrollView, Animated, ActivityIndicator, Image } from 'react-native';
+import { StyleSheet, View, Text, Modal, TouchableOpacity, ScrollView, Animated, ActivityIndicator, Image, TextInput } from 'react-native';
 import { colors, borderRadius, spacing } from '../../theme/colors';
 import { useAppState } from '../../store/AppStateContext';
 
@@ -83,6 +83,11 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   const [isAnalyzingReal, setIsAnalyzingReal] = useState(false);
   const [realProductAnalysis, setRealProductAnalysis] = useState<any>(null);
   const [realProductError, setRealProductError] = useState<string | null>(null);
+
+  // Code-barres states
+  const [scannerMode, setScannerMode] = useState<'photo' | 'barcode' | null>(null);
+  const [barcodeInput, setBarcodeInput] = useState('');
+  const [isSearchingBarcode, setIsSearchingBarcode] = useState(false);
 
   // Animation laser
   const laserAnim = useRef(new Animated.Value(0)).current;
@@ -197,11 +202,121 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     input.click();
   };
 
+  const handleBarcodeSearch = async (barcodeToSearch?: string) => {
+    const code = barcodeToSearch || barcodeInput.trim();
+    if (!code) {
+      alert("Veuillez saisir un code-barres (EAN-13).");
+      return;
+    }
+
+    setSelectedProduct(null);
+    setRealProductAnalysis(null);
+    setRealProductError(null);
+    setIsSearchingBarcode(true);
+    setScanStep('scanning');
+
+    try {
+      // 1. Interroger l'API publique Open Beauty Facts
+      const openBeautyFactsUrl = `https://world.openbeautyfacts.org/api/v0/product/${code}.json`;
+      const obfResponse = await fetch(openBeautyFactsUrl);
+      
+      if (!obfResponse.ok) {
+        throw new Error("Impossible de se connecter à la base de données internationale.");
+      }
+
+      const obfData = await obfResponse.json();
+
+      if (obfData.status !== 1 || !obfData.product) {
+        // Fallback: Product not found, prompt to take photo instead!
+        const confirmPhoto = window.confirm(
+          `Le code-barres "${code}" n'est pas encore répertorié dans la base internationale.\n\nPas de soucis ! Préfères-tu prendre directement en photo sa liste d'ingrédients au dos ?`
+        );
+        if (confirmPhoto) {
+          setScanStep('idle');
+          setScannerMode('photo');
+          setIsSearchingBarcode(false);
+          // Auto trigger camera capture
+          setTimeout(() => {
+            handleRealScanPress();
+          }, 200);
+        } else {
+          setScanStep('idle');
+          setIsSearchingBarcode(false);
+        }
+        return;
+      }
+
+      const product = obfData.product;
+      const productName = product.product_name || "Produit Inconnu";
+      const productBrand = product.brands || "Marque Inconnue";
+      const ingredientsText = product.ingredients_text;
+
+      if (!ingredientsText || ingredientsText.trim().length < 5) {
+        // Fallback: Product found but ingredients list is empty
+        const confirmPhoto = window.confirm(
+          `Produit trouvé : "${productBrand} - ${productName}" !\n\nMalheureusement, sa liste d'ingrédients est incomplète dans la base.\n\nPréfères-tu prendre en photo la liste d'ingrédients réelle au dos du produit ?`
+        );
+        if (confirmPhoto) {
+          setScanStep('idle');
+          setScannerMode('photo');
+          setIsSearchingBarcode(false);
+          setTimeout(() => {
+            handleRealScanPress();
+          }, 200);
+        } else {
+          setScanStep('idle');
+          setIsSearchingBarcode(false);
+        }
+        return;
+      }
+
+      // 2. Envoyer les ingrédients textuels à notre API Route privée
+      const scanResponse = await fetch('/api/scan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ingredientsText: ingredientsText,
+          texture: activeProfile?.diagnostic?.texture || 'Crépus',
+          porosity: activeProfile?.diagnostic?.porosity || 'Moyenne'
+        })
+      });
+
+      if (!scanResponse.ok) {
+        const errData = await scanResponse.json();
+        throw new Error(errData.error || errData.details || 'Erreur lors de l\'analyse moléculaire');
+      }
+
+      const result = await scanResponse.json();
+      
+      // Surcharge avec les infos précises d'Open Beauty Facts si besoin
+      if (productBrand && productBrand !== "Marque Inconnue") result.brand = productBrand;
+      if (productName && productName !== "Produit Inconnu") result.name = productName;
+      if (product.image_url) result.image = product.image_url;
+
+      setRealProductAnalysis(result);
+      setScanStep('result');
+
+    } catch (err: any) {
+      console.error('Barcode scan failed:', err);
+      const errMsg = err.message || 'Impossible d\'analyser ce code-barres.';
+      setRealProductError(errMsg);
+      setScanStep('idle');
+      alert(`Désolé, l'analyse a échoué : ${errMsg}`);
+    } finally {
+      setIsSearchingBarcode(false);
+    }
+  };
+
   const handleReset = () => {
     setSelectedProduct(null);
     setRealProductAnalysis(null);
     setRealProductError(null);
     setIsAnalyzingReal(false);
+    setIsSearchingBarcode(false);
+    setBarcodeInput('');
+    setScannerMode(null);
     setScanStep('idle');
   };
 
@@ -296,65 +411,193 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
             </TouchableOpacity>
           </View>
 
-          {/* IDLE STEP - CHOOSE PRODUCT */}
+          {/* IDLE STEP - CHOOSE METHOD OR PRODUCT */}
           {scanStep === 'idle' && (
             <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
               
-              {/* 📷 BOUTON SCANNER RÉEL */}
-              <TouchableOpacity
-                style={styles.realScanButton}
-                activeOpacity={0.8}
-                onPress={handleRealScanPress}
-              >
-                <Text style={styles.realScanButtonIcon}>📷</Text>
-                <View style={styles.realScanButtonTextContainer}>
-                  <Text style={styles.realScanButtonTitle}>Prendre un produit en photo</Text>
-                  <Text style={styles.realScanButtonSubtitle}>Analyse moléculaire de la liste d'ingrédients</Text>
-                </View>
-              </TouchableOpacity>
-
-              <View style={styles.separatorContainer}>
-                <View style={[styles.separatorLine, isDark ? styles.separatorLineDark : styles.separatorLineLight]} />
-                <Text style={[styles.separatorText, isDark ? styles.textMutedDark : styles.textMutedLight]}>OU SIMULER AVEC UN PRODUIT</Text>
-                <View style={[styles.separatorLine, isDark ? styles.separatorLineDark : styles.separatorLineLight]} />
-              </View>
-
-              <Text style={[styles.introText, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                Sélectionne le produit que tu possèdes pour lancer la simulation du scanner laser IA et recevoir ton rapport de compatibilité personnalisé :
-              </Text>
-
-              <View style={styles.productsGrid}>
-                {mockProductsList.map((product) => (
+              {/* DASHBOARD: CHOOSE SCANNER MODE */}
+              {scannerMode === null && (
+                <View style={styles.dashboardContainer}>
+                  <Text style={[styles.dashboardPrompt, isDark ? styles.textLight : styles.textDark]}>
+                    Comment souhaites-tu analyser ton produit ? 🔬
+                  </Text>
+                  
+                  {/* Option 1: Photo Scan */}
                   <TouchableOpacity
-                    key={product.id}
-                    style={[
-                      styles.productCard,
-                      isDark ? styles.productCardDark : styles.productCardLight
-                    ]}
-                    activeOpacity={0.8}
-                    onPress={() => handleStartScan(product)}
+                    style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
+                    activeOpacity={0.9}
+                    onPress={() => setScannerMode('photo')}
                   >
-                    <Image source={{ uri: product.image }} style={styles.productImage} />
-                    <View style={styles.productInfo}>
-                      <Text style={styles.productBrand}>{product.brand}</Text>
-                      <Text style={[styles.productName, isDark ? styles.textLight : styles.textDark]} numberOfLines={2}>
-                        {product.name}
+                    <Text style={styles.modeCardIcon}>📷</Text>
+                    <View style={styles.modeCardTextContainer}>
+                      <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Photo des ingrédients (INCI)</Text>
+                      <Text style={[styles.modeCardSubtitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                        Prends en photo la liste d'ingrédients écrite au dos de n'importe quel flacon. Fonctionne à 100 % !
                       </Text>
-                      <View style={styles.scanActionBadge}>
-                        <Text style={styles.scanActionBadgeText}>Simuler le scan 🔍</Text>
-                      </View>
                     </View>
                   </TouchableOpacity>
-                ))}
-              </View>
+
+                  {/* Option 2: Barcode Scan */}
+                  <TouchableOpacity
+                    style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
+                    activeOpacity={0.9}
+                    onPress={() => setScannerMode('barcode')}
+                  >
+                    <Text style={styles.modeCardIcon}>🏷️</Text>
+                    <View style={styles.modeCardTextContainer}>
+                      <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Code-barres du produit</Text>
+                      <Text style={[styles.modeCardSubtitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                        Flashe ou saisis le code-barres pour chercher le produit dans la base de données internationale.
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* PHOTO MODE */}
+              {scannerMode === 'photo' && (
+                <View>
+                  {/* Back button */}
+                  <TouchableOpacity style={styles.backModeButton} onPress={() => setScannerMode(null)}>
+                    <Text style={styles.backModeButtonText}>⬅️ Retour aux options</Text>
+                  </TouchableOpacity>
+
+                  {/* 📷 BOUTON SCANNER RÉEL */}
+                  <TouchableOpacity
+                    style={styles.realScanButton}
+                    activeOpacity={0.8}
+                    onPress={handleRealScanPress}
+                  >
+                    <Text style={styles.realScanButtonIcon}>📷</Text>
+                    <View style={styles.realScanButtonTextContainer}>
+                      <Text style={styles.realScanButtonTitle}>Prendre le produit en photo</Text>
+                      <Text style={styles.realScanButtonSubtitle}>Analyse moléculaire de la liste d'ingrédients</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <View style={styles.separatorContainer}>
+                    <View style={[styles.separatorLine, isDark ? styles.separatorLineDark : styles.separatorLineLight]} />
+                    <Text style={[styles.separatorText, isDark ? styles.textMutedDark : styles.textMutedLight]}>OU SIMULER AVEC UN PRODUIT</Text>
+                    <View style={[styles.separatorLine, isDark ? styles.separatorLineDark : styles.separatorLineLight]} />
+                  </View>
+
+                  <Text style={[styles.introText, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                    Sélectionne le produit que tu possèdes pour lancer la simulation du scanner laser IA et recevoir ton rapport de compatibilité personnalisé :
+                  </Text>
+
+                  <View style={styles.productsGrid}>
+                    {mockProductsList.map((product) => (
+                      <TouchableOpacity
+                        key={product.id}
+                        style={[
+                          styles.productCard,
+                          isDark ? styles.productCardDark : styles.productCardLight
+                        ]}
+                        activeOpacity={0.8}
+                        onPress={() => handleStartScan(product)}
+                      >
+                        <Image source={{ uri: product.image }} style={styles.productImage} />
+                        <View style={styles.productInfo}>
+                          <Text style={styles.productBrand}>{product.brand}</Text>
+                          <Text style={[styles.productName, isDark ? styles.textLight : styles.textDark]} numberOfLines={2}>
+                            {product.name}
+                          </Text>
+                          <View style={styles.scanActionBadge}>
+                            <Text style={styles.scanActionBadgeText}>Simuler le scan 🔍</Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* BARCODE MODE */}
+              {scannerMode === 'barcode' && (
+                <View>
+                  {/* Back button */}
+                  <TouchableOpacity style={styles.backModeButton} onPress={() => setScannerMode(null)}>
+                    <Text style={styles.backModeButtonText}>⬅️ Retour aux options</Text>
+                  </TouchableOpacity>
+
+                  <Text style={[styles.introText, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                    Saisis le code-barres (EAN-13) au dos de ton produit capillaire pour interroger la base internationale Open Beauty Facts :
+                  </Text>
+
+                  {/* Input field */}
+                  <View style={[styles.barcodeInputWrapper, isDark ? styles.barcodeInputWrapperDark : styles.barcodeInputWrapperLight]}>
+                    <TextInput
+                      style={[styles.barcodeInput, isDark ? styles.barcodeInputDark : styles.barcodeInputLight]}
+                      placeholder="Ex: 3596710406087"
+                      placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
+                      keyboardType="numeric"
+                      value={barcodeInput}
+                      onChangeText={setBarcodeInput}
+                    />
+                  </View>
+
+                  {/* Launch button */}
+                  <TouchableOpacity
+                    style={styles.launchBarcodeButton}
+                    activeOpacity={0.8}
+                    onPress={() => handleBarcodeSearch()}
+                  >
+                    <Text style={styles.launchBarcodeButtonText}>🔍 Lancer la recherche automatique</Text>
+                  </TouchableOpacity>
+
+                  {/* EAN PRE-SET EXAMPLES */}
+                  <View style={styles.examplesContainer}>
+                    <Text style={[styles.examplesTitle, isDark ? styles.textLight : styles.textDark]}>💡 Exemples de codes réels à tester :</Text>
+                    
+                    <TouchableOpacity 
+                      style={[styles.examplePill, isDark ? styles.examplePillDark : styles.examplePillLight]}
+                      onPress={() => {
+                        setBarcodeInput('3596710406087');
+                        handleBarcodeSearch('3596710406087');
+                      }}
+                    >
+                      <Text style={styles.examplePillBrand}>Activilong</Text>
+                      <Text style={[styles.examplePillName, isDark ? styles.textLight : styles.textDark]}>Shampoing Doux Actiforce</Text>
+                      <Text style={styles.examplePillEan}>Code : 3596710406087</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={[styles.examplePill, isDark ? styles.examplePillDark : styles.examplePillLight]}
+                      onPress={() => {
+                        setBarcodeInput('764302201310');
+                        handleBarcodeSearch('764302201310');
+                      }}
+                    >
+                      <Text style={styles.examplePillBrand}>Shea Moisture</Text>
+                      <Text style={[styles.examplePillName, isDark ? styles.textLight : styles.textDark]}>Coconut Curl Smoothie</Text>
+                      <Text style={styles.examplePillEan}>Code : 764302201310</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={[styles.examplePill, isDark ? styles.examplePillDark : styles.examplePillLight]}
+                      onPress={() => {
+                        setBarcodeInput('0817047020023');
+                        handleBarcodeSearch('0817047020023');
+                      }}
+                    >
+                      <Text style={styles.examplePillBrand}>Cantu</Text>
+                      <Text style={[styles.examplePillName, isDark ? styles.textLight : styles.textDark]}>Conditioning Cream</Text>
+                      <Text style={styles.examplePillEan}>Code : 0817047020023</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                </View>
+              )}
+
             </ScrollView>
           )}
 
           {/* SCANNING STEP - ANIMATED CAMERA */}
-          {scanStep === 'scanning' && (selectedProduct || isAnalyzingReal) && (
+          {scanStep === 'scanning' && (selectedProduct || isAnalyzingReal || isSearchingBarcode) && (
             <View style={styles.scannerWrapper}>
               <Text style={styles.scannerPrompt}>
-                {isAnalyzingReal ? "Analyse de ta photo en cours..." : "Cadre la liste des ingrédients INCI"}
+                {isAnalyzingReal ? "Analyse de ta photo en cours..." : 
+                 isSearchingBarcode ? "Recherche du produit en cours..." : "Cadre la liste des ingrédients INCI"}
               </Text>
               
               {/* Simulated Camera Viewfinder */}
@@ -379,10 +622,12 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                 {/* Product scanned label */}
                 <View style={styles.scanningProductLabel}>
                   <Text style={styles.scanningProductBrand}>
-                    {isAnalyzingReal ? "SCANNER IA HAUTE PRÉCISION" : (selectedProduct?.brand)}
+                    {isAnalyzingReal ? "SCANNER IA HAUTE PRÉCISION" : 
+                     isSearchingBarcode ? "BASE DE DONNÉES INCI" : (selectedProduct?.brand)}
                   </Text>
                   <Text style={styles.scanningProductName}>
-                    {isAnalyzingReal ? "Extraction de la formule moléculaire..." : (selectedProduct?.name)}
+                    {isAnalyzingReal ? "Extraction de la formule moléculaire..." : 
+                     isSearchingBarcode ? "Identification du code-barres..." : (selectedProduct?.name)}
                   </Text>
                   <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
                 </View>
@@ -390,7 +635,8 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
 
               <Text style={[styles.scannerHint, isDark ? styles.textMutedDark : styles.textMutedLight]}>
                 {isAnalyzingReal 
-                  ? "Lecture des ingrédients INCI et diagnostic personnalisé..."
+                  ? "Lecture des ingrédients INCI et diagnostic personnalisé..." : 
+                 isSearchingBarcode ? "Interrogation d'Open Beauty Facts et décryptage IA..."
                   : "Analyse moléculaire de la formule en cours avec l'IA Root'in..."}
               </Text>
             </View>
@@ -935,5 +1181,142 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginHorizontal: spacing.md,
     letterSpacing: 1,
+  },
+  dashboardContainer: {
+    gap: spacing.md,
+    marginVertical: spacing.md,
+  },
+  dashboardPrompt: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  modeCard: {
+    flexDirection: 'row',
+    borderRadius: borderRadius.md,
+    borderWidth: 1.5,
+    padding: spacing.md,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  modeCardDark: {
+    backgroundColor: '#16192A',
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  modeCardLight: {
+    backgroundColor: '#F8F9FA',
+    borderColor: 'rgba(0,0,0,0.05)',
+  },
+  modeCardIcon: {
+    fontSize: 32,
+    marginRight: spacing.md,
+  },
+  modeCardTextContainer: {
+    flex: 1,
+  },
+  modeCardTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  modeCardSubtitle: {
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 4,
+  },
+  backModeButton: {
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+    alignSelf: 'flex-start',
+  },
+  backModeButtonText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  barcodeInputWrapper: {
+    borderRadius: borderRadius.md,
+    borderWidth: 1.5,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    marginBottom: spacing.md,
+    marginTop: spacing.sm,
+  },
+  barcodeInputWrapperDark: {
+    backgroundColor: '#16192A',
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  barcodeInputWrapperLight: {
+    backgroundColor: '#F8F9FA',
+    borderColor: 'rgba(0,0,0,0.08)',
+  },
+  barcodeInput: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    outlineWidth: 0,
+  },
+  barcodeInputDark: {
+    color: '#FFFFFF',
+  },
+  barcodeInputLight: {
+    color: '#0E111F',
+  },
+  launchBarcodeButton: {
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  launchBarcodeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  examplesContainer: {
+    marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+  examplesTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  examplePill: {
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  examplePillDark: {
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  examplePillLight: {
+    backgroundColor: '#FAFBFC',
+    borderColor: 'rgba(0,0,0,0.05)',
+  },
+  examplePillBrand: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: colors.primary,
+    textTransform: 'uppercase',
+  },
+  examplePillName: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginVertical: 2,
+  },
+  examplePillEan: {
+    fontSize: 10,
+    color: colors.textSecondary,
   },
 });

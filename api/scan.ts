@@ -18,10 +18,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Méthode non autorisée. Utilisez POST.' });
   }
 
-  const { image, texture, porosity } = req.body;
+  const { image, ingredientsText, texture, porosity } = req.body;
 
-  if (!image) {
-    return res.status(400).json({ error: 'Aucune image fournie.' });
+  if (!image && !ingredientsText) {
+    return res.status(400).json({ error: 'Aucune image ni liste d\'ingrédients fournie.' });
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -34,17 +34,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Clean base64 string
-    const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
-    
-    // Determine mimeType (default to image/jpeg)
-    let mimeType = 'image/jpeg';
-    const mimeMatch = image.match(/^data:(image\/\w+);base64,/);
-    if (mimeMatch) {
-      mimeType = mimeMatch[1];
-    }
+    let promptText = '';
+    const parts: any[] = [];
 
-    const promptText = `Tu es un expert en cosmétologie capillaire et ingrédients INCI, spécialisé dans les cheveux afro et texturés (crépus, frisés, bouclés, ondulés, locksés). Analyse cette photo qui montre la liste des ingrédients d'un produit capillaire.
+    if (image) {
+      // Option 1 : Image-based scan
+      const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+      let mimeType = 'image/jpeg';
+      const mimeMatch = image.match(/^data:(image\/\w+);base64,/);
+      if (mimeMatch) {
+        mimeType = mimeMatch[1];
+      }
+
+      promptText = `Tu es un expert en cosmétologie capillaire et ingrédients INCI, spécialisé dans les cheveux afro et texturés (crépus, frisés, bouclés, ondulés, locksés). Analyse cette photo qui montre la liste des ingrédients d'un produit capillaire.
 
 Prends en compte le profil capillaire de l'utilisateur :
 - Texture : ${texture || 'Crépus'}
@@ -64,6 +66,41 @@ Fournis ton analyse en français au format JSON STRICT avec cette structure exac
   }
 }`;
 
+      parts.push({ text: promptText });
+      parts.push({
+        inlineData: {
+          mimeType: mimeType,
+          data: base64Data
+        }
+      });
+    } else {
+      // Option 2 : Text-based scan (from barcode lookup)
+      promptText = `Tu es un expert en cosmétologie capillaire et ingrédients INCI, spécialisé dans les cheveux afro et texturés (crépus, frisés, bouclés, ondulés, locksés). Analyse cette liste d'ingrédients d'un produit capillaire.
+
+Liste des ingrédients :
+${ingredientsText}
+
+Prends en compte le profil capillaire de l'utilisateur :
+- Texture : ${texture || 'Crépus'}
+- Porosité : ${porosity || 'Moyenne'}
+
+Fournis ton analyse en français au format JSON STRICT avec cette structure exacte :
+{
+  "brand": "Marque détectée (ex: Shea Moisture)",
+  "name": "Nom du produit détecté",
+  "score": 85, // Score de 0 à 100 indiquant la compatibilité exacte avec son profil (sois honnête et sévère s'il y a des ingrédients toxiques ou occlusifs inadaptés)
+  "title": "Titre court de compatibilité (ex: Excellent pour ton profil ! 🌿)",
+  "description": "Explication détaillée et personnalisée de ton avis en tant que coach capillaire IA, en expliquant spécifiquement pourquoi les ingrédients conviennent ou non à sa porosité et sa texture. Adresse-toi directement à l'utilisateur de manière bienveillante.",
+  "inciReport": {
+    "good": ["Ingrédient 1 (Explication rapide de son effet bénéfique)", "Ingrédient 2 (Explication)"],
+    "neutral": ["Ingrédient 1 (Explication)", "Ingrédient 2 (Explication)"],
+    "avoid": ["Ingrédient 1 (Pourquoi l'éviter : ex: occlusif, cire minérale, sulfate décapant, alcool desséchant)", "Ingrédient 2 (Pourquoi l'éviter)"]
+  }
+}`;
+
+      parts.push({ text: promptText });
+    }
+
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(geminiUrl, {
@@ -74,15 +111,7 @@ Fournis ton analyse en français au format JSON STRICT avec cette structure exac
       body: JSON.stringify({
         contents: [
           {
-            parts: [
-              { text: promptText },
-              {
-                inlineData: {
-                  mimeType: mimeType,
-                  data: base64Data
-                }
-              }
-            ]
+            parts: parts
           }
         ],
         generationConfig: {
