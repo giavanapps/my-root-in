@@ -542,7 +542,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
                     onPress={() => handleSelectAvatar(item.id)}
                   >
                     {avatarImageMap[item.id] ? (
-                      <View style={{ width: 60, height: 60, borderRadius: 30, overflow: 'hidden' }}>
+                      <View style={{ width: 80, height: 80, borderRadius: 40, overflow: 'hidden' }}>
                         <Image
                           source={avatarImageMap[item.id]}
                           style={{ width: '100%', height: '100%' }}
@@ -964,14 +964,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   avatarGridItem: {
-    width: '30%',
+    width: '47%', // Grid layout for exactly 2 columns in modal
     backgroundColor: 'rgba(255, 255, 255, 0.02)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: 12,
-    padding: 8,
+    borderRadius: 16,
+    padding: 12,
     alignItems: 'center',
-    marginVertical: 6,
+    justifyContent: 'center',
+    marginVertical: 8,
   },
   gridEmoji: {
     fontSize: 32,

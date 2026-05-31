@@ -258,12 +258,12 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
                 return (
                   <TouchableOpacity
                     key={item.id}
-                    style={[styles.avatarItem, isSelected && styles.avatarItemActive, { justifyContent: 'center', alignItems: 'center' }]}
+                    style={[styles.avatarItem, isSelected && styles.avatarItemActive]}
                     onPress={() => setSelectedAvatar(item.id)}
                     activeOpacity={0.8}
                   >
                     {avatarImageMap[item.id] ? (
-                      <View style={{ width: 72, height: 72, borderRadius: 36, overflow: 'hidden' }}>
+                      <View style={{ width: 96, height: 96, borderRadius: 48, overflow: 'hidden' }}>
                         <Image
                           source={avatarImageMap[item.id]}
                           style={{ width: '100%', height: '100%' }}
@@ -924,14 +924,15 @@ const styles = StyleSheet.create({
     marginVertical: 12,
   },
   avatarItem: {
-    width: (width - 48 - 32) / 3, // Grid layout for 3 columns on mobile safely
+    width: (width - 48 - 16) / 2, // Grid layout for exactly 2 columns on mobile
     backgroundColor: colors.card,
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: 16,
-    padding: 12,
+    borderRadius: 20,
+    padding: 16,
     alignItems: 'center',
-    marginVertical: 6,
+    justifyContent: 'center',
+    marginVertical: 8,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
