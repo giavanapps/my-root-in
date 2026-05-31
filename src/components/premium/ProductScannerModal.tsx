@@ -88,13 +88,17 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   const [scannerMode, setScannerMode] = useState<'photo' | 'barcode' | null>(null);
   const [barcodeInput, setBarcodeInput] = useState('');
   const [isSearchingBarcode, setIsSearchingBarcode] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(true);
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   // Animation laser
   const laserAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
+  const html5QrCodeRef = useRef<any>(null);
+
   useEffect(() => {
-    if (scanStep === 'scanning') {
+    if (scanStep === 'scanning' || (scannerMode === 'barcode' && isCameraActive && scanStep === 'idle')) {
       // Loop laser animation up and down
       Animated.loop(
         Animated.sequence([
@@ -130,7 +134,88 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
       laserAnim.setValue(0);
       pulseAnim.setValue(1);
     }
-  }, [scanStep]);
+  }, [scanStep, scannerMode, isCameraActive]);
+
+  useEffect(() => {
+    let active = true;
+    let scannerInstance: any = null;
+
+    if (
+      visible &&
+      scannerMode === 'barcode' &&
+      isCameraActive &&
+      scanStep === 'idle' &&
+      typeof document !== 'undefined'
+    ) {
+      const elementId = "barcode-scanner-reader";
+      
+      const startScanner = async () => {
+        // Attendre brièvement que le DOM soit prêt
+        await new Promise(resolve => setTimeout(resolve, 300));
+        if (!active) return;
+
+        const element = document.getElementById(elementId);
+        if (!element) {
+          console.warn("Conteneur scanner code-barres introuvable.");
+          return;
+        }
+
+        try {
+          const { Html5Qrcode } = require('html5-qrcode');
+          const html5QrCode = new Html5Qrcode(elementId);
+          scannerInstance = html5QrCode;
+          html5QrCodeRef.current = html5QrCode;
+
+          const config = {
+            fps: 15,
+            qrbox: { width: 220, height: 140 },
+            aspectRatio: 1.0
+          };
+
+          await html5QrCode.start(
+            { facingMode: "environment" },
+            config,
+            (decodedText: string) => {
+              // Code-barres scanné avec succès !
+              if (active) {
+                // Arrêt immédiat de la caméra et lancement de la recherche
+                html5QrCode.stop().then(() => {
+                  handleBarcodeSearch(decodedText);
+                }).catch((err: any) => {
+                  console.error("Erreur arrêt scanner après succès:", err);
+                  handleBarcodeSearch(decodedText);
+                });
+              }
+            },
+            (errorMessage: string) => {
+              // Erreur silencieuse de scan continu
+            }
+          );
+          setCameraError(null);
+        } catch (err: any) {
+          console.error("Échec d'initialisation de la caméra de scan:", err);
+          if (active) {
+            setCameraError(
+              "Impossible d'accéder à l'appareil photo arrière. Autorise l'accès ou saisis le code manuellement."
+            );
+            setIsCameraActive(false); // Bascule automatique en mode saisie manuelle
+          }
+        }
+      };
+
+      startScanner();
+    }
+
+    return () => {
+      active = false;
+      if (scannerInstance) {
+        if (scannerInstance.isScanning) {
+          scannerInstance.stop().catch((e: any) => console.error("Clean stop error in cleanup:", e));
+        }
+      }
+      html5QrCodeRef.current = null;
+    };
+  }, [visible, scannerMode, isCameraActive, scanStep]);
 
   const handleStartScan = (product: MockProduct) => {
     setSelectedProduct(product);
@@ -317,6 +402,8 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     setIsSearchingBarcode(false);
     setBarcodeInput('');
     setScannerMode(null);
+    setIsCameraActive(true);
+    setCameraError(null);
     setScanStep('idle');
   };
 
@@ -514,36 +601,105 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
 
               {/* BARCODE MODE */}
               {scannerMode === 'barcode' && (
-                <View>
+                <View style={{ width: '100%' }}>
                   {/* Back button */}
                   <TouchableOpacity style={styles.backModeButton} onPress={() => setScannerMode(null)}>
                     <Text style={styles.backModeButtonText}>⬅️ Retour aux options</Text>
                   </TouchableOpacity>
 
-                  <Text style={[styles.introText, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                    Saisis le code-barres (EAN-13) au dos de ton produit capillaire pour interroger la base internationale Open Beauty Facts :
-                  </Text>
+                  {isCameraActive ? (
+                    <View style={styles.cameraScannerSection}>
+                      <Text style={[styles.scannerInstructions, isDark ? styles.textLight : styles.textDark]}>
+                        📷 Cadre le code-barres dans le viseur :
+                      </Text>
+                      
+                      {/* Live Camera Viewport */}
+                      <View style={styles.cameraViewfinderWrapper}>
+                        <View style={styles.viewfinder}>
+                          {typeof window !== 'undefined' && (
+                            <div 
+                              id="barcode-scanner-reader" 
+                              style={{ 
+                                width: '100%', 
+                                height: '100%', 
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                overflow: 'hidden'
+                              }} 
+                            />
+                          )}
+                          
+                          {/* Laser Bar */}
+                          <Animated.View style={[
+                            styles.laserLine,
+                            { transform: [{ translateY: laserAnim }] }
+                          ]} />
 
-                  {/* Input field */}
-                  <View style={[styles.barcodeInputWrapper, isDark ? styles.barcodeInputWrapperDark : styles.barcodeInputWrapperLight]}>
-                    <TextInput
-                      style={[styles.barcodeInput, isDark ? styles.barcodeInputDark : styles.barcodeInputLight]}
-                      placeholder="Ex: 3596710406087"
-                      placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
-                      keyboardType="numeric"
-                      value={barcodeInput}
-                      onChangeText={setBarcodeInput}
-                    />
-                  </View>
+                          {/* Corners of Viewfinder */}
+                          <Animated.View style={[
+                            styles.viewfinderFrame,
+                            { transform: [{ scale: pulseAnim }] }
+                          ]}>
+                            <View style={[styles.corner, styles.topLeft]} />
+                            <View style={[styles.corner, styles.topRight]} />
+                            <View style={[styles.corner, styles.bottomLeft]} />
+                            <View style={[styles.corner, styles.bottomRight]} />
+                          </Animated.View>
+                        </View>
+                      </View>
 
-                  {/* Launch button */}
-                  <TouchableOpacity
-                    style={styles.launchBarcodeButton}
-                    activeOpacity={0.8}
-                    onPress={() => handleBarcodeSearch()}
-                  >
-                    <Text style={styles.launchBarcodeButtonText}>🔍 Lancer la recherche automatique</Text>
-                  </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.toggleManualButton, isDark ? styles.toggleManualButtonDark : styles.toggleManualButtonLight]}
+                        onPress={() => setIsCameraActive(false)}
+                      >
+                        <Text style={styles.toggleManualButtonText}>📝 Saisir le code-barres manuellement</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View>
+                      <Text style={[styles.introText, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                        Saisis le code-barres (EAN-13) de ton produit capillaire ou réactive le scan automatique :
+                      </Text>
+
+                      {cameraError && (
+                        <View style={styles.cameraErrorCard}>
+                          <Text style={styles.cameraErrorText}>⚠️ {cameraError}</Text>
+                        </View>
+                      )}
+
+                      {/* Input field */}
+                      <View style={[styles.barcodeInputWrapper, isDark ? styles.barcodeInputWrapperDark : styles.barcodeInputWrapperLight]}>
+                        <TextInput
+                          style={[styles.barcodeInput, isDark ? styles.barcodeInputDark : styles.barcodeInputLight]}
+                          placeholder="Ex: 3596710406087"
+                          placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
+                          keyboardType="numeric"
+                          value={barcodeInput}
+                          onChangeText={setBarcodeInput}
+                        />
+                      </View>
+
+                      {/* Launch button */}
+                      <TouchableOpacity
+                        style={styles.launchBarcodeButton}
+                        activeOpacity={0.8}
+                        onPress={() => handleBarcodeSearch()}
+                      >
+                        <Text style={styles.launchBarcodeButtonText}>🔍 Lancer la recherche automatique</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.toggleManualButton, isDark ? styles.toggleManualButtonDark : styles.toggleManualButtonLight, { marginBottom: spacing.md }]}
+                        onPress={() => {
+                          setCameraError(null);
+                          setIsCameraActive(true);
+                        }}
+                      >
+                        <Text style={styles.toggleManualButtonText}>📷 Réactiver le scan caméra</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
 
                   {/* EAN PRE-SET EXAMPLES */}
                   <View style={styles.examplesContainer}>
@@ -1318,5 +1474,61 @@ const styles = StyleSheet.create({
   examplePillEan: {
     fontSize: 10,
     color: colors.textSecondary,
+  },
+  cameraScannerSection: {
+    alignItems: 'center',
+    marginVertical: spacing.md,
+    gap: spacing.md,
+  },
+  scannerInstructions: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  cameraViewfinderWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 250,
+    height: 250,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: '#000000',
+  },
+  toggleManualButton: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  toggleManualButtonDark: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  toggleManualButtonLight: {
+    backgroundColor: '#FAFBFC',
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  toggleManualButtonText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: colors.primary,
+  },
+  cameraErrorCard: {
+    backgroundColor: 'rgba(217, 83, 79, 0.08)',
+    borderColor: 'rgba(217, 83, 79, 0.15)',
+    borderWidth: 1,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginVertical: spacing.sm,
+  },
+  cameraErrorText: {
+    color: colors.danger,
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 16,
   },
 });
