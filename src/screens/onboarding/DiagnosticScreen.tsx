@@ -26,13 +26,13 @@ export const avatarImageMap: { [key: string]: any } = {
 
 export const avatarList = [
   { id: 'avatar_1' },
-  { id: 'avatar_2' },
   { id: 'avatar_3' },
   { id: 'avatar_4' },
   { id: 'avatar_5' },
   { id: 'avatar_6' },
   { id: 'avatar_7' },
   { id: 'avatar_8' },
+  { id: 'avatar_2' },
 ];
 
 export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, onFinishDiagnostic, isEditing = false }) => {
