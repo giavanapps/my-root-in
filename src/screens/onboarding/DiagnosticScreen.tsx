@@ -22,11 +22,15 @@ export const avatarImageMap: { [key: string]: any } = {
   avatar_6: require('../../../assets/avatars/avatar_6.png'),
   avatar_7: require('../../../assets/avatars/avatar_7.png'),
   avatar_8: require('../../../assets/avatars/avatar_8.png'),
+  avatar_9: require('../../../assets/avatars/avatar_9.png'),
+  avatar_10: require('../../../assets/avatars/avatar_10.png'),
 };
 
 export const avatarList = [
   { id: 'avatar_1' },
   { id: 'avatar_3' },
+  { id: 'avatar_9' },
+  { id: 'avatar_10' },
   { id: 'avatar_4' },
   { id: 'avatar_5' },
   { id: 'avatar_6' },
