@@ -1537,22 +1537,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                 style={{ flex: 1 }}
               />
             </View>
+
+            {/* ⏰ INDIVIDUAL TIME PICKER OVERLAY */}
+            {activeCareItem && (
+              <TimePickerModal
+                visible={showTimePicker}
+                initialTime={activeCareItem.reminderTime || activeProfile.notifications.time || '08:30'}
+                onClose={() => setShowTimePicker(false)}
+                onSave={(time) => {
+                  updateRoutineItemTime(activeCareItem.id, time);
+                }}
+                title={`Heure du rappel : ${activeCareItem.category} ⏰`}
+              />
+            )}
           </View>
         </View>
       </Modal>
-
-      {/* ⏰ INDIVIDUAL TIME PICKER OVERLAY */}
-      {activeCareItem && (
-        <TimePickerModal
-          visible={showTimePicker}
-          initialTime={activeCareItem.reminderTime || activeProfile.notifications.time || '08:30'}
-          onClose={() => setShowTimePicker(false)}
-          onSave={(time) => {
-            updateRoutineItemTime(activeCareItem.id, time);
-          }}
-          title={`Heure du rappel : ${activeCareItem.category} ⏰`}
-        />
-      )}
 
       {/* 📚 ADVICE LIBRARY MODAL (Voir tous mes conseils) */}
       <Modal
