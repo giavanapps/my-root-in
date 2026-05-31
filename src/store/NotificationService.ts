@@ -100,17 +100,29 @@ export const NotificationService = {
     if (Platform.OS === 'web') return;
     
     try {
-      // 1. Wipe previous alarms to avoid duplication
+      // 1. Configurer le canal de notification Android avec haute importance pour jouer du son
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'Rappels de soins',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#E5A982', // Couleur Terracotta
+          showBadge: true,
+          sound: 'default', // utilise le son par défaut
+        });
+      }
+
+      // 2. Wipe previous alarms to avoid duplication
       await this.cancelAllReminders();
 
       const todayStr = new Date().toISOString().split('T')[0];
 
-      // 2. Filter uncompleted cares scheduled for today or in the future
+      // 3. Filter uncompleted cares scheduled for today or in the future
       const upcomingCares = routineItems.filter(
         item => !item.completed && item.date >= todayStr
       );
 
-      // 3. Register native notifications up to a safe limit (Android/iOS supports ~64 scheduled tasks max)
+      // 4. Register native notifications up to a safe limit (Android/iOS supports ~64 scheduled tasks max)
       const maxReminders = Math.min(upcomingCares.length, 30);
 
       for (let i = 0; i < maxReminders; i++) {
@@ -140,7 +152,8 @@ export const NotificationService = {
             },
             trigger: { 
               type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, 
-              seconds: secondsFromNow 
+              seconds: secondsFromNow,
+              channelId: 'default' // obligatoire pour le son sur Android 8+
             },
           });
         }
