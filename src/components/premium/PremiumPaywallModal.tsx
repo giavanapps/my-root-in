@@ -175,7 +175,18 @@ export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visibl
                       <Text style={styles.protocolStepText}>🗓️ Soin Lavage (19 Juin) : Shampoing Actiforce 🧴</Text>
                     </View>
 
-                    {!isPremium && (
+                    {isPremium ? (
+                      <TouchableOpacity 
+                        style={styles.previewButton}
+                        onPress={() => {
+                          setActivePreview(null);
+                          onClose();
+                          if (onOpenScanner) onOpenScanner();
+                        }}
+                      >
+                        <Text style={styles.previewButtonText}>Ouvrir le Scanner Réel 🚀</Text>
+                      </TouchableOpacity>
+                    ) : (
                       <View style={styles.lockedCallout}>
                         <Text style={styles.lockedCalloutText}>
                           🔒 Débloque l'Agenda Proactif pour coupler tes flacons avec ton calendrier capillaire !
@@ -200,7 +211,18 @@ export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visibl
                       </Text>
                     </View>
 
-                    {!isPremium && (
+                    {isPremium ? (
+                      <TouchableOpacity 
+                        style={styles.previewButton}
+                        onPress={() => {
+                          setActivePreview(null);
+                          onClose();
+                          if (onOpenScanner) onOpenScanner();
+                        }}
+                      >
+                        <Text style={styles.previewButtonText}>Ouvrir le Scanner Réel 🚀</Text>
+                      </TouchableOpacity>
+                    ) : (
                       <View style={styles.lockedCallout}>
                         <Text style={styles.lockedCalloutText}>
                           🔒 Utilise le comparateur anti-gaspillage en magasin pour économiser immédiatement !
@@ -225,7 +247,18 @@ export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visibl
                       </Text>
                     </View>
 
-                    {!isPremium && (
+                    {isPremium ? (
+                      <TouchableOpacity 
+                        style={styles.previewButton}
+                        onPress={() => {
+                          setActivePreview(null);
+                          onClose();
+                          if (onOpenScanner) onOpenScanner();
+                        }}
+                      >
+                        <Text style={styles.previewButtonText}>Ouvrir le Scanner Réel 🚀</Text>
+                      </TouchableOpacity>
+                    ) : (
                       <View style={styles.lockedCallout}>
                         <Text style={styles.lockedCalloutText}>
                           🔒 Génère des fiches recettes végétales adaptées à tes boucles ou locks !
