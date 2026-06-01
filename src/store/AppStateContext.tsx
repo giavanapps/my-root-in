@@ -12,6 +12,7 @@ export interface HairDiagnostic {
   thickness: 'Fins' | 'Moyens' | 'Épais';
   sensitivity: ('Cuir chevelu sensible' | 'Casse/Fourches' | 'Naturels' | 'Traités chimiquement')[];
   activeStyle: 'Naturel' | 'Coiffure protectrice' | 'Locks en évolution';
+  scalpCondition?: string;
 }
 
 export interface HairHistory {
@@ -102,6 +103,7 @@ interface AppStateContextType {
   toggleRoutineCompleted: (id: string) => void;
   deleteRoutineItem: (id: string) => void;
   updateRoutineItemTime: (id: string, time: string) => void;
+  shiftRoutineDates: (profileId: string, daysToShift: number) => void;
   
   // Settings & Profile Management Methods
   renameProfile: (id: string, newName: string) => void;
@@ -875,6 +877,28 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }));
   };
 
+  const shiftRoutineDates = (profileId: string, daysToShift: number) => {
+    const clampedShift = Math.max(-30, Math.min(30, daysToShift));
+    if (clampedShift === 0) return;
+
+    setRoutine(prev => prev.map(item => {
+      // Only shift uncompleted cares for the active profile
+      // Exception: do NOT shift manual/free cares (recurrence === 'Unique')
+      if (
+        item.profileId === profileId &&
+        !item.completed &&
+        item.recurrence !== 'Unique'
+      ) {
+        // Shift date by clampedShift days
+        const oldDate = new Date(item.date);
+        oldDate.setDate(oldDate.getDate() + clampedShift);
+        const newDateStr = oldDate.toISOString().split('T')[0];
+        return { ...item, date: newDateStr };
+      }
+      return item;
+    }));
+  };
+
   const completePorosity = (porosityValue: 'Faible' | 'Moyenne' | 'Forte') => {
     let updatedDiag: HairDiagnostic | null = null;
 
@@ -1032,6 +1056,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       toggleRoutineCompleted,
       deleteRoutineItem,
       updateRoutineItemTime,
+      shiftRoutineDates,
       
       renameProfile,
       changeAvatar,

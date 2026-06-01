@@ -12,6 +12,7 @@ import { Button } from '../../components/common/Button';
 import { TimePickerModal } from '../../components/common/TimePickerModal';
 import { PremiumPaywallModal } from '../../components/premium/PremiumPaywallModal';
 import { ProductScannerModal } from '../../components/premium/ProductScannerModal';
+import { DatePickerModal } from '../../components/common/DatePickerModal';
 
 interface CareGuide {
   title: string;
@@ -498,7 +499,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
     updateRoutineItemTime,
     isPremium,
     setPremiumStatus,
-    regularityScore
+    regularityScore,
+    shiftRoutineDates
   } = useAppState();
 
   const [showHealthDetail, setShowHealthDetail] = useState(false);
@@ -512,6 +514,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
   const [selectedGuideCategory, setSelectedGuideCategory] = useState<string>('');
   const [selectedCareId, setSelectedCareId] = useState<string>('');
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   
   // Premium and Scanner Modals active states
   const [showPaywall, setShowPaywall] = useState(false);
@@ -592,10 +595,40 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
     return `Dans ${diffDays} jours`;
   };
 
+  const formatFrenchDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const [y, m, d] = dateStr.split('-');
+    const months = [
+      'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+      'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+    ];
+    const monthIndex = parseInt(m, 10) - 1;
+    const day = parseInt(d, 10);
+    return `${day} ${months[monthIndex]} ${y}`;
+  };
+
+  const getDaysBetween = (date1: string, date2: string): number => {
+    const d1 = new Date(date1);
+    const d2 = new Date(date2);
+    d1.setHours(12, 0, 0, 0);
+    d2.setHours(12, 0, 0, 0);
+    const diffMs = d2.getTime() - d1.getTime();
+    return Math.round(diffMs / (1000 * 60 * 60 * 24));
+  };
+
   // Filter future uncompleted cares (upcoming scheduled)
   const allUpcomingCares = routine
     .filter(r => r.profileId === activeProfile.id && !r.completed && r.date >= todayStr)
     .sort((a, b) => a.date.localeCompare(b.date));
+
+  const firstCareDate = allUpcomingCares[0]?.date || todayStr;
+
+  const handleShiftRoutine = (selectedDate: string) => {
+    const deltaDays = getDaysBetween(firstCareDate, selectedDate);
+    if (deltaDays !== 0) {
+      shiftRoutineDates(activeProfile.id, deltaDays);
+    }
+  };
 
   const upcomingCares = showAllUpcoming ? allUpcomingCares : allUpcomingCares.slice(0, 4);
 
@@ -613,6 +646,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false} 
+            nestedScrollEnabled={true}
             contentContainerStyle={styles.profileScroll}
             style={{ flex: 1 }}
           >
@@ -774,6 +808,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
         {/* 📅 AGENDA EXPRESS: UPCOMING PLANED CARES FEED */}
         <View style={styles.upcomingSection}>
           <Text style={[styles.upcomingSectionTitle, { color: customText }]}>🗓️ Mon Agenda à Venir</Text>
+
+          {/* Premium Routine Date Shifter Button */}
+          {allUpcomingCares.length > 0 && (
+            <TouchableOpacity
+              style={[
+                styles.shifterButton,
+                { 
+                  backgroundColor: isLight ? 'rgba(229, 169, 130, 0.08)' : 'rgba(229, 169, 130, 0.12)',
+                  borderColor: 'rgba(229, 169, 130, 0.25)'
+                }
+              ]}
+              activeOpacity={0.8}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text style={[styles.shifterButtonText, { color: customText }]}>
+                📅 Démarrer ma routine le {formatFrenchDate(firstCareDate)}
+              </Text>
+              <View style={styles.shifterBadge}>
+                <Text style={styles.shifterBadgeText}>DÉCALER ➔</Text>
+              </View>
+            </TouchableOpacity>
+          )}
           
           {upcomingCares.length === 0 ? (
             <View style={[styles.upcomingEmptyCard, { backgroundColor: customCard, borderColor: customBorder }]}>
@@ -945,6 +1001,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
           </View>
         </View>
       </Modal>
+
+      {/* 📅 Premium Routine Date Shifter Modal */}
+      <DatePickerModal
+        visible={showDatePicker}
+        initialDate={firstCareDate}
+        onClose={() => setShowDatePicker(false)}
+        onSave={handleShiftRoutine}
+        title="Démarrer ma routine le... 📅"
+        useNativeModal={false}
+      />
 
       {/* 🔬 POROSITY SELECTOR MODAL (Complete skipped porosity) */}
       <Modal
@@ -1926,7 +1992,7 @@ const styles = StyleSheet.create({
   },
   profileScroll: {
     paddingHorizontal: 20,
-    alignItems: 'center',
+    flexDirection: 'row',
   },
   profileAvatarWrapper: {
     width: 60,
@@ -2707,5 +2773,31 @@ const styles = StyleSheet.create({
   scannerWidgetArrow: {
     fontSize: 15,
     fontWeight: 'bold',
+  },
+  shifterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  shifterButtonText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  shifterBadge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  shifterBadgeText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#FFFFFF',
   },
 });

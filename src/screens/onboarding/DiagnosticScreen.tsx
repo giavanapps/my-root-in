@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TextInput, ScrollView, TouchableOpacity, SafeAreaView, Dimensions, Image } from 'react-native';
+import { StyleSheet, View, Text, TextInput, ScrollView, TouchableOpacity, SafeAreaView, Dimensions, Image, Modal } from 'react-native';
 import { colors } from '../../theme/colors';
 import { Button } from '../../components/common/Button';
 import { HairDiagnostic, useAppState } from '../../store/AppStateContext';
@@ -44,7 +44,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
 
   // Local state for diagnostic steps
   const [step, setStep] = useState(1);
-  const totalSteps = isEditing ? 7 : 9; // Name, Avatar, Texture, Porosity, Thickness, Sensitivity, Style, History, Notifications (Soft Pitch)
+  const totalSteps = isEditing ? 8 : 10; // Name, Avatar, Texture, Porosity, Thickness, Sensitivity, Style, Scalp Condition, History, Notifications (Soft Pitch)
   const [notifTone, setNotifTone] = useState<'Doux' | 'Motivant' | 'Direct'>('Motivant');
 
   // Hair care history states
@@ -72,6 +72,10 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
   const [activeStyle, setActiveStyle] = useState<HairDiagnostic['activeStyle']>(
     isEditing && activeProfile ? activeProfile.diagnostic.activeStyle : 'Naturel'
   );
+  const [scalpCondition, setScalpCondition] = useState<string>(
+    isEditing && activeProfile && activeProfile.diagnostic.scalpCondition ? activeProfile.diagnostic.scalpCondition : 'Aucune'
+  );
+  const [showMedicalWarning, setShowMedicalWarning] = useState(false);
 
   useEffect(() => {
     if (isEditing && activeProfile) {
@@ -82,6 +86,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
       setThickness(activeProfile.diagnostic.thickness);
       setSensitivity(activeProfile.diagnostic.sensitivity);
       setActiveStyle(activeProfile.diagnostic.activeStyle);
+      setScalpCondition(activeProfile.diagnostic.scalpCondition || 'Aucune');
     } else {
       setProfileName(userName || '');
       setNameError('');
@@ -139,6 +144,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
       thickness,
       sensitivity,
       activeStyle,
+      scalpCondition,
     };
 
     if (isEditing && activeProfile) {
@@ -179,10 +185,25 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
       return;
     }
 
+    if (step === 8) {
+      if (scalpCondition !== "Aucune de ces situations") {
+        setShowMedicalWarning(true);
+        return;
+      }
+    }
+
     if (step < totalSteps) {
       setStep(step + 1);
     } else {
-      // Step 7 editing mode completion
+      handleFinish(false);
+    }
+  };
+
+  const handleConfirmWarning = () => {
+    setShowMedicalWarning(false);
+    if (step < totalSteps) {
+      setStep(step + 1);
+    } else {
       handleFinish(false);
     }
   };
@@ -474,8 +495,50 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
           </View>
         )}
 
-        {/* Step 8: Hair History Questionnaire */}
+        {/* Step 8: Condition du cuir chevelu */}
         {step === 8 && (
+          <View style={styles.stepCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <Text style={styles.welcomeText}>Profil : {profileName} </Text>
+              {avatarImageMap[selectedAvatar] ? (
+                <Image source={avatarImageMap[selectedAvatar]} style={{ width: 22, height: 22, borderRadius: 11 }} resizeMode="contain" />
+              ) : (
+                <Text style={styles.welcomeText}>{selectedAvatar}</Text>
+              )}
+            </View>
+            <Text style={styles.title}>As-tu une condition particulière du cuir chevelu ? ⚠️</Text>
+            <Text style={styles.subtitle}>Ces informations nous permettent de veiller au respect de la physiologie de ton scalp.</Text>
+            
+            {[
+              { value: 'Pellicules/Dermite séborrhéique', icon: '❄️', desc: 'Desquamations, démangeaisons ou rougeurs localisées.' },
+              { value: 'Psoriasis', icon: '🩹', desc: 'Plaques épaisses de peaux mortes blanchâtres/argentées.' },
+              { value: 'Cuir chevelu très réactif/sensible', icon: '⚡', desc: 'Sensations d\'échauffement, tiraillements au moindre produit.' },
+              { value: 'Alopécie/Chute importante', icon: '📉', desc: 'Perte de cheveux localisée ou diffuse prononcée.' },
+              { value: 'Aucune de ces situations', icon: '💚', desc: 'Cuir chevelu sain et équilibré, pas de condition médicale.' },
+            ].map(option => (
+              <TouchableOpacity
+                key={option.value}
+                activeOpacity={0.8}
+                style={[
+                  styles.optionCard,
+                  scalpCondition === option.value && styles.selectedOptionCard,
+                ]}
+                onPress={() => setScalpCondition(option.value)}
+              >
+                <Text style={option.value === scalpCondition ? [styles.optionIcon, { color: colors.primary }] : styles.optionIcon}>{option.icon}</Text>
+                <View style={styles.optionTextWrapper}>
+                  <Text style={[styles.optionTitle, scalpCondition === option.value && styles.selectedOptionTitle]}>
+                    {option.value}
+                  </Text>
+                  <Text style={styles.optionDesc}>{option.desc}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* Step 9: Hair History Questionnaire */}
+        {step === 9 && (
           <View style={styles.stepCard}>
             <Text style={styles.welcomeText}>Historique de soins 🌿</Text>
             <Text style={styles.title}>Dis-nous où tu en es</Text>
@@ -590,8 +653,8 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
           </View>
         )}
 
-        {/* Step 9: Onboarding Soft Pitch Notification Permission */}
-        {step === 9 && (
+        {/* Step 10: Onboarding Soft Pitch Notification Permission */}
+        {step === 10 && (
           <View style={styles.stepCard}>
             <Text style={styles.welcomeText}>Dernière étape ! 🔔</Text>
             <Text style={styles.title}>Ne manquez aucun soin de votre routine</Text>
@@ -660,7 +723,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
 
       {/* Bottom Button Row */}
       <View style={styles.footer}>
-        {step === 9 ? (
+        {step === 10 ? (
           <View style={styles.softPitchFooterRow}>
             <Button
               title="Plus tard"
@@ -695,6 +758,31 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
           </>
         )}
       </View>
+      {/* ⚠️ MEDICAL WARNING MODAL */}
+      <Modal
+        visible={showMedicalWarning}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowMedicalWarning(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.feedbackCard}>
+            <Text style={styles.feedbackEmoji}>🩺</Text>
+            <Text style={[styles.feedbackTitle, { color: colors.textPrimary }]}>Avertissement Médical</Text>
+            <Text style={[styles.feedbackSubtitle, { color: colors.textSecondary, marginVertical: 12 }]}>
+              L'application <Text style={{ fontWeight: '800', color: colors.primary }}>My Root'in</Text> ne remplace en aucun cas un avis, un diagnostic ou un traitement médical.{"\n\n"}
+              Nous te recommandons vivement de <Text style={{ fontWeight: '700', color: colors.primary }}>consulter un dermatologue</Text> avant de démarrer ta routine capillaire.
+            </Text>
+
+            <Button
+              title="J'ai compris, je continue ➔"
+              onPress={handleConfirmWarning}
+              variant="primary"
+              style={{ width: '100%', marginTop: 8 }}
+            />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -1102,5 +1190,43 @@ const styles = StyleSheet.create({
   historyPillTextActive: {
     color: colors.primary,
     fontWeight: '800',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  feedbackCard: {
+    backgroundColor: colors.card,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 24,
+    width: '100%',
+    maxWidth: 340,
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  feedbackEmoji: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  feedbackTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  feedbackSubtitle: {
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
+    marginBottom: 20,
   },
 });

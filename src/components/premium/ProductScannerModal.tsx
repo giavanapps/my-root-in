@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, Modal, TouchableOpacity, ScrollView, Animated, ActivityIndicator, Image, TextInput } from 'react-native';
+import { StyleSheet, View, Text, Modal, TouchableOpacity, ScrollView, Animated, ActivityIndicator, Image, TextInput, Platform } from 'react-native';
 import { colors, borderRadius, spacing } from '../../theme/colors';
 import { useAppState } from '../../store/AppStateContext';
+import * as ImagePicker from 'expo-image-picker';
 
 interface ProductScannerModalProps {
   visible: boolean;
@@ -161,7 +162,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
       scannerMode === 'barcode' &&
       isCameraActive &&
       scanStep === 'idle' &&
-      typeof document !== 'undefined'
+      Platform.OS === 'web'
     ) {
       const elementId = "barcode-scanner-reader";
       
@@ -252,64 +253,103 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     }, 2500);
   };
 
-  const handleRealScanPress = () => {
-    if (typeof document === 'undefined') return;
+  const handleRealScanPress = async () => {
+    setSelectedProduct(null);
+    setRealProductAnalysis(null);
+    setRealProductError(null);
 
-    // Créer un élément input caché de type fichier
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.capture = 'environment'; // Demande l'appareil photo arrière sur mobile
+    if (Platform.OS === 'web') {
+      if (typeof document === 'undefined') return;
 
-    input.onchange = async (e: any) => {
-      const file = e.target.files[0];
-      if (file) {
-        // Lancer l'étape de scan
-        setSelectedProduct(null);
-        setRealProductAnalysis(null);
-        setRealProductError(null);
-        setIsAnalyzingReal(true);
-        setScanStep('scanning');
+      // Créer un élément input caché de type fichier pour le web
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.capture = 'environment'; // Demande l'appareil photo arrière sur mobile
 
-        const reader = new FileReader();
-        reader.onload = async () => {
-          const base64Data = reader.result as string;
-          try {
-            // Appel à notre API Route sécurisée sur Vercel
-            const response = await fetch('/api/scan', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                image: base64Data,
-                texture: activeProfile?.diagnostic?.texture || 'Crépus',
-                porosity: activeProfile?.diagnostic?.porosity || 'Moyenne'
-              })
-            });
+      input.onchange = async (e: any) => {
+        const file = e.target.files[0];
+        if (file) {
+          setIsAnalyzingReal(true);
+          setScanStep('scanning');
 
-            if (!response.ok) {
-              const errData = await response.json();
-              throw new Error(errData.error || errData.details || 'Erreur lors de l\'analyse');
-            }
+          const reader = new FileReader();
+          reader.onload = async () => {
+            const base64Data = reader.result as string;
+            await uploadAndAnalyze(base64Data);
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      input.click();
+    } else {
+      // Version native pour l'APK / Expo Go
+      try {
+        // 1. Demander les permissions d'appareil photo
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          alert("Désolé, nous avons besoin des permissions d'appareil photo pour analyser votre produit.");
+          return;
+        }
 
-            const result = await response.json();
-            setRealProductAnalysis(result);
-            setScanStep('result');
-          } catch (err: any) {
-            console.error('Scan failed:', err);
-            const errMsg = err.message || 'Impossible d\'analyser cette photo. Vérifie ta connexion ou ta clé d\'API Gemini.';
-            setRealProductError(errMsg);
-            setScanStep('idle');
-            alert(`Désolé, l'analyse a échoué : ${errMsg}`);
-          } finally {
-            setIsAnalyzingReal(false);
-          }
-        };
-        reader.readAsDataURL(file);
+        // 2. Ouvrir l'appareil photo natif
+        const result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: false,
+          quality: 0.5,
+          base64: true, // Très important pour obtenir le base64 directement
+        });
+
+        if (!result.canceled && result.assets && result.assets[0]) {
+          const asset = result.assets[0];
+          // Construire le format data URI requis par l'API
+          const base64Data = `data:image/jpeg;base64,${asset.base64}`;
+          
+          setIsAnalyzingReal(true);
+          setScanStep('scanning');
+          await uploadAndAnalyze(base64Data);
+        }
+      } catch (err: any) {
+        console.error("Camera launch error on native:", err);
+        alert("Une erreur est survenue lors de l'ouverture de l'appareil photo.");
       }
-    };
-    input.click();
+    }
+  };
+
+  const uploadAndAnalyze = async (base64Data: string) => {
+    try {
+      // Toujours utiliser l'URL absolue de Vercel car les URLs relatives échouent sur l'APK natif !
+      const apiUrl = 'https://my-root-in-nine.vercel.app/api/scan';
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          image: base64Data,
+          texture: activeProfile?.diagnostic?.texture || 'Crépus',
+          porosity: activeProfile?.diagnostic?.porosity || 'Moyenne'
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || errData.details || 'Erreur lors de l\'analyse');
+      }
+
+      const result = await response.json();
+      setRealProductAnalysis(result);
+      setScanStep('result');
+    } catch (err: any) {
+      console.error('Scan failed:', err);
+      const errMsg = err.message || 'Impossible d\'analyser cette photo. Vérifie ta connexion ou ta clé d\'API Gemini.';
+      setRealProductError(errMsg);
+      setScanStep('idle');
+      alert(`Désolé, l'analyse a échoué : ${errMsg}`);
+    } finally {
+      setIsAnalyzingReal(false);
+    }
   };
 
   const handleBarcodeSearch = async (barcodeToSearch?: string) => {
@@ -381,7 +421,8 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
       }
 
       // 2. Envoyer les ingrédients textuels à notre API Route privée
-      const scanResponse = await fetch('/api/scan', {
+      // Toujours utiliser l'URL absolue de Vercel car les URLs relatives échouent sur l'APK natif !
+      const scanResponse = await fetch('https://my-root-in-nine.vercel.app/api/scan', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -633,7 +674,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     <Text style={styles.backModeButtonText}>⬅️ Retour aux options</Text>
                   </TouchableOpacity>
 
-                  {isCameraActive ? (
+                  {isCameraActive && Platform.OS === 'web' ? (
                     <View style={styles.cameraScannerSection}>
                       <Text style={[styles.scannerInstructions, isDark ? styles.textLight : styles.textDark]}>
                         📷 Cadre le code-barres dans le viseur :
@@ -642,7 +683,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                       {/* Live Camera Viewport */}
                       <View style={styles.cameraViewfinderWrapper}>
                         <View style={styles.viewfinder}>
-                          {typeof window !== 'undefined' && (
+                          {Platform.OS === 'web' && (
                             <div 
                               id="barcode-scanner-reader" 
                               style={{ 

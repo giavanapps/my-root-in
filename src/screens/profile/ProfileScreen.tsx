@@ -186,7 +186,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
         <Text style={[styles.topLabel, { color: isLight ? '#888' : colors.textSecondary }]}>
           Gérer les profils familiaux :
         </Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.profileScroll}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} nestedScrollEnabled={true} contentContainerStyle={styles.profileScroll}>
           {profiles.map(p => {
             const isActive = p.id === activeProfileId;
             return (
@@ -242,6 +242,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
             <View style={styles.badge}><Text style={styles.badgeText}>Texture: {activeProfile.diagnostic.texture}</Text></View>
             <View style={[styles.badge, { backgroundColor: 'rgba(92, 133, 138, 0.1)' }]}><Text style={[styles.badgeText, { color: colors.porosityLow }]}>Porosité: {activeProfile.diagnostic.porosity ?? 'Non définie'}</Text></View>
             <View style={[styles.badge, { backgroundColor: 'rgba(92, 138, 107, 0.1)' }]}><Text style={[styles.badgeText, { color: colors.secondary }]}>Style: {activeProfile.diagnostic.activeStyle}</Text></View>
+            {activeProfile.diagnostic.scalpCondition && 
+             activeProfile.diagnostic.scalpCondition !== 'Aucune' && 
+             activeProfile.diagnostic.scalpCondition !== 'Aucune de ces situations' && (
+              <View style={[styles.badge, { backgroundColor: 'rgba(217, 83, 79, 0.1)', borderColor: 'rgba(217, 83, 79, 0.25)', borderWidth: 1 }]}>
+                <Text style={[styles.badgeText, { color: colors.danger }]}>
+                  ⚠️ Cuir chevelu: {activeProfile.diagnostic.scalpCondition}
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Changer de coiffure / Style bouton majeur */}
@@ -711,7 +720,7 @@ const styles = StyleSheet.create({
   },
   profileScroll: {
     paddingHorizontal: 20,
-    alignItems: 'center',
+    flexDirection: 'row',
   },
   profileAvatarWrapper: {
     width: 60,

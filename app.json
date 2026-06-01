@@ -20,9 +20,19 @@
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "android.permission.SCHEDULE_EXACT_ALARM"
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.CAMERA"
       ]
     },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "L'application a besoin d'accéder à vos photos pour analyser vos produits.",
+          "cameraPermission": "L'application a besoin d'accéder à l'appareil photo pour scanner vos produits."
+        }
+      ]
+    ],
     "web": {
       "favicon": "./assets/favicon.png"
     },

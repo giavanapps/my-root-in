@@ -121,6 +121,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          nestedScrollEnabled={true}
           contentContainerStyle={styles.monthsScroll}
           style={styles.monthsWrapper}
         >
@@ -259,7 +260,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   monthsScroll: {
-    alignItems: 'center',
+    flexDirection: 'row',
   },
   monthBtn: {
     borderRadius: 10,
