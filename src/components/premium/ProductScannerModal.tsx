@@ -82,22 +82,26 @@ export interface DiyRecipe {
 
 export const detectCategory = (name: string, brand: string): string => {
   const full = `${brand} ${name}`.toLowerCase();
-  if (full.includes('shampoing') || full.includes('shampoo') || full.includes('wash') || full.includes('nettoyant')) {
+  
+  if (/\bshampoing\b|\bshampoo\b|\bwash\b|\bcowash\b|\bco-wash\b|\bnettoyant\b/i.test(full)) {
     return 'Lavage';
   }
-  if (full.includes('masque') || full.includes('mask') || full.includes('treatment') || full.includes('soin profond') || full.includes('reconstructeur')) {
+  if (/\bmasque\b|\bmask\b|\btreatment\b|\bdeep\b|\breconstructeur\b/i.test(full)) {
     return 'Masque hydratant';
   }
-  if (full.includes('bain') || full.includes('huile') || full.includes('oil') || full.includes('serum')) {
-    return "Bain d'huile";
+  if (/\bhuile\b|\boil\b|\boils\b|\bserum\b/i.test(full)) {
+    // If it also contains cream, crème, lotion, lait, smoothie, it's a cream/leave-in, not a pure oil!
+    if (!/\bcream\b|\bcrème\b|\bcreme\b|\blotion\b|\blait\b|\bsmoothie\b/i.test(full)) {
+      return "Bain d'huile";
+    }
   }
-  if (full.includes('leave') || full.includes('lait') || full.includes('crème') || full.includes('cream') || full.includes('smoothie') || full.includes('conditioner') || full.includes('après-shampoing')) {
-    return 'Soin sans rinçage';
-  }
-  if (full.includes('gel') || full.includes('wax') || full.includes('cire') || full.includes('retwist') || full.includes('styling') || full.includes('locks')) {
+  if (/\bgel\b|\bwax\b|\bcire\b|\bretwist\b|\bstyling\b|\blocks\b/i.test(full)) {
     return 'Retwist';
   }
-  if (full.includes('clarif') || full.includes('détox') || full.includes('argile') || full.includes('clay')) {
+  if (/\bleave\b|\blait\b|\bcrème\b|\bcreme\b|\bcream\b|\blotion\b|\bsmoothie\b|\bconditioner\b|\baprès-shampoing\b|\bapres-shampoing\b/i.test(full)) {
+    return 'Soin sans rinçage';
+  }
+  if (/\bclarif\b|\bdétox\b|\bdetox\b|\bargile\b|\bclay\b/i.test(full)) {
     return 'Clarification';
   }
   return 'Soin sans rinçage';
@@ -111,19 +115,20 @@ export const matchesCategory = (prodCat: string, agendaCat: string): boolean => 
     return pc.includes('lavage') || pc.includes('shampoing') || pc.includes('co-wash') || pc.includes('cowash');
   }
   if (ac.includes('bain')) {
-    return pc.includes('bain') || pc.includes('huile');
+    // agenda: Bain d'huile. Match Bain d'huile or pure oil, but NOT creams, milks, or lotions containing oils
+    return pc.includes("bain d'huile") || (pc.includes('huile') && !pc.includes('crème') && !pc.includes('cream') && !pc.includes('lait') && !pc.includes('lotion'));
   }
   if (ac.includes('masque') || ac.includes('hydratant') || ac.includes('protéin')) {
     return pc.includes('masque') || pc.includes('hydratant') || pc.includes('protéin') || pc.includes('reconstructeur');
   }
-  if (ac.includes('sans rinçage') || ac.includes('leave') || ac.includes('lait') || ac.includes('crème')) {
-    return pc.includes('sans rinçage') || pc.includes('leave') || pc.includes('lait') || pc.includes('crème') || pc.includes('smoothie');
+  if (ac.includes('sans rinçage') || ac.includes('leave') || ac.includes('lait') || ac.includes('crème') || ac.includes('cream')) {
+    return pc.includes('sans rinçage') || pc.includes('leave') || pc.includes('lait') || pc.includes('crème') || pc.includes('cream') || pc.includes('smoothie');
   }
   if (ac.includes('retwist')) {
-    return pc.includes('retwist') || pc.includes('gel') || pc.includes('wax') || pc.includes('cire');
+    return pc.includes('retwist') || pc.includes('gel') || pc.includes('wax') || pc.includes('cire') || pc.includes('locks');
   }
   if (ac.includes('clarif')) {
-    return pc.includes('clarif') || pc.includes('détox') || pc.includes('argile');
+    return pc.includes('clarif') || pc.includes('détox') || pc.includes('argile') || pc.includes('clay');
   }
   return false;
 };
@@ -290,7 +295,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   const [realProductError, setRealProductError] = useState<string | null>(null);
 
   // Code-barres states
-  const [scannerMode, setScannerMode] = useState<'photo' | 'barcode' | null>(null);
+  const [scannerMode, setScannerMode] = useState<'photo' | 'barcode' | 'select_method' | null>(null);
   const [barcodeInput, setBarcodeInput] = useState('');
   const [isSearchingBarcode, setIsSearchingBarcode] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(true);
@@ -300,6 +305,16 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   // Animation laser
   const laserAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Reset scanner mode to show the 4 premium functions on entry unless displaying a result
+  useEffect(() => {
+    if (visible) {
+      if (scanStep !== 'result') {
+        setScannerMode(null);
+        setScanStep('idle');
+      }
+    }
+  }, [visible]);
 
   const html5QrCodeRef = useRef<any>(null);
 
@@ -774,14 +789,115 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
           {scanStep === 'idle' && (
             <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
               
-              {/* DASHBOARD: CHOOSE SCANNER MODE */}
+              {/* DASHBOARD: CHOOSE SCANNER FUNCTION */}
               {scannerMode === null && (
                 <View style={styles.dashboardContainer}>
                   <Text style={[styles.dashboardPrompt, isDark ? styles.textLight : styles.textDark]}>
-                    Comment souhaites-tu analyser ton produit ? 🔬
+                    Choisis l'une de nos 4 fonctions intelligentes : 🔬
                   </Text>
                   
-                  {/* Option 1: Photo Scan */}
+                  {/* Card 1: Diagnostic INCI */}
+                  <TouchableOpacity
+                    style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
+                    activeOpacity={0.9}
+                    onPress={() => {
+                      setActiveFeatureTab('inci');
+                      setScannerMode('select_method');
+                    }}
+                  >
+                    <Text style={styles.modeCardIcon}>🔬</Text>
+                    <View style={styles.modeCardTextContainer}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Analyse Totale & Profil Capillaire</Text>
+                      </View>
+                      <Text style={[styles.modeCardSubtitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                        Analyse moléculaire complète de la formule INCI et diagnostic personnalisé de compatibilité avec tes cuticules.
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Card 2: Ranger */}
+                  <TouchableOpacity
+                    style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
+                    activeOpacity={0.9}
+                    onPress={() => {
+                      setActiveFeatureTab('add');
+                      setScannerMode('select_method');
+                    }}
+                  >
+                    <Text style={styles.modeCardIcon}>➕</Text>
+                    <View style={styles.modeCardTextContainer}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Ajouter à ma Salle de Bain</Text>
+                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: colors.primary, backgroundColor: 'rgba(229, 169, 130, 0.15)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3 }}>PROACTIF</Text>
+                      </View>
+                      <Text style={[styles.modeCardSubtitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                        Enregistre ton produit dans ton placard virtuel pour que l'IA intelligente l'associe automatiquement à tes futurs soins du calendrier.
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Card 3: Comparateur */}
+                  <TouchableOpacity
+                    style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
+                    activeOpacity={0.9}
+                    onPress={() => {
+                      setActiveFeatureTab('compare');
+                      setScannerMode('select_method');
+                    }}
+                  >
+                    <Text style={styles.modeCardIcon}>🧐</Text>
+                    <View style={styles.modeCardTextContainer}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Est-ce que j'ai un équivalent chez moi ?</Text>
+                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#5C8AA7', backgroundColor: 'rgba(92, 138, 167, 0.15)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3 }}>ANTI-GASPI</Text>
+                      </View>
+                      <Text style={[styles.modeCardSubtitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                        Flashe un produit en magasin pour comparer sa formule et détecter instantanément si tu as déjà un doublon identique à la maison.
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Card 4: DIY Dupe */}
+                  <TouchableOpacity
+                    style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
+                    activeOpacity={0.9}
+                    onPress={() => {
+                      setActiveFeatureTab('diy');
+                      setScannerMode('select_method');
+                    }}
+                  >
+                    <Text style={styles.modeCardIcon}>🌿</Text>
+                    <View style={styles.modeCardTextContainer}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Dupe Végétal DIY</Text>
+                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#A892B3', backgroundColor: 'rgba(168, 146, 179, 0.15)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3 }}>RECETTE NATURELLE</Text>
+                      </View>
+                      <Text style={[styles.modeCardSubtitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                        Conçois une alternative saine, 100% naturelle et économique sous forme de recette maison sur-mesure pour ton type de cheveu.
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* SELECT METHOD MODE */}
+              {scannerMode === 'select_method' && (
+                <View>
+                  {/* Back button */}
+                  <TouchableOpacity style={styles.backModeButton} onPress={() => setScannerMode(null)}>
+                    <Text style={styles.backModeButtonText}>⬅️ Retour aux fonctions</Text>
+                  </TouchableOpacity>
+
+                  <Text style={[styles.dashboardPrompt, isDark ? styles.textLight : styles.textDark, { textAlign: 'left', marginBottom: spacing.md }]}>
+                    Comment souhaites-tu analyser ton produit pour lancer l'action :
+                    {activeFeatureTab === 'inci' && " Analyse INCI ?"}
+                    {activeFeatureTab === 'add' && " Ranger dans ta Salle de Bain ?"}
+                    {activeFeatureTab === 'compare' && " Comparer en magasin ?"}
+                    {activeFeatureTab === 'diy' && " Créer ton dupe végétal DIY ?"}
+                  </Text>
+
+                  {/* Method 1: Photo */}
                   <TouchableOpacity
                     style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
                     activeOpacity={0.9}
@@ -789,14 +905,14 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                   >
                     <Text style={styles.modeCardIcon}>📷</Text>
                     <View style={styles.modeCardTextContainer}>
-                      <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Photo des ingrédients (INCI)</Text>
+                      <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Prendre une Photo des ingrédients (INCI)</Text>
                       <Text style={[styles.modeCardSubtitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                        Prends en photo la liste d'ingrédients écrite au dos de n'importe quel flacon. Fonctionne à 100 % !
+                        Prends en photo la liste d'ingrédients au dos de ton flacon.
                       </Text>
                     </View>
                   </TouchableOpacity>
 
-                  {/* Option 2: Barcode Scan */}
+                  {/* Method 2: Code-barres */}
                   <TouchableOpacity
                     style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
                     activeOpacity={0.9}
@@ -804,9 +920,9 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                   >
                     <Text style={styles.modeCardIcon}>🏷️</Text>
                     <View style={styles.modeCardTextContainer}>
-                      <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Code-barres du produit</Text>
+                      <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Flasher le Code-barres du produit</Text>
                       <Text style={[styles.modeCardSubtitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                        Flashe ou saisis le code-barres pour chercher le produit dans la base de données internationale.
+                        Flashe avec l'appareil photo ou saisis manuellement le code EAN du produit.
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -817,8 +933,8 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
               {scannerMode === 'photo' && (
                 <View>
                   {/* Back button */}
-                  <TouchableOpacity style={styles.backModeButton} onPress={() => setScannerMode(null)}>
-                    <Text style={styles.backModeButtonText}>⬅️ Retour aux options</Text>
+                  <TouchableOpacity style={styles.backModeButton} onPress={() => setScannerMode('select_method')}>
+                    <Text style={styles.backModeButtonText}>⬅️ Retour aux choix</Text>
                   </TouchableOpacity>
 
                   {/* 📷 BOUTON SCANNER RÉEL */}
@@ -875,8 +991,8 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
               {scannerMode === 'barcode' && (
                 <View style={{ width: '100%' }}>
                   {/* Back button */}
-                  <TouchableOpacity style={styles.backModeButton} onPress={() => setScannerMode(null)}>
-                    <Text style={styles.backModeButtonText}>⬅️ Retour aux options</Text>
+                  <TouchableOpacity style={styles.backModeButton} onPress={() => setScannerMode('select_method')}>
+                    <Text style={styles.backModeButtonText}>⬅️ Retour aux choix</Text>
                   </TouchableOpacity>
 
                   {isCameraActive && Platform.OS === 'web' ? (

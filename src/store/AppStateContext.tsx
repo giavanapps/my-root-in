@@ -955,19 +955,20 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             return pc.includes('lavage') || pc.includes('shampoing') || pc.includes('co-wash') || pc.includes('cowash');
           }
           if (ac.includes('bain')) {
-            return pc.includes('bain') || pc.includes('huile');
+            // agenda: Bain d'huile. Match Bain d'huile or pure oil, but NOT creams, milks, or lotions containing oils
+            return pc.includes("bain d'huile") || (pc.includes('huile') && !pc.includes('crème') && !pc.includes('cream') && !pc.includes('lait') && !pc.includes('lotion'));
           }
           if (ac.includes('masque') || ac.includes('hydratant') || ac.includes('protéin')) {
             return pc.includes('masque') || pc.includes('hydratant') || pc.includes('protéin') || pc.includes('reconstructeur');
           }
-          if (ac.includes('sans rinçage') || ac.includes('leave') || ac.includes('lait') || ac.includes('crème')) {
-            return pc.includes('sans rinçage') || pc.includes('leave') || pc.includes('lait') || pc.includes('crème') || pc.includes('smoothie');
+          if (ac.includes('sans rinçage') || ac.includes('leave') || ac.includes('lait') || ac.includes('crème') || ac.includes('cream')) {
+            return pc.includes('sans rinçage') || pc.includes('leave') || pc.includes('lait') || pc.includes('crème') || pc.includes('cream') || pc.includes('smoothie');
           }
           if (ac.includes('retwist')) {
-            return pc.includes('retwist') || pc.includes('gel') || pc.includes('wax') || pc.includes('cire');
+            return pc.includes('retwist') || pc.includes('gel') || pc.includes('wax') || pc.includes('cire') || pc.includes('locks');
           }
           if (ac.includes('clarif')) {
-            return pc.includes('clarif') || pc.includes('détox') || pc.includes('argile');
+            return pc.includes('clarif') || pc.includes('détox') || pc.includes('argile') || pc.includes('clay');
           }
           return false;
         };
