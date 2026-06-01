@@ -8,9 +8,10 @@ import { DiagnosticScreen } from './src/screens/onboarding/DiagnosticScreen';
 import { HomeScreen } from './src/screens/home/HomeScreen';
 import { ProfileScreen } from './src/screens/profile/ProfileScreen';
 import { CalendarScreen } from './src/screens/calendar/CalendarScreen';
+import { BathroomScreen } from './src/screens/bathroom/BathroomScreen';
 
 type ActiveScreen = 'auth' | 'diagnostic' | 'home';
-type ActiveTab = 'dashboard' | 'calendar' | 'profile';
+type ActiveTab = 'dashboard' | 'calendar' | 'bathroom' | 'profile';
 
 function MainApp() {
   const [currentScreen, setCurrentScreen] = useState<ActiveScreen>('auth');
@@ -105,6 +106,9 @@ function MainApp() {
                   onCloseAutoOpen={() => setAutoOpenCalendarModal(false)}
                 />
               )}
+              {activeTab === 'bathroom' && (
+                <BathroomScreen />
+              )}
               {activeTab === 'profile' && (
                 <ProfileScreen 
                   onRefireDiagnostic={() => {
@@ -158,7 +162,24 @@ function MainApp() {
                 </Text>
               </TouchableOpacity>
 
-              {/* Tab 3: Mon Profil */}
+              {/* Tab 3: Salle de Bain */}
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                style={styles.tabItem} 
+                onPress={() => setActiveTab('bathroom')}
+              >
+                <Text style={[styles.tabIcon, { opacity: activeTab === 'bathroom' ? 1 : 0.6 }]}>
+                  🧴
+                </Text>
+                <Text style={[
+                  styles.tabLabel, 
+                  { color: activeTab === 'bathroom' ? activeTextColor : inactiveTextColor }
+                ]}>
+                  Salle de Bain
+                </Text>
+              </TouchableOpacity>
+
+              {/* Tab 4: Mon Profil */}
               <TouchableOpacity 
                 activeOpacity={0.8}
                 style={styles.tabItem} 

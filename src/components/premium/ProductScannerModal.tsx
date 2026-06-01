@@ -73,11 +73,215 @@ const mockProductsList: MockProduct[] = [
   }
 ];
 
+export interface DiyRecipe {
+  title: string;
+  ingredients: string[];
+  steps: string[];
+  preservation: string;
+}
+
+export const detectCategory = (name: string, brand: string): string => {
+  const full = `${brand} ${name}`.toLowerCase();
+  if (full.includes('shampoing') || full.includes('shampoo') || full.includes('wash') || full.includes('nettoyant')) {
+    return 'Lavage';
+  }
+  if (full.includes('masque') || full.includes('mask') || full.includes('treatment') || full.includes('soin profond') || full.includes('reconstructeur')) {
+    return 'Masque hydratant';
+  }
+  if (full.includes('bain') || full.includes('huile') || full.includes('oil') || full.includes('serum')) {
+    return "Bain d'huile";
+  }
+  if (full.includes('leave') || full.includes('lait') || full.includes('crème') || full.includes('cream') || full.includes('smoothie') || full.includes('conditioner') || full.includes('après-shampoing')) {
+    return 'Soin sans rinçage';
+  }
+  if (full.includes('gel') || full.includes('wax') || full.includes('cire') || full.includes('retwist') || full.includes('styling') || full.includes('locks')) {
+    return 'Retwist';
+  }
+  if (full.includes('clarif') || full.includes('détox') || full.includes('argile') || full.includes('clay')) {
+    return 'Clarification';
+  }
+  return 'Soin sans rinçage';
+};
+
+export const matchesCategory = (prodCat: string, agendaCat: string): boolean => {
+  const pc = prodCat.toLowerCase();
+  const ac = agendaCat.toLowerCase();
+  
+  if (ac.includes('lavage') || ac.includes('shampoing')) {
+    return pc.includes('lavage') || pc.includes('shampoing') || pc.includes('co-wash') || pc.includes('cowash');
+  }
+  if (ac.includes('bain')) {
+    return pc.includes('bain') || pc.includes('huile');
+  }
+  if (ac.includes('masque') || ac.includes('hydratant') || ac.includes('protéin')) {
+    return pc.includes('masque') || pc.includes('hydratant') || pc.includes('protéin') || pc.includes('reconstructeur');
+  }
+  if (ac.includes('sans rinçage') || ac.includes('leave') || ac.includes('lait') || ac.includes('crème')) {
+    return pc.includes('sans rinçage') || pc.includes('leave') || pc.includes('lait') || pc.includes('crème') || pc.includes('smoothie');
+  }
+  if (ac.includes('retwist')) {
+    return pc.includes('retwist') || pc.includes('gel') || pc.includes('wax') || pc.includes('cire');
+  }
+  if (ac.includes('clarif')) {
+    return pc.includes('clarif') || pc.includes('détox') || pc.includes('argile');
+  }
+  return false;
+};
+
+export const getCategoryEmoji = (category: string): string => {
+  const cat = category.toLowerCase();
+  if (cat.includes('lavage') || cat.includes('shampoing')) return '🧴';
+  if (cat.includes('bain') || cat.includes('huile')) return '🌿';
+  if (cat.includes('masque') || cat.includes('hydra')) return '🍯';
+  if (cat.includes('rinçage') || cat.includes('leave') || cat.includes('lait')) return '💧';
+  if (cat.includes('gel') || cat.includes('retwist')) return '👑';
+  if (cat.includes('clarif') || cat.includes('détox')) return '🔬';
+  return '🌸';
+};
+
+export const getDiyDupeRecipe = (category: string, porosity: string, texture: string): DiyRecipe => {
+  const isLowPoro = porosity === 'Faible';
+  const isHighPoro = porosity === 'Forte';
+  
+  if (category === 'Lavage') {
+    return {
+      title: '🌿 Shampoing Doux Clarifiant de Shikakaï & Aloe Vera',
+      ingredients: [
+        '3 c. à s. de Poudre de Shikakaï (nettoyant saponifère ayurvédique)',
+        '2 c. à s. de Gel d\'Aloe Vera Bio (agent hydratant apaisant)',
+        isLowPoro 
+          ? '1 c. à c. d\'Huile de Jojoba (légère, évite d\'alourdir ta porosité faible)' 
+          : isHighPoro 
+            ? '1 c. à s. d\'Huile de Ricin (riche et fortifiante pour ta porosité forte)'
+            : '1 c. à c. d\'Huile d\'Argan (équilibrée et protectrice)',
+        '150ml d\'Eau chaude infusée aux fleurs d\'hibiscus'
+      ],
+      steps: [
+        'Dans un bol non métallique, mélange la poudre de Shikakaï avec l\'eau chaude pour former une pâte crémeuse.',
+        'Ajoute le gel d\'Aloe Vera et l\'huile végétale adaptée à ta porosité, puis mélange jusqu\'à homogénéité.',
+        'Applique sur le cuir chevelu mouillé et masse doucement. Laisse poser 3 à 5 minutes pour profiter des actifs saponifères.',
+        'Rince abondamment à l\'eau tiède (ou eau froide pour sceller si ta porosité est forte).'
+      ],
+      preservation: '⚠️ À utiliser immédiatement. Ne se conserve pas au-delà de 24h.'
+    };
+  }
+  
+  if (category === "Bain d'huile") {
+    return {
+      title: '🌿 Bain d\'Élixir Nutritif Jojoba, Argan & Ylang-Ylang',
+      ingredients: [
+        isLowPoro 
+          ? '2 c. à s. d\'Huile de Jojoba (très fluide, pénètre facilement ta porosité faible)' 
+          : isHighPoro 
+            ? '2 c. à s. d\'Huile d\'Avocat ou de Coco (très riches pour combler ta porosité forte)'
+            : '2 c. à s. d\'Huile d\'Argan (parfaitement équilibrée)',
+        '1 c. à s. d\'Huile d\'Amande Douce (assouplissante)',
+        '4 gouttes d\'Huile Essentielle d\'Ylang-Ylang (force et brillance)'
+      ],
+      steps: [
+        'Mélange toutes les huiles végétales et l\'huile essentielle dans un flacon propre en verre ambré.',
+        'Fais chauffer le flacon quelques minutes au bain-marie pour tiédir les huiles (la chaleur aide à ouvrir tes cuticules).',
+        'Applique raie par raie sur le cuir chevelu puis étire sur les longueurs.',
+        'Enveloppe tes cheveux sous une serviette tiède ou un bonnet chauffant et laisse poser 30 à 45 minutes avant ton shampoing.'
+      ],
+      preservation: '🌿 Conserver à l\'abri de la lumière et de la chaleur pendant 6 mois maximum.'
+    };
+  }
+  
+  if (category === 'Masque hydratant') {
+    return {
+      title: '🍯 Masque Hydra-Nourrissant au Gel de Lin & Miel Sauvage',
+      ingredients: [
+        '100ml de Gel de graines de Lin maison (hydratant intense à effet glissant)',
+        '1 c. à s. de Miel Bio (humectant naturel puissant captant l\'eau)',
+        isLowPoro 
+          ? '1 c. à c. d\'Huile d\'Argan (pénétration rapide pour ta porosité faible)' 
+          : isHighPoro 
+            ? '1 c. à s. de Beurre de Karité fondu ou Huile d\'Avocat (protection extrême)'
+            : '1 c. à c. d\'Huile d\'Olive extra-vierge (brillance et nutrition)',
+        '3 gouttes de Vitamine E (conservateur naturel antioxydant)'
+      ],
+      steps: [
+        'Fais bouillir 2 c. à s. de graines de lin dans 250ml d\'eau pendant 10 min jusqu\'à consistance sirupeuse, puis filtre à chaud.',
+        'Laisse tiédir le gel obtenu puis prélève 100ml dans un bol propre.',
+        'Incorpore énergiquement le miel, l\'huile végétale adaptée à ta porosité et la vitamine E.',
+        'Applique sur cheveux lavés et essorés. Laisse poser 45 minutes sous un bonnet de douche, puis rince soigneusement.'
+      ],
+      preservation: '❄️ À conserver au réfrigérateur et à utiliser sous 7 jours maximum.'
+    };
+  }
+  
+  if (category === 'Retwist') {
+    return {
+      title: '👑 Gel Végétal Fixant de Gombo & Aloe Vera (Définition & Tenue Sans Résidus)',
+      ingredients: [
+        '5 Gombos frais coupés en rondelles (crée un gel mucilagineux parfait pour locks & boucles)',
+        '2 c. à s. de Gel d\'Aloe Vera Pur (fixation douce et hydratation)',
+        isLowPoro 
+          ? '1 c. à c. d\'Huile de Pépins de Raisin (légère et séchante)' 
+          : '1 c. à c. d\'Huile de Ricin (discipline et fortifie les locks)',
+        '200ml d\'Eau minérale'
+      ],
+      steps: [
+        'Fais frémir les rondelles de gombo dans l\'eau minérale pendant 15 minutes à feu moyen jusqu\'à obtenir un gel glissant.',
+        'Filtre immédiatement le gel à chaud à travers un tissu propre ou un collant (attention aux brûlures !).',
+        'Laisse refroidir le gel obtenu, puis fouette-le avec le gel d\'aloe vera et l\'huile végétale choisie.',
+        'Applique en petite quantité sur tes locks pour resserrer les racines (retwist) ou sur tes boucles libres pour les définir.'
+      ],
+      preservation: '❄️ Conserver obligatoirement au frais et utiliser dans les 10 jours.'
+    };
+  }
+  
+  if (category === 'Clarification') {
+    return {
+      title: '🔬 Soin Détox Purifiant & Clarifiant au Rhassoul & Romarin',
+      ingredients: [
+        '3 c. à s. de Poudre de Rhassoul du Maroc (argile minérale absorbante)',
+        '3 c. à s. d\'Infusion de Romarin tiède (assainissant)',
+        '1 c. à s. de Vinaigre de Cidre de Pomme Bio (régulateur de pH brillant)'
+      ],
+      steps: [
+        'Dans un récipient non métallique, mélange l\'argile de Rhassoul avec l\'infusion de romarin tiède.',
+        'Ajoute le vinaigre de cidre et mélange doucement à l\'aide d\'une cuillère en bois jusqu\'à obtenir une pâte onctueuse.',
+        'Humidifie tes cheveux et applique la pâte sur ton cuir chevelu et tes longueurs en massant brièvement.',
+        'Laisse poser 10 minutes (l\'argile ne doit pas sécher complètement), puis rince abondamment.'
+      ],
+      preservation: '⚠️ Usage unique immédiat. Ne pas stocker le mélange après préparation.'
+    };
+  }
+
+  // Fallback / Leave-in
+  return {
+    title: '💧 Leave-In Fluide Hydratant à l\'Hibiscus & Ylang-Ylang',
+    ingredients: [
+      '60ml d\'Infusion de fleurs d\'Hibiscus (acidifiante, referme les écailles)',
+      '30ml de Gel d\'Aloe Vera Bio (anti-frisottis et hydratation prolongée)',
+      '1 c. à c. d\'Huile de Jojoba (lumière et gaine légère)',
+      '3 gouttes de Vitamine E (conservateur protecteur)'
+    ],
+    steps: [
+      'Fais infuser une poignée de fleurs d\'hibiscus séchées dans de l\'eau bouillante, laisse refroidir et filtre.',
+      'Mélange 60ml de cette infusion refroidie avec le gel d\'aloe vera dans un flacon vaporisateur propre.',
+      'Ajoute l\'huile de jojoba et les gouttes de vitamine E, puis secoue vigoureusement pour émulsionner.',
+      'Vaporise quotidiennement sur tes longueurs sèches ou humides pour restaurer la souplesse de tes boucles.'
+    ],
+    preservation: '❄️ Conserver dans un endroit frais (réfrigérateur recommandé) pendant 2 semaines maximum.'
+  };
+};
+
 export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visible, onClose }) => {
-  const { activeProfile, themeMode } = useAppState();
+  const { 
+    activeProfile, 
+    themeMode, 
+    addBathroomProduct, 
+    bathroomProducts, 
+    routine, 
+    activeProfileId 
+  } = useAppState();
   const isDark = themeMode === 'dark';
 
   const [scanStep, setScanStep] = useState<'idle' | 'scanning' | 'result'>('idle');
+  const [activeFeatureTab, setActiveFeatureTab] = useState<'inci' | 'add' | 'compare' | 'diy'>('inci');
   const [selectedProduct, setSelectedProduct] = useState<MockProduct | null>(null);
 
   // Vrai scan IA states
@@ -472,6 +676,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     setCameraError(null);
     setShowScanTip(false);
     setScanStep('idle');
+    setActiveFeatureTab('inci');
   };
 
   // Generate Personalized Capillary Diagnostic Report
@@ -901,71 +1106,328 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                   </View>
                 </View>
 
-                {/* Compatibility Score Widget */}
-                <View style={[styles.scoreCard, isDark ? styles.scoreCardDark : styles.scoreCardLight]}>
-                  <View style={[styles.scoreRing, { borderColor: scoreColor }]}>
-                    <Text style={[styles.scoreNumber, { color: scoreColor }]}>{report.score}%</Text>
-                    <Text style={styles.scoreLabel}>COMPATIBLE</Text>
-                  </View>
-                  <View style={styles.scoreTextContainer}>
-                    <Text style={[styles.scoreTitle, { color: scoreColor }]}>{report.title}</Text>
-                    <Text style={[styles.scoreDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                      Basé sur ton profil : <Text style={styles.boldText}>{activeProfile?.diagnostic?.texture || 'Crépus'}</Text> & porosité <Text style={styles.boldText}>{activeProfile?.diagnostic?.porosity || 'Inconnue'}</Text>
+                {/* Premium Glassmorphic Segmented Tab Bar */}
+                <View style={[styles.tabBarContainer, isDark ? styles.tabBarContainerDark : styles.tabBarContainerLight]}>
+                  <TouchableOpacity
+                    style={[styles.tabBarButton, activeFeatureTab === 'inci' && styles.tabBarButtonActive]}
+                    onPress={() => setActiveFeatureTab('inci')}
+                  >
+                    <Text style={[styles.tabBarButtonText, activeFeatureTab === 'inci' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
+                      🔬 Analyse
                     </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.tabBarButton, activeFeatureTab === 'add' && styles.tabBarButtonActive]}
+                    onPress={() => setActiveFeatureTab('add')}
+                  >
+                    <Text style={[styles.tabBarButtonText, activeFeatureTab === 'add' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
+                      ➕ Ranger
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.tabBarButton, activeFeatureTab === 'compare' && styles.tabBarButtonActive]}
+                    onPress={() => setActiveFeatureTab('compare')}
+                  >
+                    <Text style={[styles.tabBarButtonText, activeFeatureTab === 'compare' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
+                      🧐 Comparer
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.tabBarButton, activeFeatureTab === 'diy' && styles.tabBarButtonActive]}
+                    onPress={() => setActiveFeatureTab('diy')}
+                  >
+                    <Text style={[styles.tabBarButtonText, activeFeatureTab === 'diy' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
+                      🌿 Dupe DIY
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Tab 1: Analyse INCI */}
+                {activeFeatureTab === 'inci' && (
+                  <View>
+                    {/* Compatibility Score Widget */}
+                    <View style={[styles.scoreCard, isDark ? styles.scoreCardDark : styles.scoreCardLight]}>
+                      <View style={[styles.scoreRing, { borderColor: scoreColor }]}>
+                        <Text style={[styles.scoreNumber, { color: scoreColor }]}>{report.score}%</Text>
+                        <Text style={styles.scoreLabel}>COMPATIBLE</Text>
+                      </View>
+                      <View style={styles.scoreTextContainer}>
+                        <Text style={[styles.scoreTitle, { color: scoreColor }]}>{report.title}</Text>
+                        <Text style={[styles.scoreDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                          Basé sur ton profil : <Text style={styles.boldText}>{activeProfile?.diagnostic?.texture || 'Crépus'}</Text> & porosité <Text style={styles.boldText}>{activeProfile?.diagnostic?.porosity || 'Inconnue'}</Text>
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Customized AI Explanation */}
+                    <View style={[styles.explanationCard, isDark ? styles.explanationCardDark : styles.explanationCardLight]}>
+                      <Text style={styles.explanationTitle}>🤖 L'avis de ton Coach IA :</Text>
+                      <Text style={[styles.explanationText, isDark ? styles.textLight : styles.textDark]}>
+                        {report.description}
+                      </Text>
+                    </View>
+
+                    {/* INCI Ingredients Breakdown */}
+                    <View style={styles.ingredientsSection}>
+                      <Text style={[styles.sectionTitle, isDark ? styles.textLight : styles.textDark]}>Analyse des Ingrédients (INCI)</Text>
+
+                      {/* Beneficial Ingredients (Green) */}
+                      {report.inciReport?.good?.length > 0 && (
+                        <View style={styles.ingredientGroup}>
+                          <Text style={[styles.groupTitle, { color: colors.success }]}>🌿 Ingrédients bénéfiques :</Text>
+                          {report.inciReport.good.map((ing: string, idx: number) => (
+                            <View key={idx} style={styles.ingredientItem}>
+                              <Text style={styles.bulletPoint}>•</Text>
+                              <Text style={[styles.ingredientName, isDark ? styles.textLight : styles.textDark]}>{ing}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+
+                      {/* Neutral Ingredients */}
+                      {report.inciReport?.neutral?.length > 0 && (
+                        <View style={styles.ingredientGroup}>
+                          <Text style={[styles.groupTitle, isDark ? styles.textLight : styles.textDark]}>⚪ Ingrédients neutres :</Text>
+                          {report.inciReport.neutral.map((ing: string, idx: number) => (
+                            <View key={idx} style={styles.ingredientItem}>
+                              <Text style={styles.bulletPoint}>•</Text>
+                              <Text style={[styles.ingredientName, isDark ? styles.textLight : styles.textDark]}>{ing}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+
+                      {/* Avoid Ingredients (Red) */}
+                      {report.inciReport?.avoid?.length > 0 && (
+                        <View style={styles.ingredientGroup}>
+                          <Text style={[styles.groupTitle, { color: colors.danger }]}>⚠️ Éléments problématiques ou suspectés :</Text>
+                          {report.inciReport.avoid.map((ing: string, idx: number) => (
+                            <View key={idx} style={styles.ingredientItem}>
+                              <Text style={styles.bulletPoint}>•</Text>
+                              <Text style={[styles.ingredientName, isDark ? styles.textLight : styles.textDark]}>{ing}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
                   </View>
-                </View>
+                )}
 
-                {/* Customized AI Explanation */}
-                <View style={[styles.explanationCard, isDark ? styles.explanationCardDark : styles.explanationCardLight]}>
-                  <Text style={styles.explanationTitle}>🤖 L'avis de ton Coach IA :</Text>
-                  <Text style={[styles.explanationText, isDark ? styles.textLight : styles.textDark]}>
-                    {report.description}
-                  </Text>
-                </View>
+                {/* Tab 2: Ranger (Ajouter à ma Salle de Bain) */}
+                {activeFeatureTab === 'add' && (() => {
+                  const category = detectCategory(displayName, displayBrand);
+                  const isAlreadyInBathroom = bathroomProducts.some(
+                    p => p.brand.toLowerCase() === displayBrand.toLowerCase() && p.name.toLowerCase() === displayName.toLowerCase()
+                  );
+                  
+                  const ingredients = isReal ? (realProductAnalysis.ingredients || []) : selectedProduct?.ingredients || [];
+                  const isOcclusive = ingredients.some((i: string) => 
+                    i.toLowerCase().includes('mineral oil') || 
+                    i.toLowerCase().includes('petrolatum') || 
+                    i.toLowerCase().includes('cire') || 
+                    i.toLowerCase().includes('wax')
+                  );
+                  const isLowPoro = activeProfile?.diagnostic?.porosity === 'Faible';
+                  
+                  const matchingUpcomingRoutine = routine.filter(
+                    item => item.profileId === activeProfileId &&
+                            !item.completed &&
+                            item.date >= new Date().toISOString().split('T')[0] &&
+                            matchesCategory(category, item.category)
+                  );
 
-                {/* INCI Ingredients Breakdown */}
-                <View style={styles.ingredientsSection}>
-                  <Text style={[styles.sectionTitle, isDark ? styles.textLight : styles.textDark]}>Analyse des Ingrédients (INCI)</Text>
-
-                  {/* Beneficial Ingredients (Green) */}
-                  {report.inciReport?.good?.length > 0 && (
-                    <View style={styles.ingredientGroup}>
-                      <Text style={[styles.groupTitle, { color: colors.success }]}>🌿 Ingrédients bénéfiques :</Text>
-                      {report.inciReport.good.map((ing: string, idx: number) => (
-                        <View key={idx} style={styles.ingredientItem}>
-                          <Text style={styles.bulletPoint}>•</Text>
-                          <Text style={[styles.ingredientName, isDark ? styles.textLight : styles.textDark]}>{ing}</Text>
+                  return (
+                    <View style={styles.tabContentBlock}>
+                      {isAlreadyInBathroom ? (
+                        <View style={[styles.successStateCard, isDark ? styles.successStateCardDark : styles.successStateCardLight]}>
+                          <Text style={styles.successStateIcon}>✅</Text>
+                          <Text style={[styles.successStateTitle, isDark ? styles.textLight : styles.textDark]}>Produit déjà rangé</Text>
+                          <Text style={[styles.successStateDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                            Ce produit capillaire est stocké dans ton placard virtuel "{getCategoryEmoji(category)} {category}".
+                          </Text>
                         </View>
-                      ))}
-                    </View>
-                  )}
+                      ) : (
+                        <TouchableOpacity
+                          style={styles.premiumActionButton}
+                          activeOpacity={0.8}
+                          onPress={() => {
+                            const compatibility = report.score >= 80 ? 'Compatible' : 'Attention';
+                            addBathroomProduct({
+                              name: displayName,
+                              brand: displayBrand,
+                              category,
+                              ingredients,
+                              compatibility,
+                              score: report.score,
+                              image: displayImage,
+                              inciReport: report.inciReport
+                            });
+                          }}
+                        >
+                          <Text style={styles.premiumActionButtonText}>➕ Ranger dans ma Salle de Bain</Text>
+                        </TouchableOpacity>
+                      )}
 
-                  {/* Neutral Ingredients */}
-                  {report.inciReport?.neutral?.length > 0 && (
-                    <View style={styles.ingredientGroup}>
-                      <Text style={[styles.groupTitle, isDark ? styles.textLight : styles.textDark]}>⚪ Ingrédients neutres :</Text>
-                      {report.inciReport.neutral.map((ing: string, idx: number) => (
-                        <View key={idx} style={styles.ingredientItem}>
-                          <Text style={styles.bulletPoint}>•</Text>
-                          <Text style={[styles.ingredientName, isDark ? styles.textLight : styles.textDark]}>{ing}</Text>
+                      {isOcclusive && isLowPoro && (
+                        <View style={styles.proactiveWarningCard}>
+                          <Text style={styles.proactiveWarningTitle}>⚠️ Incompatibilité Porosité Faible</Text>
+                          <Text style={styles.proactiveWarningDesc}>
+                            Ce produit contient des ingrédients lourds ou occlusifs (cire/huile minérale). Tes cuticules étant serrées, ce soin va saturer la surface sans l'hydrater.
+                          </Text>
                         </View>
-                      ))}
-                    </View>
-                  )}
+                      )}
 
-                  {/* Avoid Ingredients (Red) */}
-                  {report.inciReport?.avoid?.length > 0 && (
-                    <View style={styles.ingredientGroup}>
-                      <Text style={[styles.groupTitle, { color: colors.danger }]}>⚠️ Éléments problématiques ou suspectés :</Text>
-                      {report.inciReport.avoid.map((ing: string, idx: number) => (
-                        <View key={idx} style={styles.ingredientItem}>
-                          <Text style={styles.bulletPoint}>•</Text>
-                          <Text style={[styles.ingredientName, isDark ? styles.textLight : styles.textDark]}>{ing}</Text>
-                        </View>
-                      ))}
+                      {/* Proactive Agenda Sync Info */}
+                      <View style={[styles.proactiveCard, isDark ? styles.proactiveCardDark : styles.proactiveCardLight]}>
+                        <Text style={styles.proactiveTitle}>📅 L'Agenda Proactif & Intelligent :</Text>
+                        <Text style={[styles.proactiveDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                          En l'ajoutant à ton placard, l'IA Root'in injecte automatiquement ce produit dans tes futures étapes de soins du calendrier correspondantes.
+                        </Text>
+                        
+                        <View style={styles.upcomingDivider} />
+                        
+                        <Text style={[styles.upcomingTitle, isDark ? styles.textLight : styles.textDark]}>
+                          Prochaines étapes ciblées dans ton calendrier :
+                        </Text>
+                        
+                        {matchingUpcomingRoutine.length === 0 ? (
+                          <Text style={[styles.noUpcomingText, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                            Aucun soin de type "{category}" planifié pour le moment dans les 30 prochains jours.
+                          </Text>
+                        ) : (
+                          <View style={styles.upcomingList}>
+                            {matchingUpcomingRoutine.slice(0, 3).map((item, idx) => (
+                              <View key={idx} style={styles.upcomingItem}>
+                                <Text style={styles.upcomingEmoji}>🗓️</Text>
+                                <View style={styles.upcomingItemDetails}>
+                                  <Text style={[styles.upcomingItemDate, isDark ? styles.textLight : styles.textDark]}>
+                                    {item.date.split('-').reverse().join('/')}
+                                  </Text>
+                                  <Text style={[styles.upcomingItemCat, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                                    Soin : {item.category}
+                                  </Text>
+                                </View>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                      </View>
                     </View>
-                  )}
-                </View>
+                  );
+                })()}
+
+                {/* Tab 3: Comparer (Anti-gaspillage en magasin) */}
+                {activeFeatureTab === 'compare' && (() => {
+                  const category = detectCategory(displayName, displayBrand);
+                  const equivalents = bathroomProducts.filter(
+                    p => p.category.toLowerCase() === category.toLowerCase()
+                  );
+
+                  return (
+                    <View style={styles.tabContentBlock}>
+                      {equivalents.length > 0 ? (
+                        <View style={styles.comparisonAlertCard}>
+                          <Text style={styles.comparisonAlertIcon}>🚨</Text>
+                          <View style={styles.comparisonAlertTextWrapper}>
+                            <Text style={styles.comparisonAlertTitle}>Ne l'achète pas !</Text>
+                            <Text style={styles.comparisonAlertDesc}>
+                              Ton produit <Text style={styles.boldText}>{equivalents[0].brand} - {equivalents[0].name}</Text> qui dort dans ton placard fait exactement la même chose pour ton profil.
+                            </Text>
+                            <View style={styles.savingBadge}>
+                              <Text style={styles.savingBadgeText}>🌿 ÉCONOMIE RÉALISÉE !</Text>
+                            </View>
+                          </View>
+                        </View>
+                      ) : (
+                        <View style={styles.comparisonSuccessCard}>
+                          <Text style={styles.comparisonSuccessIcon}>✅</Text>
+                          <View style={styles.comparisonAlertTextWrapper}>
+                            <Text style={styles.comparisonSuccessTitle}>Achat Validé !</Text>
+                            <Text style={styles.comparisonSuccessDesc}>
+                              Tu ne possèdes aucun produit de catégorie <Text style={styles.boldText}>"{category}"</Text> dans ta salle de bain. C'est un bon complément à ta routine.
+                            </Text>
+                          </View>
+                        </View>
+                      )}
+
+                      {equivalents.length > 0 && (
+                        <View style={[styles.equivalentsSection, isDark ? styles.equivalentsSectionDark : styles.equivalentsSectionLight]}>
+                          <Text style={[styles.equivalentsTitleText, isDark ? styles.textLight : styles.textDark]}>
+                            Produit(s) équivalent(s) déjà chez toi :
+                          </Text>
+                          {equivalents.map((eq, idx) => (
+                            <View key={idx} style={[styles.eqItemCard, isDark ? styles.eqItemCardDark : styles.eqItemCardLight]}>
+                              <Image source={{ uri: eq.image || 'https://images.unsplash.com/photo-1556228720-195a672e8a03?q=80&w=200&auto=format&fit=crop' }} style={styles.eqItemImage} />
+                              <View style={styles.eqItemInfo}>
+                                <Text style={styles.eqItemBrand}>{eq.brand}</Text>
+                                <Text style={[styles.eqItemName, isDark ? styles.textLight : styles.textDark]} numberOfLines={1}>{eq.name}</Text>
+                                <Text style={[styles.eqItemCat, isDark ? styles.textMutedDark : styles.textMutedLight]}>Catégorie : {eq.category}</Text>
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })()}
+
+                {/* Tab 4: Dupe Végétal DIY */}
+                {activeFeatureTab === 'diy' && (() => {
+                  const category = detectCategory(displayName, displayBrand);
+                  const porosity = activeProfile?.diagnostic?.porosity || 'Moyenne';
+                  const texture = activeProfile?.diagnostic?.texture || 'Crépus';
+                  const recipe = getDiyDupeRecipe(category, porosity, texture);
+
+                  return (
+                    <View style={styles.tabContentBlock}>
+                      <View style={[styles.recipeCard, isDark ? styles.recipeCardDark : styles.recipeCardLight]}>
+                        <View style={styles.recipeHeader}>
+                          <Text style={styles.recipeHeaderTag}>🍃 DUPE VÉGÉTAL 100% NATUREL</Text>
+                          <Text style={[styles.recipeTitleText, isDark ? styles.textLight : styles.textDark]}>{recipe.title}</Text>
+                          <Text style={[styles.recipeIntroText, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                            Alternative saine formulée sur-mesure pour tes cheveux <Text style={styles.boldText}>{texture}</Text> et ta porosité <Text style={styles.boldText}>{porosity}</Text>.
+                          </Text>
+                        </View>
+
+                        <View style={styles.recipeDivider} />
+
+                        {/* Ingredients List */}
+                        <View style={styles.recipeSection}>
+                          <Text style={styles.recipeSectionTitle}>🌿 Ingrédients simples :</Text>
+                          {recipe.ingredients.map((ing, idx) => (
+                            <View key={idx} style={styles.recipeIngredientItem}>
+                              <Text style={styles.recipeBullet}>🌱</Text>
+                              <Text style={[styles.recipeIngredientText, isDark ? styles.textLight : styles.textDark]}>{ing}</Text>
+                            </View>
+                          ))}
+                        </View>
+
+                        <View style={styles.recipeDivider} />
+
+                        {/* Preparation Steps */}
+                        <View style={styles.recipeSection}>
+                          <Text style={styles.recipeSectionTitle}>🥣 Étapes de préparation :</Text>
+                          {recipe.steps.map((step, idx) => (
+                            <View key={idx} style={styles.recipeStepItem}>
+                              <View style={styles.recipeStepNumber}>
+                                <Text style={styles.recipeStepNumberText}>{idx + 1}</Text>
+                              </View>
+                              <Text style={[styles.recipeStepText, isDark ? styles.textLight : styles.textDark]}>{step}</Text>
+                            </View>
+                          ))}
+                        </View>
+
+                        <View style={styles.recipeDivider} />
+
+                        {/* Preservation rules */}
+                        <View style={styles.recipePreservationCard}>
+                          <Text style={styles.recipePreservationTitle}>❄️ Règles de conservation :</Text>
+                          <Text style={styles.recipePreservationText}>{recipe.preservation}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })()}
 
                 {/* Reset Button */}
                 <TouchableOpacity 
@@ -1621,5 +2083,415 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     textAlign: 'center',
     fontWeight: 'bold',
+  },
+  
+  // TAB BAR STYLES
+  tabBarContainer: {
+    flexDirection: 'row',
+    borderRadius: borderRadius.md,
+    padding: 4,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+  },
+  tabBarContainerDark: {
+    backgroundColor: '#16192A',
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  tabBarContainerLight: {
+    backgroundColor: '#F8F9FA',
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  tabBarButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.sm,
+  },
+  tabBarButtonActive: {
+    backgroundColor: colors.primary,
+  },
+  tabBarButtonText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  tabBarButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  
+  // TAB CONTENT STYLES
+  tabContentBlock: {
+    marginTop: spacing.xs,
+    gap: spacing.md,
+  },
+  
+  // RANGER (ADD) TAB
+  successStateCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(92, 138, 107, 0.15)',
+    marginBottom: spacing.sm,
+  },
+  successStateCardDark: {
+    backgroundColor: 'rgba(92, 138, 107, 0.05)',
+  },
+  successStateCardLight: {
+    backgroundColor: 'rgba(92, 138, 107, 0.08)',
+  },
+  successStateIcon: {
+    fontSize: 32,
+    marginBottom: spacing.xs,
+  },
+  successStateTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  successStateDesc: {
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  premiumActionButton: {
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 3,
+    marginBottom: spacing.sm,
+  },
+  premiumActionButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  proactiveWarningCard: {
+    backgroundColor: 'rgba(217, 83, 79, 0.05)',
+    borderColor: 'rgba(217, 83, 79, 0.15)',
+    borderWidth: 1,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.danger,
+    marginBottom: spacing.sm,
+  },
+  proactiveWarningTitle: {
+    color: colors.danger,
+    fontSize: 13,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  proactiveWarningDesc: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  proactiveCard: {
+    borderWidth: 1,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+  },
+  proactiveCardDark: {
+    backgroundColor: '#16192A',
+    borderColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  proactiveCardLight: {
+    backgroundColor: '#F8F9FA',
+    borderColor: 'rgba(0, 0, 0, 0.04)',
+  },
+  proactiveTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: colors.primary,
+    marginBottom: 6,
+  },
+  proactiveDesc: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  upcomingDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    marginVertical: spacing.md,
+  },
+  upcomingTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginBottom: spacing.sm,
+  },
+  noUpcomingText: {
+    fontSize: 11,
+    fontStyle: 'italic',
+  },
+  upcomingList: {
+    gap: spacing.sm,
+  },
+  upcomingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.sm,
+    borderRadius: borderRadius.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  upcomingEmoji: {
+    fontSize: 18,
+    marginRight: spacing.sm,
+  },
+  upcomingItemDetails: {
+    flex: 1,
+  },
+  upcomingItemDate: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  upcomingItemCat: {
+    fontSize: 10,
+    marginTop: 2,
+  },
+  
+  // COMPARER TAB
+  comparisonAlertCard: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(217, 83, 79, 0.05)',
+    borderColor: 'rgba(217, 83, 79, 0.2)',
+    borderWidth: 1.5,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    borderLeftWidth: 5,
+    borderLeftColor: colors.danger,
+    alignItems: 'center',
+  },
+  comparisonAlertIcon: {
+    fontSize: 32,
+    marginRight: spacing.md,
+  },
+  comparisonAlertTextWrapper: {
+    flex: 1,
+  },
+  comparisonAlertTitle: {
+    color: colors.danger,
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  comparisonAlertDesc: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  savingBadge: {
+    backgroundColor: 'rgba(217, 83, 79, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    marginTop: spacing.sm,
+  },
+  savingBadgeText: {
+    color: '#D9534F',
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  comparisonSuccessCard: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(92, 138, 107, 0.05)',
+    borderColor: 'rgba(92, 138, 107, 0.2)',
+    borderWidth: 1.5,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    borderLeftWidth: 5,
+    borderLeftColor: colors.success,
+    alignItems: 'center',
+  },
+  comparisonSuccessIcon: {
+    fontSize: 32,
+    marginRight: spacing.md,
+  },
+  comparisonSuccessTitle: {
+    color: colors.success,
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  comparisonSuccessDesc: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  equivalentsSection: {
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+  },
+  equivalentsSectionDark: {
+    backgroundColor: 'rgba(255, 255, 255, 0.01)',
+  },
+  equivalentsSectionLight: {
+    backgroundColor: '#FAFBFC',
+  },
+  equivalentsTitleText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    marginBottom: spacing.sm,
+  },
+  eqItemCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    marginBottom: spacing.xs,
+  },
+  eqItemCardDark: {
+    backgroundColor: '#16192A',
+    borderColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  eqItemCardLight: {
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(0, 0, 0, 0.04)',
+  },
+  eqItemImage: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.sm,
+    marginRight: spacing.sm,
+  },
+  eqItemInfo: {
+    flex: 1,
+  },
+  eqItemBrand: {
+    fontSize: 8,
+    color: colors.primary,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+  },
+  eqItemName: {
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  eqItemCat: {
+    fontSize: 9,
+    marginTop: 2,
+  },
+  
+  // DUPE DIY TAB
+  recipeCard: {
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    padding: spacing.md,
+    borderTopWidth: 4,
+    borderTopColor: colors.secondary,
+  },
+  recipeCardDark: {
+    backgroundColor: '#16192A',
+    borderColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  recipeCardLight: {
+    backgroundColor: '#F8F9FA',
+    borderColor: 'rgba(0, 0, 0, 0.04)',
+  },
+  recipeHeader: {
+    marginBottom: spacing.sm,
+  },
+  recipeHeaderTag: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: colors.secondary,
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  recipeTitleText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  recipeIntroText: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  recipeDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    marginVertical: spacing.md,
+  },
+  recipeSection: {
+    gap: spacing.sm,
+  },
+  recipeSectionTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: colors.secondary,
+    marginBottom: 4,
+  },
+  recipeIngredientItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingLeft: spacing.xs,
+  },
+  recipeBullet: {
+    fontSize: 12,
+    marginRight: spacing.sm,
+    marginTop: 2,
+  },
+  recipeIngredientText: {
+    fontSize: 12,
+    flex: 1,
+    lineHeight: 16,
+  },
+  recipeStepItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: spacing.xs,
+  },
+  recipeStepNumber: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(118, 160, 138, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+    marginTop: 2,
+  },
+  recipeStepNumberText: {
+    color: colors.secondary,
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  recipeStepText: {
+    fontSize: 12,
+    flex: 1,
+    lineHeight: 16,
+  },
+  recipePreservationCard: {
+    backgroundColor: 'rgba(118, 160, 138, 0.08)',
+    borderColor: 'rgba(118, 160, 138, 0.15)',
+    borderWidth: 1,
+    borderRadius: borderRadius.sm,
+    padding: spacing.md,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.secondary,
+  },
+  recipePreservationTitle: {
+    color: colors.secondary,
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  recipePreservationText: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    lineHeight: 15,
   },
 });

@@ -64,6 +64,22 @@ export interface RoutineItem {
   reminderTime?: string; // "HH:MM"
 }
 
+export interface BathroomProduct {
+  id: string;
+  name: string;
+  brand: string;
+  category: string;
+  ingredients: string[];
+  compatibility: 'Compatible' | 'Attention';
+  score: number;
+  image?: string;
+  inciReport?: {
+    good: string[];
+    neutral: string[];
+    avoid: string[];
+  };
+}
+
 interface AppStateContextType {
   profiles: Profile[];
   activeProfileId: string;
@@ -72,6 +88,9 @@ interface AppStateContextType {
   logs: ActionLog[];
   showFeedbackQuiz: boolean;
   catchUpTask: RoutineItem | null;
+  bathroomProducts: BathroomProduct[];
+  addBathroomProduct: (product: Omit<BathroomProduct, 'id'>) => void;
+  deleteBathroomProduct: (id: string) => void;
   themeMode: 'dark' | 'light';
   masterEmail: string;
   isLoading: boolean;
@@ -378,6 +397,8 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const [logs, setLogs] = useState<ActionLog[]>([]);
 
+  const [bathroomProducts, setBathroomProducts] = useState<BathroomProduct[]>([]);
+
   // Startup session lock to prevent race conditions
   const [isSavedCredentialsLoaded, setIsSavedCredentialsLoaded] = useState(false);
 
@@ -427,6 +448,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           if (data.activeProfileId) setActiveProfileId(data.activeProfileId);
           if (data.themeMode) setThemeMode(data.themeMode);
           if (data.isPremium !== undefined) setIsPremium(data.isPremium);
+          if (data.bathroomProducts) setBathroomProducts(data.bathroomProducts);
         } else {
           // Document does not exist in Cloud, initialize it with current local state
           await setDoc(docRef, {
@@ -437,6 +459,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             routine,
             logs,
             isPremium,
+            bathroomProducts,
             updatedAt: new Date().toISOString()
           });
         }
@@ -464,6 +487,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           routine,
           logs,
           isPremium,
+          bathroomProducts,
           updatedAt: new Date().toISOString()
         }, { merge: true });
       } catch (error) {
@@ -472,7 +496,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     syncToFirestore();
-  }, [profiles, routine, logs, activeProfileId, themeMode, isLoading, masterEmail, isPremium]);
+  }, [profiles, routine, logs, activeProfileId, themeMode, isLoading, masterEmail, isPremium, bathroomProducts]);
 
   // Derived active properties
   const activeProfile = profiles.find(p => p.id === activeProfileId);
@@ -899,6 +923,88 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }));
   };
 
+  const addBathroomProduct = (productData: Omit<BathroomProduct, 'id'>) => {
+    const newId = uuid();
+    const newProduct: BathroomProduct = {
+      ...productData,
+      id: newId
+    };
+    
+    setBathroomProducts(prev => {
+      // Prevent duplicates
+      if (prev.some(p => p.brand.toLowerCase() === newProduct.brand.toLowerCase() && p.name.toLowerCase() === newProduct.name.toLowerCase())) {
+        return prev;
+      }
+      return [...prev, newProduct];
+    });
+
+    // Proactive agenda script:
+    // Update future uncompleted routine items where category matches
+    setRoutine(prev => prev.map(item => {
+      if (
+        item.profileId === activeProfileId &&
+        !item.completed &&
+        item.date >= new Date().toISOString().split('T')[0]
+      ) {
+        // Map product categories to agenda categories
+        const matchesCategory = (prodCat: string, agendaCat: string): boolean => {
+          const pc = prodCat.toLowerCase();
+          const ac = agendaCat.toLowerCase();
+          
+          if (ac.includes('lavage') || ac.includes('shampoing')) {
+            return pc.includes('lavage') || pc.includes('shampoing') || pc.includes('co-wash') || pc.includes('cowash');
+          }
+          if (ac.includes('bain')) {
+            return pc.includes('bain') || pc.includes('huile');
+          }
+          if (ac.includes('masque') || ac.includes('hydratant') || ac.includes('protéin')) {
+            return pc.includes('masque') || pc.includes('hydratant') || pc.includes('protéin') || pc.includes('reconstructeur');
+          }
+          if (ac.includes('sans rinçage') || ac.includes('leave') || ac.includes('lait') || ac.includes('crème')) {
+            return pc.includes('sans rinçage') || pc.includes('leave') || pc.includes('lait') || pc.includes('crème') || pc.includes('smoothie');
+          }
+          if (ac.includes('retwist')) {
+            return pc.includes('retwist') || pc.includes('gel') || pc.includes('wax') || pc.includes('cire');
+          }
+          if (ac.includes('clarif')) {
+            return pc.includes('clarif') || pc.includes('détox') || pc.includes('argile');
+          }
+          return false;
+        };
+
+        if (matchesCategory(newProduct.category, item.category)) {
+          // Check for conflicts / bad interactions
+          const isOcclusive = newProduct.ingredients.some(i => 
+            i.toLowerCase().includes('mineral oil') || 
+            i.toLowerCase().includes('petrolatum') || 
+            i.toLowerCase().includes('cire') || 
+            i.toLowerCase().includes('wax')
+          );
+          
+          const profile = profiles.find(p => p.id === activeProfileId);
+          const isLowPoro = profile?.diagnostic?.porosity === 'Faible';
+          
+          let suggestion = `Tu peux faire ce soin avec ${newProduct.brand} - ${newProduct.name} de ta salle de bain.`;
+          
+          if (isOcclusive && isLowPoro) {
+            suggestion += ` ⚠️ Attention : ce produit est lourd et occlusif, peu conseillé pour ta porosité faible.`;
+          }
+          
+          return {
+            ...item,
+            product: `${newProduct.brand} - ${newProduct.name} 🧴`,
+            recurrence: suggestion
+          };
+        }
+      }
+      return item;
+    }));
+  };
+
+  const deleteBathroomProduct = (id: string) => {
+    setBathroomProducts(prev => prev.filter(p => p.id !== id));
+  };
+
   const completePorosity = (porosityValue: 'Faible' | 'Moyenne' | 'Forte') => {
     let updatedDiag: HairDiagnostic | null = null;
 
@@ -1032,6 +1138,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       logs,
       showFeedbackQuiz,
       catchUpTask,
+      bathroomProducts,
+      addBathroomProduct,
+      deleteBathroomProduct,
       themeMode,
       masterEmail,
       isLoading,
