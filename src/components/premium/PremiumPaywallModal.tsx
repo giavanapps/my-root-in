@@ -10,49 +10,43 @@ interface PremiumPaywallModalProps {
 }
 
 export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visible, onClose, onOpenScanner }) => {
-  const { themeMode, setPremiumStatus, isPremium, triggerSosBooster, activeProfile } = useAppState();
+  const { themeMode, setPremiumStatus, isPremium, activeProfile } = useAppState();
   const isDark = themeMode === 'dark';
 
-  const [activePreview, setActivePreview] = useState<'scanner' | 'sos' | 'health' | null>(null);
-  const [sosPlanned, setSosPlanned] = useState(false);
+  const [activePreview, setActivePreview] = useState<'inci' | 'add' | 'compare' | 'diy' | null>(null);
 
   const handleSimulatePurchase = () => {
     setPremiumStatus(true);
   };
 
-  const handleFeatureClick = (type: 'scanner' | 'sos' | 'health') => {
+  const handleFeatureClick = (type: 'inci' | 'add' | 'compare' | 'diy') => {
     setActivePreview(type);
-    setSosPlanned(false);
-  };
-
-  const handlePlanSosFromPreview = () => {
-    triggerSosBooster();
-    setSosPlanned(true);
-    setTimeout(() => {
-      setSosPlanned(false);
-      setActivePreview(null);
-      onClose();
-    }, 2500);
   };
 
   const benefits = [
     {
-      type: 'scanner' as const,
-      icon: '🔍',
-      title: 'Scanner Capillaire IA (INCI)',
-      desc: 'Scanne la liste des ingrédients de n\'importe quel produit et découvre sa compatibilité avec ta texture et porosité. [Clique pour tester/prévisualiser ➔]',
+      type: 'inci' as const,
+      icon: '🔬',
+      title: 'Analyse INCI & Diagnostic IA',
+      desc: 'Analyse moléculaire de la formule INCI et diagnostic complet (Pour/Contre) adapté à tes cuticules. [Prévisualiser ➔]',
     },
     {
-      type: 'sos' as const,
-      icon: '🚨',
-      title: 'SOS Booster Illimité',
-      desc: 'Accès sans limites aux protocoles d\'urgence intensifs en cas de casse importante ou sécheresse extrême. [Clique pour tester/prévisualiser ➔]',
+      type: 'add' as const,
+      icon: '📅',
+      title: 'Agenda Proactif & Cabinet Virtuel',
+      desc: 'Range tes flacons dans Ma Salle de Bain et laisse l\'IA injecter automatiquement des soins suggérés dans ton calendrier. [Prévisualiser ➔]',
     },
     {
-      type: 'health' as const,
-      icon: '📈',
-      title: 'Suivi de Santé Avancé',
-      desc: 'Historique illimité de l\'évolution de tes jauges d\'hydratation, nutrition et régularité. [Clique pour tester/prévisualiser ➔]',
+      type: 'compare' as const,
+      icon: '🧐',
+      title: 'Comparateur Anti-Gaspillage',
+      desc: 'Scan en rayon pour détecter instantanément si tu possèdes déjà un produit équivalent à la maison. [Prévisualiser ➔]',
+    },
+    {
+      type: 'diy' as const,
+      icon: '🌿',
+      title: 'Alternative Naturelle DIY (Dupe Végétal)',
+      desc: 'Conçois des recettes végétales saines (plantes, poudres, huiles) sur-mesure pour ton type de cheveu. [Prévisualiser ➔]',
     },
   ];
 
@@ -131,19 +125,19 @@ export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visibl
                 isDark ? styles.previewContainerDark : styles.previewContainerLight
               ]}>
                 
-                {/* 🔍 SCANNER PREVIEW */}
-                {activePreview === 'scanner' && (
+                {/* 🔬 INCI PREVIEW */}
+                {activePreview === 'inci' && (
                   <View>
-                    <Text style={styles.previewTitle}>🔍 Prévisualisation : Analyseur d'ingrédients IA</Text>
+                    <Text style={styles.previewTitle}>🔬 Prévisualisation : Diagnostic INCI IA</Text>
                     <Text style={[styles.previewDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                      Scannez l'arrière d'un flacon ou recherchez un code-barres. Notre IA analyse la liste INCI et la compare à vos cheveux {activeProfile?.diagnostic?.texture.toLowerCase()}.
+                      Scanne la formule INCI et obtiens une note précise et un rapport personnalisé des ingrédients adaptés ou à éviter.
                     </Text>
 
-                    {/* Simulated Viewfinder */}
+                    {/* Simulated Score Card */}
                     <View style={styles.simulatedViewfinder}>
                       <View style={styles.viewfinderLaser} />
-                      <Text style={styles.viewfinderText}>Mélange Moringa & Carbomer detecté...</Text>
-                      <Text style={styles.viewfinderBadge}>COMPATIBLE À 92% (LOCKS) ✓</Text>
+                      <Text style={styles.viewfinderText}>Mélange Moringa & Coco détecté...</Text>
+                      <Text style={styles.viewfinderBadge}>COMPATIBLE À 94% (BOUCLÉS) ✓</Text>
                     </View>
 
                     {isPremium ? (
@@ -155,93 +149,86 @@ export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visibl
                           if (onOpenScanner) onOpenScanner();
                         }}
                       >
-                        <Text style={styles.previewButtonText}>Ouvrir le Scanner Réel maintenant 🚀</Text>
+                        <Text style={styles.previewButtonText}>Ouvrir le Scanner Réel 🚀</Text>
                       </TouchableOpacity>
                     ) : (
                       <View style={styles.lockedCallout}>
                         <Text style={styles.lockedCalloutText}>
-                          🔒 Pour débloquer l'analyse INCI réelle sur tous tes flacons, abonne-toi ci-dessous ou clique sur le bouton secret "Activer Root'in Premium 🔑" en bas de page !
+                          🔒 Active l'accès Premium ci-dessous pour débloquer l'analyse INCI réelle de tes flacons !
                         </Text>
                       </View>
                     )}
                   </View>
                 )}
 
-                {/* 🚨 SOS BOOSTER PREVIEW */}
-                {activePreview === 'sos' && (
+                {/* 📅 PROACTIVE AGENDA PREVIEW */}
+                {activePreview === 'add' && (
                   <View>
-                    <Text style={styles.previewTitle}>🚨 Prévisualisation : SOS Booster 14 Jours</Text>
+                    <Text style={styles.previewTitle}>📅 Prévisualisation : Agenda Proactif</Text>
                     <Text style={[styles.previewDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                      Un protocole d'urgence intensif planifié automatiquement dans votre calendrier en cas de casse importante ou d'assèchement extrême.
+                      Associe tes flacons virtuels à ton calendrier. L'IA Root'in injecte de manière dynamique des instructions intelligentes.
                     </Text>
 
                     {/* Protocol Steps Preview */}
                     <View style={styles.protocolPreviewBox}>
-                      <Text style={styles.protocolStepText}>🔬 Jour 1 : Clarification Détox Bentonite</Text>
-                      <Text style={styles.protocolStepText}>🍯 Jour 3 : Masque Hydratation Profonde & Miel</Text>
-                      <Text style={styles.protocolStepText}>🌿 Jour 7 : Bain aux Huiles Chaudes Coco/Karité</Text>
-                      <Text style={styles.protocolStepText}>💪 Jour 10 : Soin Reconstructeur Protéines (Force)</Text>
+                      <Text style={styles.protocolStepText}>🗓️ Soin Lavage (12 Juin) : Shampoing Actiforce 🧴</Text>
+                      <Text style={styles.protocolStepText}>🗓️ Soin Lavage (19 Juin) : Shampoing Actiforce 🧴</Text>
                     </View>
 
-                    {sosPlanned ? (
-                      <View style={styles.sosSuccessIndicator}>
-                        <ActivityIndicator size="small" color="#5C8A6B" style={{ marginRight: 8 }} />
-                        <Text style={styles.sosSuccessText}>SOS Booster planifié avec succès ! 🩺🚀</Text>
-                      </View>
-                    ) : isPremium ? (
-                      <TouchableOpacity 
-                        style={[styles.previewButton, { backgroundColor: colors.danger }]}
-                        onPress={handlePlanSosFromPreview}
-                      >
-                        <Text style={[styles.previewButtonText, { color: '#FFFFFF' }]}>🆘 Planifier le Protocole SOS 14J</Text>
-                      </TouchableOpacity>
-                    ) : (
+                    {!isPremium && (
                       <View style={styles.lockedCallout}>
                         <Text style={styles.lockedCalloutText}>
-                          🔒 Pour pouvoir planifier ce protocole de secours en 1 clic dans ton calendrier, abonne-toi ci-dessous ou clique sur le bouton secret "Activer Root'in Premium 🔑" en bas de page !
+                          🔒 Débloque l'Agenda Proactif pour coupler tes flacons avec ton calendrier capillaire !
                         </Text>
                       </View>
                     )}
                   </View>
                 )}
 
-                {/* 📈 HEALTH HISTORY PREVIEW */}
-                {activePreview === 'health' && (
+                {/* 🧐 COMPARATOR PREVIEW */}
+                {activePreview === 'compare' && (
                   <View>
-                    <Text style={styles.previewTitle}>📈 Prévisualisation : Suivi de Santé Avancé</Text>
+                    <Text style={styles.previewTitle}>🧐 Prévisualisation : Comparateur Magasin</Text>
                     <Text style={[styles.previewDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                      Graphique interactif d'analyse de progression. Visualise en temps réel comment ta régularité de soins augmente ta santé capillaire globale.
+                      Flashe un produit en magasin pour savoir s'il est doublon avec un flacon existant déjà dans ton placard.
                     </Text>
 
-                    {/* Beautiful Neon Chart representation */}
-                    <View style={styles.chartWrapper}>
-                      <View style={styles.chartYAxis}>
-                        <Text style={styles.chartAxisLabel}>100%</Text>
-                        <Text style={styles.chartAxisLabel}>50%</Text>
-                        <Text style={styles.chartAxisLabel}>0%</Text>
-                      </View>
-                      
-                      <View style={styles.chartGrid}>
-                        {chartData.map((data, index) => (
-                          <View key={index} style={styles.chartColumn}>
-                            <View style={[styles.chartBarTrack]}>
-                              <View style={[styles.chartBarFill, { height: `${data.score}%` }]} />
-                            </View>
-                            <Text style={styles.chartAxisXText}>{data.week}</Text>
-                            <Text style={styles.chartBarValueText}>{data.score}%</Text>
-                          </View>
-                        ))}
-                      </View>
+                    <View style={[styles.protocolPreviewBox, { backgroundColor: 'rgba(217, 83, 79, 0.05)', borderColor: 'rgba(217, 83, 79, 0.15)' }]}>
+                      <Text style={[styles.protocolStepText, { color: colors.danger }]}>🚨 NE L'ACHÈTE PAS !</Text>
+                      <Text style={{ fontSize: 11, color: '#A0A5C0', lineHeight: 14 }}>
+                        Ton produit <Text style={{ fontWeight: 'bold', color: '#FFFFFF' }}>Cantu Styling Wax</Text> fait exactement la même chose pour ton profil. Économie réalisée !
+                      </Text>
                     </View>
-
-                    <Text style={styles.chartAiAdvice}>
-                      🤖 <Text style={{ fontWeight: 'bold' }}>Analyse IA :</Text> Progression de +30 points. Ton cuir chevelu est équilibré, tes fourches ont diminué de 15%. Continue !
-                    </Text>
 
                     {!isPremium && (
                       <View style={styles.lockedCallout}>
                         <Text style={styles.lockedCalloutText}>
-                          🔒 Pour débloquer l'accès à tes graphiques et ton historique complet, abonne-toi ci-dessous ou clique sur le bouton secret "Activer Root'in Premium 🔑" en bas de page !
+                          🔒 Utilise le comparateur anti-gaspillage en magasin pour économiser immédiatement !
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                {/* 🌿 DUPE DIY PREVIEW */}
+                {activePreview === 'diy' && (
+                  <View>
+                    <Text style={styles.previewTitle}>🌿 Prévisualisation : Dupe Végétal DIY</Text>
+                    <Text style={[styles.previewDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                      Génère une alternative végétale 100% saine et naturelle de n'importe quel produit industriel.
+                    </Text>
+
+                    <View style={[styles.protocolPreviewBox, { backgroundColor: 'rgba(118, 160, 138, 0.05)', borderColor: 'rgba(118, 160, 138, 0.15)' }]}>
+                      <Text style={[styles.protocolStepText, { color: colors.secondary }]}>🍃 Dupe : Gel de Gombo & Aloe Vera</Text>
+                      <Text style={{ fontSize: 10, color: '#A0A5C0', lineHeight: 13 }}>
+                        Ingrédients : Gombos frais coupés, Aloe Vera, Huile de Jojoba.
+                      </Text>
+                    </View>
+
+                    {!isPremium && (
+                      <View style={styles.lockedCallout}>
+                        <Text style={styles.lockedCalloutText}>
+                          🔒 Génère des fiches recettes végétales adaptées à tes boucles ou locks !
                         </Text>
                       </View>
                     )}
