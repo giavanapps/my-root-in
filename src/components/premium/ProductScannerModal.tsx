@@ -776,10 +776,35 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
           
           {/* Header */}
           <View style={styles.header}>
-            <Text style={[styles.headerTitle, isDark ? styles.textLight : styles.textDark]}>
-              {scanStep === 'idle' ? 'Root\'in IA Scanner 🔬' : 
-               scanStep === 'scanning' ? 'Analyse en cours...' : 'Rapport de Diagnostic INCI'}
-            </Text>
+            {scanStep === 'result' ? (
+              <TouchableOpacity onPress={handleReset} style={styles.headerLeftButton}>
+                <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 13 }}>⬅️ Nouveau Scan</Text>
+              </TouchableOpacity>
+            ) : scanStep === 'idle' && scannerMode !== null ? (
+              <TouchableOpacity 
+                onPress={() => {
+                  if (scannerMode === 'select_method') {
+                    setScannerMode(null);
+                  } else {
+                    setScannerMode('select_method');
+                  }
+                }} 
+                style={styles.headerLeftButton}
+              >
+                <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 13 }}>⬅️ Retour</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={[styles.headerTitle, isDark ? styles.textLight : styles.textDark]}>
+                {scanStep === 'idle' ? 'Root\'in IA Scanner 🔬' : 'Analyse en cours...'}
+              </Text>
+            )}
+            
+            {scanStep === 'result' && (
+              <Text style={[styles.headerTitle, isDark ? styles.textLight : styles.textDark, { fontSize: 14 }]}>
+                Rapport INCI
+              </Text>
+            )}
+
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Text style={isDark ? styles.textLight : styles.textDark}>Fermer</Text>
             </TouchableOpacity>
@@ -1602,6 +1627,10 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  headerLeftButton: {
+    paddingVertical: spacing.xs,
+    paddingRight: spacing.sm,
   },
   closeButton: {
     paddingVertical: spacing.xs,
