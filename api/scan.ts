@@ -18,9 +18,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Méthode non autorisée. Utilisez POST.' });
   }
 
-  const { image, ingredientsText, manualBrand, manualName, manualType, texture, porosity } = req.body;
+  const { frontImage, backImage, image, ingredientsText, manualBrand, manualName, manualType, texture, porosity } = req.body;
 
-  if (!image && !ingredientsText && (!manualBrand || !manualName)) {
+  if (!frontImage && !backImage && !image && !ingredientsText && (!manualBrand || !manualName)) {
     return res.status(400).json({ error: 'Aucune image, liste d\'ingrédients, ni informations de saisie manuelle fournies.' });
   }
 
@@ -37,8 +37,63 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let promptText = '';
     const parts: any[] = [];
 
-    if (image) {
-      // Option 1 : Image-based scan
+    if (frontImage && backImage) {
+      // Option 1 : Double-image scan (front + back)
+      const base64Front = frontImage.replace(/^data:image\/\w+;base64,/, '');
+      const base64Back = backImage.replace(/^data:image\/\w+;base64,/, '');
+
+      let mimeTypeFront = 'image/jpeg';
+      const mimeMatchFront = frontImage.match(/^data:(image\/\w+);base64,/);
+      if (mimeMatchFront) {
+        mimeTypeFront = mimeMatchFront[1];
+      }
+
+      let mimeTypeBack = 'image/jpeg';
+      const mimeMatchBack = backImage.match(/^data:(image\/\w+);base64,/);
+      if (mimeMatchBack) {
+        mimeTypeBack = mimeMatchBack[1];
+      }
+
+      promptText = `Tu es un expert en cosmétologie capillaire et ingrédients INCI, spécialisé dans les cheveux afro et texturés (crépus, frisés, bouclés, ondulés, locksés). 
+On te fournit deux images d'un produit capillaire :
+- L'Image 1 montre le DEVANT (le recto) du produit.
+- L'Image 2 montre le DOS (le verso) avec la liste des ingrédients INCI.
+
+Analyse l'Image 1 pour extraire la Marque et le Nom exact du produit, puis analyse l'Image 2 (la liste INCI) pour exécuter les 4 fonctions Premium (Analyse, Ajout Salle de Bain, Comparateur, Dupe DIY).
+
+Prends en compte le profil capillaire de l'utilisateur :
+- Texture : ${texture || 'Crépus'}
+- Porosité : ${porosity || 'Moyenne'}
+
+Fournis ton analyse en français au format JSON STRICT avec cette structure exacte :
+{
+  "brand": "Marque exacte extraite de l'Image 1 (ex: Cantu)",
+  "name": "Nom exact du produit extrait de l'Image 1 (ex: Shea Butter Hydrating Conditioner)",
+  "score": 85, // Score de 0 à 100 indiquant la compatibilité exacte avec son profil (sois honnête et sévère s'il y a des ingrédients toxiques ou occlusifs inadaptés)
+  "title": "Titre court de compatibilité (ex: Excellent pour ton profil ! 🌿)",
+  "description": "Explication détaillée et personnalisée de ton avis en tant que coach capillaire IA, en expliquant spécifiquement pourquoi les ingrédients conviennent ou non à sa porosité et sa texture. Adresse-toi directement à l'utilisateur de manière bienveillante.",
+  "inciReport": {
+    "good": ["Ingrédient 1 (Explication rapide de son effet bénéfique)", "Ingrédient 2 (Explication)"],
+    "neutral": ["Ingrédient 1 (Explication)", "Ingrédient 2 (Explication)"],
+    "avoid": ["Ingrédient 1 (Pourquoi l'éviter : ex: occlusif, cire minérale, sulfate décapant, alcool desséchant)", "Ingrédient 2 (Pourquoi l'éviter)"]
+  }
+}`;
+
+      parts.push({ text: promptText });
+      parts.push({
+        inlineData: {
+          mimeType: mimeTypeFront,
+          data: base64Front
+        }
+      });
+      parts.push({
+        inlineData: {
+          mimeType: mimeTypeBack,
+          data: base64Back
+        }
+      });
+    } else if (image) {
+      // Option 2 : Single Image-based scan
       const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
       let mimeType = 'image/jpeg';
       const mimeMatch = image.match(/^data:(image\/\w+);base64,/);

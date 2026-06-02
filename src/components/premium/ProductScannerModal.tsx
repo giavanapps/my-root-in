@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, Modal, TouchableOpacity, ScrollView, Animated, 
 import { colors, borderRadius, spacing } from '../../theme/colors';
 import { useAppState } from '../../store/AppStateContext';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 interface ProductScannerModalProps {
   visible: boolean;
@@ -322,6 +323,48 @@ export const getDiyDupeRecipe = (category: string, porosity: string, texture: st
   };
 };
 
+const compressImageWeb = (base64Str: string, maxWidth = 1024, maxHeight = 1024, quality = 0.7): Promise<string> => {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') {
+    return Promise.resolve(base64Str);
+  }
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.src = base64Str;
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressedBase64);
+      } else {
+        resolve(base64Str);
+      }
+    };
+    img.onerror = () => {
+      resolve(base64Str);
+    };
+  });
+};
+
 export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visible, onClose }) => {
   const { 
     activeProfile, 
@@ -341,6 +384,12 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   const [isAnalyzingReal, setIsAnalyzingReal] = useState(false);
   const [realProductAnalysis, setRealProductAnalysis] = useState<any>(null);
   const [realProductError, setRealProductError] = useState<string | null>(null);
+
+  // Double-photo capture states
+  const [frontPhoto, setFrontPhoto] = useState<string | null>(null);
+  const [backPhoto, setBackPhoto] = useState<string | null>(null);
+  const [captureStep, setCaptureStep] = useState<'front' | 'back'>('front');
+  const frontPhotoRef = useRef<string | null>(null);
 
   // Code-barres states
   const [scannerMode, setScannerMode] = useState<'photo' | 'barcode' | 'select_method' | null>(null);
@@ -362,13 +411,10 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   const laserAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Reset scanner mode to show the 4 premium functions on entry unless displaying a result
+  // Reset scanner mode when the modal is closed
   useEffect(() => {
-    if (visible) {
-      if (scanStep !== 'result') {
-        setScannerMode(null);
-        setScanStep('idle');
-      }
+    if (!visible) {
+      handleReset();
     }
   }, [visible]);
 
@@ -528,7 +574,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     }, 2500);
   };
 
-  const handleRealScanPress = async () => {
+  const capturePhoto = async (step: 'front' | 'back') => {
     setSelectedProduct(null);
     setRealProductAnalysis(null);
     setRealProductError(null);
@@ -545,13 +591,20 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
       input.onchange = async (e: any) => {
         const file = e.target.files[0];
         if (file) {
-          setIsAnalyzingReal(true);
-          setScanStep('scanning');
-
           const reader = new FileReader();
           reader.onload = async () => {
-            const base64Data = reader.result as string;
-            await uploadAndAnalyze(base64Data);
+            const rawBase64 = reader.result as string;
+            const base64Data = await compressImageWeb(rawBase64);
+            if (step === 'front') {
+              setFrontPhoto(base64Data);
+              frontPhotoRef.current = base64Data;
+              setCaptureStep('back');
+            } else {
+              setBackPhoto(base64Data);
+              setIsAnalyzingReal(true);
+              setScanStep('scanning');
+              await uploadAndAnalyzeDouble(frontPhotoRef.current || frontPhoto || base64Data, base64Data);
+            }
           };
           reader.readAsDataURL(file);
         }
@@ -577,12 +630,27 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
 
         if (!result.canceled && result.assets && result.assets[0]) {
           const asset = result.assets[0];
-          // Construire le format data URI requis par l'API
-          const base64Data = `data:image/jpeg;base64,${asset.base64}`;
           
-          setIsAnalyzingReal(true);
-          setScanStep('scanning');
-          await uploadAndAnalyze(base64Data);
+          // Utiliser expo-image-manipulator pour compresser et redimensionner l'image nativement
+          const manipResult = await ImageManipulator.manipulateAsync(
+            asset.uri,
+            [{ resize: { width: 1024 } }],
+            { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+          );
+
+          // Construire le format data URI requis par l'API
+          const base64Data = `data:image/jpeg;base64,${manipResult.base64}`;
+          
+          if (step === 'front') {
+            setFrontPhoto(base64Data);
+            frontPhotoRef.current = base64Data;
+            setCaptureStep('back');
+          } else {
+            setBackPhoto(base64Data);
+            setIsAnalyzingReal(true);
+            setScanStep('scanning');
+            await uploadAndAnalyzeDouble(frontPhotoRef.current || frontPhoto || base64Data, base64Data);
+          }
         }
       } catch (err: any) {
         console.error("Camera launch error on native:", err);
@@ -591,7 +659,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     }
   };
 
-  const uploadAndAnalyze = async (base64Data: string) => {
+  const uploadAndAnalyzeDouble = async (front: string, back: string) => {
     try {
       // Toujours utiliser l'URL absolue de Vercel car les URLs relatives échouent sur l'APK natif !
       const apiUrl = 'https://my-root-in-nine.vercel.app/api/scan';
@@ -602,7 +670,8 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          image: base64Data,
+          frontImage: front,
+          backImage: back,
           texture: activeProfile?.diagnostic?.texture || 'Crépus',
           porosity: activeProfile?.diagnostic?.porosity || 'Moyenne'
         })
@@ -618,7 +687,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
       setScanStep('result');
     } catch (err: any) {
       console.error('Scan failed:', err);
-      const errMsg = err.message || 'Impossible d\'analyser cette photo. Vérifie ta connexion ou ta clé d\'API Gemini.';
+      const errMsg = err.message || 'Impossible d\'analyser ces photos. Vérifie ta connexion ou ta clé d\'API Gemini.';
       setRealProductError(errMsg);
       setScanStep('scan_error');
     } finally {
@@ -660,8 +729,11 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
           setScannerMode('photo');
           setIsSearchingBarcode(false);
           // Auto trigger camera capture
+          setFrontPhoto(null);
+          setBackPhoto(null);
+          setCaptureStep('front');
           setTimeout(() => {
-            handleRealScanPress();
+            capturePhoto('front');
           }, 200);
         } else {
           setScanStep('idle');
@@ -684,8 +756,11 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
           setScanStep('idle');
           setScannerMode('photo');
           setIsSearchingBarcode(false);
+          setFrontPhoto(null);
+          setBackPhoto(null);
+          setCaptureStep('front');
           setTimeout(() => {
-            handleRealScanPress();
+            capturePhoto('front');
           }, 200);
         } else {
           setScanStep('idle');
@@ -797,6 +872,10 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     setManualType('Shampoing');
     setIsSubmittingManual(false);
     setShowDropdown(false);
+    setFrontPhoto(null);
+    setBackPhoto(null);
+    setCaptureStep('front');
+    frontPhotoRef.current = null;
   };
 
   // Generate Personalized Capillary Diagnostic Report
@@ -888,11 +967,11 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
             ) : scanStep === 'idle' && scannerMode !== null ? (
               <TouchableOpacity 
                 onPress={() => {
-                  if (scannerMode === 'select_method') {
-                    setScannerMode(null);
-                  } else {
-                    setScannerMode('select_method');
-                  }
+                  setScannerMode(null);
+                  setFrontPhoto(null);
+                  setBackPhoto(null);
+                  setCaptureStep('front');
+                  frontPhotoRef.current = null;
                 }} 
                 style={styles.headerLeftButton}
               >
@@ -932,7 +1011,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     activeOpacity={0.9}
                     onPress={() => {
                       setActiveFeatureTab('inci');
-                      setScannerMode('select_method');
+                      setScannerMode('photo');
                     }}
                   >
                     <Text style={styles.modeCardIcon}>🔬</Text>
@@ -952,7 +1031,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     activeOpacity={0.9}
                     onPress={() => {
                       setActiveFeatureTab('diy');
-                      setScannerMode('select_method');
+                      setScannerMode('photo');
                     }}
                   >
                     <Text style={styles.modeCardIcon}>🌿</Text>
@@ -973,7 +1052,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     activeOpacity={0.9}
                     onPress={() => {
                       setActiveFeatureTab('add');
-                      setScannerMode('select_method');
+                      setScannerMode('photo');
                     }}
                   >
                     <Text style={styles.modeCardIcon}>➕</Text>
@@ -994,7 +1073,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     activeOpacity={0.9}
                     onPress={() => {
                       setActiveFeatureTab('compare');
-                      setScannerMode('select_method');
+                      setScannerMode('photo');
                     }}
                   >
                     <Text style={styles.modeCardIcon}>🧐</Text>
@@ -1063,57 +1142,74 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
               {scannerMode === 'photo' && (
                 <View>
                   {/* Back button */}
-                  <TouchableOpacity style={styles.backModeButton} onPress={() => setScannerMode('select_method')}>
-                    <Text style={styles.backModeButtonText}>⬅️ Retour aux choix</Text>
+                  <TouchableOpacity style={styles.backModeButton} onPress={() => {
+                    setScannerMode(null);
+                    setFrontPhoto(null);
+                    setBackPhoto(null);
+                    setCaptureStep('front');
+                    frontPhotoRef.current = null;
+                  }}>
+                    <Text style={styles.backModeButtonText}>⬅️ Retour aux fonctions</Text>
                   </TouchableOpacity>
 
-                  {/* 📷 BOUTON SCANNER RÉEL */}
-                  <TouchableOpacity
-                    style={styles.realScanButton}
-                    activeOpacity={0.8}
-                    onPress={handleRealScanPress}
-                  >
-                    <Text style={styles.realScanButtonIcon}>📷</Text>
-                    <View style={styles.realScanButtonTextContainer}>
-                      <Text style={styles.realScanButtonTitle}>Prendre le produit en photo</Text>
-                      <Text style={styles.realScanButtonSubtitle}>Analyse moléculaire de la liste d'ingrédients</Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  <View style={styles.separatorContainer}>
-                    <View style={[styles.separatorLine, isDark ? styles.separatorLineDark : styles.separatorLineLight]} />
-                    <Text style={[styles.separatorText, isDark ? styles.textMutedDark : styles.textMutedLight]}>OU SIMULER AVEC UN PRODUIT</Text>
-                    <View style={[styles.separatorLine, isDark ? styles.separatorLineDark : styles.separatorLineLight]} />
-                  </View>
-
-                  <Text style={[styles.introText, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                    Sélectionne le produit que tu possèdes pour lancer la simulation du scanner laser IA et recevoir ton rapport de compatibilité personnalisé :
-                  </Text>
-
-                  <View style={styles.productsGrid}>
-                    {mockProductsList.map((product) => (
+                  {captureStep === 'front' ? (
+                    <View style={{ alignItems: 'center', marginTop: 12 }}>
+                      <View style={{ backgroundColor: 'rgba(229, 169, 130, 0.1)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginBottom: 16, width: '100%' }}>
+                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.primary, textAlign: 'center' }}>
+                          📸 Étape 1 : l'utilisatrice doit prendre le devant du produit
+                        </Text>
+                      </View>
+                      
                       <TouchableOpacity
-                        key={product.id}
-                        style={[
-                          styles.productCard,
-                          isDark ? styles.productCardDark : styles.productCardLight
-                        ]}
+                        style={[styles.realScanButton, { width: '100%', marginBottom: spacing.md }]}
                         activeOpacity={0.8}
-                        onPress={() => handleStartScan(product)}
+                        onPress={() => capturePhoto('front')}
                       >
-                        <Image source={{ uri: product.image }} style={styles.productImage} />
-                        <View style={styles.productInfo}>
-                          <Text style={styles.productBrand}>{product.brand}</Text>
-                          <Text style={[styles.productName, isDark ? styles.textLight : styles.textDark]} numberOfLines={2}>
-                            {product.name}
-                          </Text>
-                          <View style={styles.scanActionBadge}>
-                            <Text style={styles.scanActionBadgeText}>Simuler le scan 🔍</Text>
-                          </View>
+                        <Text style={styles.realScanButtonIcon}>📷</Text>
+                        <View style={styles.realScanButtonTextContainer}>
+                          <Text style={styles.realScanButtonTitle}>Prendre le devant en photo</Text>
+                          <Text style={styles.realScanButtonSubtitle}>Analyse de la marque & du nom par l'IA</Text>
                         </View>
                       </TouchableOpacity>
-                    ))}
-                  </View>
+                    </View>
+                  ) : (
+                    <View style={{ alignItems: 'center', marginTop: 12 }}>
+                      <View style={{ backgroundColor: 'rgba(92, 138, 107, 0.1)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginBottom: 16, width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                        <Text style={{ fontSize: 18, color: colors.secondary }}>✓</Text>
+                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.secondary, textAlign: 'center' }}>
+                          Devant capturé avec succès !
+                        </Text>
+                      </View>
+
+                      <View style={{ backgroundColor: 'rgba(229, 169, 130, 0.1)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginBottom: 16, width: '100%' }}>
+                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.primary, textAlign: 'center' }}>
+                          📸 Étape 2 : pour prendre le dos avec les ingrédients
+                        </Text>
+                      </View>
+                      
+                      <TouchableOpacity
+                        style={[styles.realScanButton, { width: '100%', marginBottom: spacing.md, backgroundColor: colors.secondary }]}
+                        activeOpacity={0.8}
+                        onPress={() => capturePhoto('back')}
+                      >
+                        <Text style={styles.realScanButtonIcon}>📷</Text>
+                        <View style={styles.realScanButtonTextContainer}>
+                          <Text style={[styles.realScanButtonTitle, { color: '#FFFFFF' }]}>Prendre le dos en photo</Text>
+                          <Text style={[styles.realScanButtonSubtitle, { color: 'rgba(255,255,255,0.8)' }]}>Analyse INCI et moléculaire</Text>
+                        </View>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={{ padding: 12, marginTop: 8 }}
+                        onPress={() => {
+                          setFrontPhoto(null);
+                          setCaptureStep('front');
+                        }}
+                      >
+                        <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 12 }}>🔄 Recommencer l'étape 1</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               )}
 
@@ -1121,8 +1217,14 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
               {scannerMode === 'barcode' && (
                 <View style={{ width: '100%' }}>
                   {/* Back button */}
-                  <TouchableOpacity style={styles.backModeButton} onPress={() => setScannerMode('select_method')}>
-                    <Text style={styles.backModeButtonText}>⬅️ Retour aux choix</Text>
+                  <TouchableOpacity style={styles.backModeButton} onPress={() => {
+                    setScannerMode(null);
+                    setFrontPhoto(null);
+                    setBackPhoto(null);
+                    setCaptureStep('front');
+                    frontPhotoRef.current = null;
+                  }}>
+                    <Text style={styles.backModeButtonText}>⬅️ Retour aux fonctions</Text>
                   </TouchableOpacity>
 
                   {isCameraActive && Platform.OS === 'web' ? (
@@ -1226,48 +1328,6 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                       </TouchableOpacity>
                     </View>
                   )}
-
-                  {/* EAN PRE-SET EXAMPLES */}
-                  <View style={styles.examplesContainer}>
-                    <Text style={[styles.examplesTitle, isDark ? styles.textLight : styles.textDark]}>💡 Exemples de codes réels à tester :</Text>
-                    
-                    <TouchableOpacity 
-                      style={[styles.examplePill, isDark ? styles.examplePillDark : styles.examplePillLight]}
-                      onPress={() => {
-                        setBarcodeInput('3596710406087');
-                        handleBarcodeSearch('3596710406087');
-                      }}
-                    >
-                      <Text style={styles.examplePillBrand}>Activilong</Text>
-                      <Text style={[styles.examplePillName, isDark ? styles.textLight : styles.textDark]}>Shampoing Doux Actiforce</Text>
-                      <Text style={styles.examplePillEan}>Code : 3596710406087</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                      style={[styles.examplePill, isDark ? styles.examplePillDark : styles.examplePillLight]}
-                      onPress={() => {
-                        setBarcodeInput('764302201310');
-                        handleBarcodeSearch('764302201310');
-                      }}
-                    >
-                      <Text style={styles.examplePillBrand}>Shea Moisture</Text>
-                      <Text style={[styles.examplePillName, isDark ? styles.textLight : styles.textDark]}>Coconut Curl Smoothie</Text>
-                      <Text style={styles.examplePillEan}>Code : 764302201310</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                      style={[styles.examplePill, isDark ? styles.examplePillDark : styles.examplePillLight]}
-                      onPress={() => {
-                        setBarcodeInput('0817047020023');
-                        handleBarcodeSearch('0817047020023');
-                      }}
-                    >
-                      <Text style={styles.examplePillBrand}>Cantu</Text>
-                      <Text style={[styles.examplePillName, isDark ? styles.textLight : styles.textDark]}>Conditioning Cream</Text>
-                      <Text style={styles.examplePillEan}>Code : 0817047020023</Text>
-                    </TouchableOpacity>
-                  </View>
-
                 </View>
               )}
 
@@ -1278,7 +1338,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
           {scanStep === 'scanning' && (selectedProduct || isAnalyzingReal || isSearchingBarcode || isSubmittingManual) && (
             <View style={styles.scannerWrapper}>
               <Text style={styles.scannerPrompt}>
-                {isAnalyzingReal ? "Analyse de ta photo en cours..." : 
+                {isAnalyzingReal ? (frontPhoto && backPhoto ? "Analyse de vos 2 photos en cours..." : "Analyse de ta photo en cours...") : 
                  isSearchingBarcode ? "Recherche du produit en cours..." :
                  isSubmittingManual ? "Consultation de la base de connaissances IA..." : "Cadre la liste des ingrédients INCI"}
               </Text>
@@ -1305,12 +1365,12 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                 {/* Product scanned label */}
                 <View style={styles.scanningProductLabel}>
                   <Text style={styles.scanningProductBrand}>
-                    {isAnalyzingReal ? "SCANNER IA HAUTE PRÉCISION" : 
+                    {isAnalyzingReal ? (frontPhoto && backPhoto ? "RECTO / VERSO IA SCANNER" : "SCANNER IA HAUTE PRÉCISION") : 
                      isSearchingBarcode ? "BASE DE DONNÉES INCI" : 
                      isSubmittingManual ? "INTELLIGENCE ARTIFICIELLE" : (selectedProduct?.brand)}
                   </Text>
                   <Text style={styles.scanningProductName}>
-                    {isAnalyzingReal ? "Extraction de la formule moléculaire..." : 
+                    {isAnalyzingReal ? (frontPhoto && backPhoto ? "Extraction du nom & décryptage INCI..." : "Extraction de la formule moléculaire...") : 
                      isSearchingBarcode ? "Identification du code-barres..." :
                      isSubmittingManual ? `Reconstitution de la formule de ${manualBrand}...` : (selectedProduct?.name)}
                   </Text>
@@ -1320,7 +1380,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
 
               <Text style={[styles.scannerHint, isDark ? styles.textMutedDark : styles.textMutedLight]}>
                 {isAnalyzingReal 
-                  ? "Lecture des ingrédients INCI et diagnostic personnalisé..." : 
+                  ? (frontPhoto && backPhoto ? "Gemini compare la photo du devant et la liste d'ingrédients..." : "Lecture des ingrédients INCI et diagnostic personnalisé...") : 
                  isSearchingBarcode ? "Interrogation d'Open Beauty Facts et décryptage IA..." :
                  isSubmittingManual ? "Recherche moléculaire et évaluation de la compatibilité..."
                   : "Analyse moléculaire de la formule en cours avec l'IA Root'in..."}
@@ -1347,9 +1407,12 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                   style={styles.errorOptionButton}
                   activeOpacity={0.8}
                   onPress={() => {
+                    setFrontPhoto(null);
+                    setBackPhoto(null);
+                    setCaptureStep('front');
                     setScanStep('idle');
                     setTimeout(() => {
-                      handleRealScanPress();
+                      capturePhoto('front');
                     }, 100);
                   }}
                 >

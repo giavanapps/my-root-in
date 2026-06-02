@@ -11,7 +11,7 @@ import { FeaturedAdvice } from '../../components/home/FeaturedAdvice';
 import { Button } from '../../components/common/Button';
 import { TimePickerModal } from '../../components/common/TimePickerModal';
 import { PremiumPaywallModal } from '../../components/premium/PremiumPaywallModal';
-import { ProductScannerModal } from '../../components/premium/ProductScannerModal';
+import { ProductScannerModal, matchesCategory } from '../../components/premium/ProductScannerModal';
 import { DatePickerModal } from '../../components/common/DatePickerModal';
 
 interface CareGuide {
@@ -588,7 +588,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
     isPremium,
     setPremiumStatus,
     regularityScore,
-    shiftRoutineDates
+    shiftRoutineDates,
+    bathroomProducts
   } = useAppState();
 
   const [showHealthDetail, setShowHealthDetail] = useState(false);
@@ -606,6 +607,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
   
   // Premium and Scanner Modals active states
   const [showPaywall, setShowPaywall] = useState(false);
+  const [showLocalPaywall, setShowLocalPaywall] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [showPremiumHealthModal, setShowPremiumHealthModal] = useState(false);
   const [showSosSuccessModal, setShowSosSuccessModal] = useState(false);
@@ -853,11 +855,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
           style={[styles.scannerWidgetCard, { backgroundColor: customCard, borderColor: customBorder }]}
           activeOpacity={0.8}
           onPress={() => {
-            if (isPremium) {
-              setShowScanner(true);
-            } else {
-              setShowPaywall(true);
-            }
+            setShowScanner(true);
           }}
         >
           <View style={styles.scannerWidgetLeft}>
@@ -986,9 +984,54 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                         </Text>
                       </View>
                       
-                      <Text style={[styles.upcomingCareProductText, { color: customTextSec }]} numberOfLines={1}>
-                        {care.product}
-                      </Text>
+                      {(() => {
+                        const matchingBathroomProduct = bathroomProducts.find(bp => matchesCategory(bp.category, care.category));
+                        if (matchingBathroomProduct) {
+                          const isOcclusive = matchingBathroomProduct.ingredients.some(i => 
+                            i.toLowerCase().includes('mineral oil') || 
+                            i.toLowerCase().includes('petrolatum') || 
+                            i.toLowerCase().includes('cire') || 
+                            i.toLowerCase().includes('wax')
+                          );
+                          const isLowPoro = activeProfile.diagnostic.porosity === 'Faible';
+                          const hasWarning = matchingBathroomProduct.compatibility === 'Attention' || (isOcclusive && isLowPoro);
+
+                          if (hasWarning) {
+                            return (
+                              <View style={[
+                                styles.bathroomBadgeContainer,
+                                { 
+                                  backgroundColor: isLight ? 'rgba(217, 83, 79, 0.08)' : 'rgba(217, 83, 79, 0.15)',
+                                  borderColor: 'rgba(217, 83, 79, 0.3)'
+                                }
+                              ]}>
+                                <Text style={[styles.bathroomBadgeText, { color: isLight ? '#D9534F' : '#FF7875' }]} numberOfLines={1}>
+                                  🧼⚠️ {matchingBathroomProduct.brand} • {matchingBathroomProduct.name} (Attention)
+                                </Text>
+                              </View>
+                            );
+                          }
+
+                          return (
+                            <View style={[
+                              styles.bathroomBadgeContainer,
+                              { 
+                                backgroundColor: isLight ? 'rgba(118, 160, 138, 0.08)' : 'rgba(118, 160, 138, 0.15)',
+                                borderColor: 'rgba(118, 160, 138, 0.3)'
+                              }
+                            ]}>
+                              <Text style={[styles.bathroomBadgeText, { color: isLight ? '#4D735F' : '#9CCCAE' }]} numberOfLines={1}>
+                                🧼 {matchingBathroomProduct.brand} • {matchingBathroomProduct.name}
+                              </Text>
+                            </View>
+                          );
+                        }
+                        return (
+                          <Text style={[styles.upcomingCareProductText, { color: customTextSec }]} numberOfLines={1}>
+                            {care.product}
+                          </Text>
+                        );
+                      })()}
                       
                       <View style={styles.upcomingCareFooterRow}>
                         <Text style={{ fontSize: 9, color: colors.secondary, fontWeight: '700' }}>
@@ -1581,6 +1624,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
           setShowCareGuide(false);
           setSelectedCareId('');
           setShowGuideShoppingList(false);
+          setShowLocalPaywall(false);
         }}
       >
         <View style={[styles.modalOverlay, { backgroundColor: isLight ? 'rgba(0, 0, 0, 0.4)' : colors.overlay }]}>
@@ -1593,6 +1637,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                   setShowCareGuide(false);
                   setSelectedCareId('');
                   setShowGuideShoppingList(false);
+                  setShowLocalPaywall(false);
                 }}
               >
                 <Text style={[styles.closeDetailIconText, { color: customTextSec }]}>✕</Text>
@@ -1618,6 +1663,68 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                   *Personnalisé pour vos cheveux {activeProfile.diagnostic.texture} ({activeProfile.diagnostic.porosity || 'porosité non définie'}, épaisseur {activeProfile.diagnostic.thickness.toLowerCase()}).
                 </Text>
               </View>
+
+              {/* Bathroom Match Callout Box */}
+              {(() => {
+                const targetCategory = activeCareItem ? activeCareItem.category : categoryToUse;
+                const matchingProduct = bathroomProducts.find(bp => matchesCategory(bp.category, targetCategory));
+
+                if (!matchingProduct) return null;
+
+                const isOcclusive = matchingProduct.ingredients.some(i => 
+                  i.toLowerCase().includes('mineral oil') || 
+                  i.toLowerCase().includes('petrolatum') || 
+                  i.toLowerCase().includes('cire') || 
+                  i.toLowerCase().includes('wax')
+                );
+                
+                const isLowPoro = activeProfile.diagnostic.porosity === 'Faible';
+                const hasWarning = matchingProduct.compatibility === 'Attention' || (isOcclusive && isLowPoro);
+
+                if (hasWarning) {
+                  return (
+                    <View style={[
+                      styles.guideSectionBox, 
+                      { 
+                        backgroundColor: isLight ? 'rgba(217, 83, 79, 0.05)' : 'rgba(217, 83, 79, 0.08)', 
+                        borderColor: 'rgba(217, 83, 79, 0.25)',
+                        borderWidth: 1.2,
+                        marginTop: 4,
+                        marginBottom: 12
+                      }
+                    ]}>
+                      <Text style={[styles.guideSectionHeader, { color: colors.danger }]}>🧼⚠️ Option dans ta Salle de Bain (Attention) :</Text>
+                      <Text style={[styles.guideSectionText, { color: customText, fontWeight: '700', marginBottom: 4 }]}>
+                        {matchingProduct.brand} - {matchingProduct.name}
+                      </Text>
+                      <Text style={[styles.guideSectionText, { color: customTextSec, fontSize: 11, lineHeight: 16 }]}>
+                        Tu as ce produit dans ton placard virtuel pour faire ce soin, MAIS attention : ce produit contient des cires occlusives ou ingrédients lourds peu adaptés à tes cuticules serrées (porosité faible). Utilise-le avec précaution ou fais une clarification forte juste après pour éviter toute accumulation étouffante.
+                      </Text>
+                    </View>
+                  );
+                }
+
+                return (
+                  <View style={[
+                    styles.guideSectionBox, 
+                    { 
+                      backgroundColor: isLight ? 'rgba(118, 160, 138, 0.06)' : 'rgba(118, 160, 138, 0.1)', 
+                      borderColor: 'rgba(118, 160, 138, 0.25)',
+                      borderWidth: 1.2,
+                      marginTop: 4,
+                      marginBottom: 12
+                    }
+                  ]}>
+                    <Text style={[styles.guideSectionHeader, { color: isLight ? '#4D735F' : '#9CCCAE' }]}>🧼 Solution dans ta Salle de Bain :</Text>
+                    <Text style={[styles.guideSectionText, { color: customText, fontWeight: '700', marginBottom: 4 }]}>
+                      {matchingProduct.brand} - {matchingProduct.name}
+                    </Text>
+                    <Text style={[styles.guideSectionText, { color: customTextSec, fontSize: 11, lineHeight: 16 }]}>
+                      Génial ! Tu as ce produit dans ton placard virtuel. Tu peux parfaitement réaliser ce soin avec ce produit de ta salle de bain ! Il est 100% compatible et idéal.
+                    </Text>
+                  </View>
+                );
+              })()}
 
               {/* Individual Care Reminder Hour Picker Row */}
               {activeCareItem && (
@@ -1654,9 +1761,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                   ]}
                   activeOpacity={0.8}
                   onPress={() => {
-                    setShowCareGuide(false);
-                    setSelectedCareId('');
-                    setShowPaywall(true);
+                    setShowLocalPaywall(true);
                   }}
                 >
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
@@ -1768,6 +1873,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                   setShowCareGuide(false);
                   setSelectedCareId('');
                   setShowGuideShoppingList(false);
+                  setShowLocalPaywall(false);
                 }}
                 disabled={!activeCareItem || activeCareItem.completed}
                 variant="primary"
@@ -1779,11 +1885,134 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                   setShowCareGuide(false);
                   setSelectedCareId('');
                   setShowGuideShoppingList(false);
+                  setShowLocalPaywall(false);
                 }}
                 variant="outline"
                 style={{ flex: 1 }}
               />
             </View>
+
+            {showLocalPaywall && (
+              <View style={[StyleSheet.absoluteFill, { 
+                backgroundColor: isLight ? '#FFFFFF' : '#0E111F', 
+                borderRadius: 28, 
+                padding: 24, 
+                zIndex: 999, 
+                justifyContent: 'center', 
+                alignItems: 'center' 
+              }]}>
+                {/* Pop-up header */}
+                <View style={{ width: '100%', alignItems: 'center', marginBottom: 20 }}>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.accent, backgroundColor: 'rgba(230, 198, 135, 0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, overflow: 'hidden', marginBottom: 12 }}>
+                    💎 SOIN OPTIMISÉ PREMIUM
+                  </Text>
+                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: customText, textAlign: 'center', marginBottom: 6 }}>
+                    Débloque ta Liste de Courses & Budget
+                  </Text>
+                  <Text style={{ fontSize: 12, color: customTextSec, textAlign: 'center', lineHeight: 16, paddingHorizontal: 10 }}>
+                    Active l'abonnement Premium pour obtenir instantanément tous les secrets de ce soin et de ta routine !
+                  </Text>
+                </View>
+
+                {/* Core Premium benefits highlighted */}
+                <View style={{ width: '100%', marginBottom: 20, gap: 12 }}>
+                  {/* Benefit 1: Courses */}
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+                    <Text style={{ fontSize: 20 }}>🛒</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12.5, fontWeight: 'bold', color: customText }}>Liste de courses actuelle & Budget</Text>
+                      <Text style={{ fontSize: 11, color: customTextSec, lineHeight: 14 }}>
+                        Ingrédients exacts requis pour {currentGuide.title.toLowerCase()} et estimation du coût total.
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Benefit 2: Scanner IA */}
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+                    <Text style={{ fontSize: 20 }}>📸</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12.5, fontWeight: 'bold', color: customText }}>Scanner IA Double-Étape Recto/Verso</Text>
+                      <Text style={{ fontSize: 11, color: customTextSec, lineHeight: 14 }}>
+                        Analyse moléculaire de la marque, du nom (recto) et de la liste INCI (verso) pour éviter toute erreur d'identification.
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Benefit 3: Salle de bain */}
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+                    <Text style={{ fontSize: 20 }}>🧼</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12.5, fontWeight: 'bold', color: customText }}>Placard Virtuel "Ma Salle de Bain"</Text>
+                      <Text style={{ fontSize: 11, color: customTextSec, lineHeight: 14 }}>
+                        Enregistre tes produits et reçois des alertes proactives de compatibilité et d'occlusion sur tes prochains soins.
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Simulated Purchase Button */}
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: colors.primary,
+                    width: '100%',
+                    paddingVertical: 12,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    shadowColor: colors.primary,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 8,
+                    elevation: 5,
+                    marginBottom: 12
+                  }}
+                  activeOpacity={0.9}
+                  onPress={() => {
+                    setPremiumStatus(true);
+                    setShowLocalPaywall(false);
+                    setShowGuideShoppingList(true);
+                  }}
+                >
+                  <Text style={{ color: '#0B0D17', fontSize: 13.5, fontWeight: 'bold' }}>
+                    Commencer mon essai de 7 jours 🚀
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Developer Secret Bypass Section in Local paywall */}
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: 'rgba(230, 198, 135, 0.08)',
+                    borderColor: 'rgba(230, 198, 135, 0.3)',
+                    borderWidth: 1,
+                    borderStyle: 'dashed',
+                    width: '100%',
+                    paddingVertical: 8,
+                    borderRadius: 10,
+                    alignItems: 'center',
+                    marginBottom: 12
+                  }}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setPremiumStatus(true);
+                    setShowLocalPaywall(false);
+                    setShowGuideShoppingList(true);
+                  }}
+                >
+                  <Text style={{ color: colors.accent, fontSize: 10.5, fontWeight: 'bold' }}>
+                    🛠️ Développeur : Activer Premium Root'in
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Close local paywall button */}
+                <TouchableOpacity 
+                  style={{ paddingVertical: 6 }}
+                  onPress={() => setShowLocalPaywall(false)}
+                >
+                  <Text style={{ color: customTextSec, fontSize: 11.5, fontWeight: '600', textDecorationLine: 'underline' }}>
+                    ✕ Retour au soin
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           {/* ⏰ INDIVIDUAL TIME PICKER OVERLAY */}
@@ -3055,6 +3284,18 @@ const styles = StyleSheet.create({
   guideShoppingTip: {
     fontSize: 11,
     lineHeight: 16,
+    fontWeight: 'bold',
+  },
+  bathroomBadgeContainer: {
+    borderRadius: 8,
+    borderWidth: 0.5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
+  bathroomBadgeText: {
+    fontSize: 9.5,
     fontWeight: 'bold',
   },
 });
