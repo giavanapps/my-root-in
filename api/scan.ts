@@ -18,10 +18,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Méthode non autorisée. Utilisez POST.' });
   }
 
-  const { image, ingredientsText, texture, porosity } = req.body;
+  const { image, ingredientsText, manualBrand, manualName, manualType, texture, porosity } = req.body;
 
-  if (!image && !ingredientsText) {
-    return res.status(400).json({ error: 'Aucune image ni liste d\'ingrédients fournie.' });
+  if (!image && !ingredientsText && (!manualBrand || !manualName)) {
+    return res.status(400).json({ error: 'Aucune image, liste d\'ingrédients, ni informations de saisie manuelle fournies.' });
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -73,7 +73,7 @@ Fournis ton analyse en français au format JSON STRICT avec cette structure exac
           data: base64Data
         }
       });
-    } else {
+    } else if (ingredientsText) {
       // Option 2 : Text-based scan (from barcode lookup)
       promptText = `Tu es un expert en cosmétologie capillaire et ingrédients INCI, spécialisé dans les cheveux afro et texturés (crépus, frisés, bouclés, ondulés, locksés). Analyse cette liste d'ingrédients d'un produit capillaire.
 
@@ -91,6 +91,36 @@ Fournis ton analyse en français au format JSON STRICT avec cette structure exac
   "score": 85, // Score de 0 à 100 indiquant la compatibilité exacte avec son profil (sois honnête et sévère s'il y a des ingrédients toxiques ou occlusifs inadaptés)
   "title": "Titre court de compatibilité (ex: Excellent pour ton profil ! 🌿)",
   "description": "Explication détaillée et personnalisée de ton avis en tant que coach capillaire IA, en expliquant spécifiquement pourquoi les ingrédients conviennent ou non à sa porosité et sa texture. Adresse-toi directement à l'utilisateur de manière bienveillante.",
+  "inciReport": {
+    "good": ["Ingrédient 1 (Explication rapide de son effet bénéfique)", "Ingrédient 2 (Explication)"],
+    "neutral": ["Ingrédient 1 (Explication)", "Ingrédient 2 (Explication)"],
+    "avoid": ["Ingrédient 1 (Pourquoi l'éviter : ex: occlusif, cire minérale, sulfate décapant, alcool desséchant)", "Ingrédient 2 (Pourquoi l'éviter)"]
+  }
+}`;
+
+      parts.push({ text: promptText });
+    } else {
+      // Option 3 : Manual Express Entry Search
+      promptText = `Tu es un expert en cosmétologie capillaire et ingrédients INCI, spécialisé dans les cheveux afro et texturés (crépus, frisés, bouclés, ondulés, locksés). L'utilisateur a fait une saisie manuelle car le scan de son produit a échoué.
+      
+Produit saisi à la main :
+- Marque : ${manualBrand}
+- Nom du produit : ${manualName}
+- Type de produit : ${manualType || 'Non spécifié'}
+
+Utilise ta propre base de connaissances sur ce produit exact. Si tu connais ce produit, reconstitue mentalement sa liste d'ingrédients INCI officielle. Si c'est un produit générique ou peu connu, imagine la liste d'ingrédients la plus probable pour ce type de produit de cette marque.
+
+Prends en compte le profil capillaire de l'utilisateur :
+- Texture : ${texture || 'Crépus'}
+- Porosité : ${porosity || 'Moyenne'}
+
+Fournis ton analyse en français au format JSON STRICT avec cette structure exacte :
+{
+  "brand": "${manualBrand}",
+  "name": "${manualName}",
+  "score": 85, // Score de 0 à 100 indiquant la compatibilité exacte avec son profil (sois honnête et sévère s'il y a des ingrédients toxiques ou occlusifs inadaptés)
+  "title": "Titre court de compatibilité (ex: Excellent pour ton profil ! 🌿)",
+  "description": "Explication détaillée et personnalisée de ton avis en tant que coach capillaire IA, en expliquant spécifiquement pourquoi les ingrédients de ce produit conviennent ou non à sa porosité et sa texture. Adresse-toi directement à l'utilisateur de manière bienveillante. Mentionne au début que tu analyses ce produit via ta base de connaissances.",
   "inciReport": {
     "good": ["Ingrédient 1 (Explication rapide de son effet bénéfique)", "Ingrédient 2 (Explication)"],
     "neutral": ["Ingrédient 1 (Explication)", "Ingrédient 2 (Explication)"],

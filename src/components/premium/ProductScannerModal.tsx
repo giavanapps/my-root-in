@@ -333,7 +333,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   } = useAppState();
   const isDark = themeMode === 'dark';
 
-  const [scanStep, setScanStep] = useState<'idle' | 'scanning' | 'result'>('idle');
+  const [scanStep, setScanStep] = useState<'idle' | 'scanning' | 'result' | 'scan_error' | 'manual_express'>('idle');
   const [activeFeatureTab, setActiveFeatureTab] = useState<'inci' | 'add' | 'compare' | 'diy'>('inci');
   const [selectedProduct, setSelectedProduct] = useState<MockProduct | null>(null);
 
@@ -350,6 +350,13 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [showScanTip, setShowScanTip] = useState(false);
   const [showShoppingList, setShowShoppingList] = useState(false);
+
+  // Formulaire Saisie Express states
+  const [manualBrand, setManualBrand] = useState('');
+  const [manualName, setManualName] = useState('');
+  const [manualType, setManualType] = useState('Shampoing');
+  const [isSubmittingManual, setIsSubmittingManual] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
 
   // Animation laser
   const laserAnim = useRef(new Animated.Value(0)).current;
@@ -613,8 +620,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
       console.error('Scan failed:', err);
       const errMsg = err.message || 'Impossible d\'analyser cette photo. Vérifie ta connexion ou ta clé d\'API Gemini.';
       setRealProductError(errMsg);
-      setScanStep('idle');
-      alert(`Désolé, l'analyse a échoué : ${errMsg}`);
+      setScanStep('scan_error');
     } finally {
       setIsAnalyzingReal(false);
     }
@@ -721,10 +727,54 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
       console.error('Barcode scan failed:', err);
       const errMsg = err.message || 'Impossible d\'analyser ce code-barres.';
       setRealProductError(errMsg);
-      setScanStep('idle');
-      alert(`Désolé, l'analyse a échoué : ${errMsg}`);
+      setScanStep('scan_error');
     } finally {
       setIsSearchingBarcode(false);
+    }
+  };
+
+  const handleManualExpressSubmit = async () => {
+    if (!manualBrand.trim() || !manualName.trim()) {
+      alert("Veuillez renseigner la marque et le nom du produit.");
+      return;
+    }
+
+    setRealProductAnalysis(null);
+    setRealProductError(null);
+    setIsSubmittingManual(true);
+    setScanStep('scanning');
+
+    try {
+      const response = await fetch('https://my-root-in-nine.vercel.app/api/scan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          manualBrand: manualBrand.trim(),
+          manualName: manualName.trim(),
+          manualType: manualType,
+          texture: activeProfile?.diagnostic?.texture || 'Crépus',
+          porosity: activeProfile?.diagnostic?.porosity || 'Moyenne'
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || errData.details || 'Erreur lors de la recherche de la formule');
+      }
+
+      const result = await response.json();
+      setRealProductAnalysis(result);
+      setScanStep('result');
+    } catch (err: any) {
+      console.error('Manual express submit failed:', err);
+      const errMsg = err.message || 'Impossible de trouver ou d\'analyser ce produit.';
+      setRealProductError(errMsg);
+      setScanStep('scan_error');
+      alert(`Désolé, l'analyse manuelle a échoué : ${errMsg}`);
+    } finally {
+      setIsSubmittingManual(false);
     }
   };
 
@@ -742,6 +792,11 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     setScanStep('idle');
     setActiveFeatureTab('inci');
     setShowShoppingList(false);
+    setManualBrand('');
+    setManualName('');
+    setManualType('Shampoing');
+    setIsSubmittingManual(false);
+    setShowDropdown(false);
   };
 
   // Generate Personalized Capillary Diagnostic Report
@@ -1220,11 +1275,12 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
           )}
 
           {/* SCANNING STEP - ANIMATED CAMERA */}
-          {scanStep === 'scanning' && (selectedProduct || isAnalyzingReal || isSearchingBarcode) && (
+          {scanStep === 'scanning' && (selectedProduct || isAnalyzingReal || isSearchingBarcode || isSubmittingManual) && (
             <View style={styles.scannerWrapper}>
               <Text style={styles.scannerPrompt}>
                 {isAnalyzingReal ? "Analyse de ta photo en cours..." : 
-                 isSearchingBarcode ? "Recherche du produit en cours..." : "Cadre la liste des ingrédients INCI"}
+                 isSearchingBarcode ? "Recherche du produit en cours..." :
+                 isSubmittingManual ? "Consultation de la base de connaissances IA..." : "Cadre la liste des ingrédients INCI"}
               </Text>
               
               {/* Simulated Camera Viewfinder */}
@@ -1250,11 +1306,13 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                 <View style={styles.scanningProductLabel}>
                   <Text style={styles.scanningProductBrand}>
                     {isAnalyzingReal ? "SCANNER IA HAUTE PRÉCISION" : 
-                     isSearchingBarcode ? "BASE DE DONNÉES INCI" : (selectedProduct?.brand)}
+                     isSearchingBarcode ? "BASE DE DONNÉES INCI" : 
+                     isSubmittingManual ? "INTELLIGENCE ARTIFICIELLE" : (selectedProduct?.brand)}
                   </Text>
                   <Text style={styles.scanningProductName}>
                     {isAnalyzingReal ? "Extraction de la formule moléculaire..." : 
-                     isSearchingBarcode ? "Identification du code-barres..." : (selectedProduct?.name)}
+                     isSearchingBarcode ? "Identification du code-barres..." :
+                     isSubmittingManual ? `Reconstitution de la formule de ${manualBrand}...` : (selectedProduct?.name)}
                   </Text>
                   <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
                 </View>
@@ -1263,10 +1321,167 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
               <Text style={[styles.scannerHint, isDark ? styles.textMutedDark : styles.textMutedLight]}>
                 {isAnalyzingReal 
                   ? "Lecture des ingrédients INCI et diagnostic personnalisé..." : 
-                 isSearchingBarcode ? "Interrogation d'Open Beauty Facts et décryptage IA..."
+                 isSearchingBarcode ? "Interrogation d'Open Beauty Facts et décryptage IA..." :
+                 isSubmittingManual ? "Recherche moléculaire et évaluation de la compatibilité..."
                   : "Analyse moléculaire de la formule en cours avec l'IA Root'in..."}
               </Text>
             </View>
+          )}
+
+          {/* SCAN ERROR STEP - INTERMEDIATE CHOICES */}
+          {scanStep === 'scan_error' && (
+            <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorIcon}>⚠️</Text>
+                <Text style={[styles.errorTitle, isDark ? styles.textLight : styles.textDark]}>
+                  L'analyse automatique a échoué
+                </Text>
+                <Text style={[styles.errorDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                  Désolé, nous n'avons pas réussi à lire ou à identifier la formule. Pas d'inquiétude, tu peux contourner cet obstacle très facilement !
+                </Text>
+
+                <View style={styles.errorDivider} />
+
+                {/* Option 1: Recommencer le scan */}
+                <TouchableOpacity
+                  style={styles.errorOptionButton}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setScanStep('idle');
+                    setTimeout(() => {
+                      handleRealScanPress();
+                    }, 100);
+                  }}
+                >
+                  <Text style={styles.errorOptionButtonText}>📸 Recommencer le scan</Text>
+                </TouchableOpacity>
+
+                {/* Option 2: Saisie Express à la main */}
+                <TouchableOpacity
+                  style={[styles.errorOptionButton, styles.errorOptionButtonSecondary]}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setScanStep('manual_express');
+                  }}
+                >
+                  <Text style={[styles.errorOptionButtonText, styles.errorOptionButtonTextSecondary]}>✍️ Saisie Express à la main</Text>
+                </TouchableOpacity>
+
+                {/* Option 3: Retour à l'accueil du scanner */}
+                <TouchableOpacity
+                  style={styles.errorCancelButton}
+                  activeOpacity={0.8}
+                  onPress={handleReset}
+                >
+                  <Text style={styles.errorCancelButtonText}>⬅️ Retour à l'accueil du scanner</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          )}
+
+          {/* MANUAL EXPRESS FORM STEP */}
+          {scanStep === 'manual_express' && (
+            <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+              <View style={styles.formContainer}>
+                <Text style={[styles.formHeaderTitle, isDark ? styles.textLight : styles.textDark]}>
+                  ✍️ Saisie Express à la main
+                </Text>
+                <Text style={[styles.formHeaderDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                  Renseigne uniquement ces 3 informations. Notre IA Root'in va interroger sa propre base de connaissances pour reconstituer la formule moléculaire exacte de ton produit capillaire !
+                </Text>
+
+                {/* Field 1: Brand */}
+                <View style={styles.formField}>
+                  <Text style={[styles.formLabel, isDark ? styles.textLight : styles.textDark]}>1. Marque du produit :</Text>
+                  <View style={[styles.formInputWrapper, isDark ? styles.formInputWrapperDark : styles.formInputWrapperLight]}>
+                    <TextInput
+                      style={[styles.formInput, isDark ? styles.formInputDark : styles.formInputLight]}
+                      placeholder="Ex: Shea Moisture, Cantu, Activilong..."
+                      placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
+                      value={manualBrand}
+                      onChangeText={setManualBrand}
+                    />
+                  </View>
+                </View>
+
+                {/* Field 2: Product Name */}
+                <View style={styles.formField}>
+                  <Text style={[styles.formLabel, isDark ? styles.textLight : styles.textDark]}>2. Nom exact du produit :</Text>
+                  <View style={[styles.formInputWrapper, isDark ? styles.formInputWrapperDark : styles.formInputWrapperLight]}>
+                    <TextInput
+                      style={[styles.formInput, isDark ? styles.formInputDark : styles.formInputLight]}
+                      placeholder="Ex: Coconut & Hibiscus Curl Smoothie..."
+                      placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
+                      value={manualName}
+                      onChangeText={setManualName}
+                    />
+                  </View>
+                </View>
+
+                {/* Field 3: Product Type (Dropdown) */}
+                <View style={styles.formField}>
+                  <Text style={[styles.formLabel, isDark ? styles.textLight : styles.textDark]}>3. Type de produit :</Text>
+                  
+                  <TouchableOpacity
+                    style={[styles.dropdownTrigger, isDark ? styles.dropdownTriggerDark : styles.dropdownTriggerLight]}
+                    activeOpacity={0.8}
+                    onPress={() => setShowDropdown(!showDropdown)}
+                  >
+                    <Text style={[styles.dropdownTriggerText, isDark ? styles.textLight : styles.textDark]}>
+                      {manualType}
+                    </Text>
+                    <Text style={{ color: colors.primary, fontWeight: 'bold' }}>
+                      {showDropdown ? '▲' : '▼'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {showDropdown && (
+                    <View style={[styles.dropdownMenu, isDark ? styles.dropdownMenuDark : styles.dropdownMenuLight]}>
+                      {['Shampoing', 'Masque', 'Bain d\'huile', 'Leave-in', 'Gel', 'Spray'].map((type) => (
+                        <TouchableOpacity
+                          key={type}
+                          style={[
+                            styles.dropdownMenuItem,
+                            manualType === type && styles.dropdownMenuItemActive
+                          ]}
+                          onPress={() => {
+                            setManualType(type);
+                            setShowDropdown(false);
+                          }}
+                        >
+                          <Text style={[
+                            styles.dropdownMenuItemText, 
+                            manualType === type ? styles.dropdownMenuItemTextActive : (isDark ? styles.textLight : styles.textDark)
+                          ]}>
+                            {type}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.formDivider} />
+
+                {/* Submit button */}
+                <TouchableOpacity
+                  style={styles.formSubmitButton}
+                  activeOpacity={0.8}
+                  onPress={handleManualExpressSubmit}
+                >
+                  <Text style={styles.formSubmitButtonText}>🤖 Décrypter avec l'IA Root'in ➔</Text>
+                </TouchableOpacity>
+
+                {/* Cancel button */}
+                <TouchableOpacity
+                  style={styles.formCancelButton}
+                  activeOpacity={0.8}
+                  onPress={() => setScanStep('scan_error')}
+                >
+                  <Text style={styles.formCancelButtonText}>⬅️ Retour aux choix</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           )}
 
           {/* RESULT STEP - IA REPORT COMPATIBILITY */}
@@ -2818,6 +3033,213 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 11,
     lineHeight: 16,
+    fontWeight: 'bold',
+  },
+  // SCAN ERROR SCREEN STYLES
+  errorContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.md,
+  },
+  errorIcon: {
+    fontSize: 48,
+    marginBottom: spacing.md,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  errorDesc: {
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: spacing.xl,
+  },
+  errorDivider: {
+    width: '100%',
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    marginVertical: spacing.md,
+  },
+  errorOptionButton: {
+    width: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    padding: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  errorOptionButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  errorOptionButtonSecondary: {
+    backgroundColor: 'rgba(118, 160, 138, 0.1)',
+    borderWidth: 1,
+    borderColor: '#76A08A',
+    shadowColor: 'transparent',
+    elevation: 0,
+  },
+  errorOptionButtonTextSecondary: {
+    color: '#76A08A',
+  },
+  errorCancelButton: {
+    paddingVertical: spacing.md,
+    marginTop: spacing.md,
+  },
+  errorCancelButtonText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+
+  // MANUAL EXPRESS FORM STYLES
+  formContainer: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+  },
+  formHeaderTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: spacing.xs,
+  },
+  formHeaderDesc: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginBottom: spacing.xl,
+  },
+  formField: {
+    marginBottom: spacing.lg,
+    width: '100%',
+  },
+  formLabel: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    marginBottom: spacing.sm,
+  },
+  formInputWrapper: {
+    borderRadius: borderRadius.md,
+    borderWidth: 1.5,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+  },
+  formInputWrapperDark: {
+    backgroundColor: '#16192A',
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  formInputWrapperLight: {
+    backgroundColor: '#F8F9FA',
+    borderColor: 'rgba(0,0,0,0.08)',
+  },
+  formInput: {
+    fontSize: 14,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    outlineWidth: 0,
+  },
+  formInputDark: {
+    color: '#FFFFFF',
+  },
+  formInputLight: {
+    color: '#0E111F',
+  },
+  dropdownTrigger: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderRadius: borderRadius.md,
+    borderWidth: 1.5,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+  },
+  dropdownTriggerDark: {
+    backgroundColor: '#16192A',
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  dropdownTriggerLight: {
+    backgroundColor: '#F8F9FA',
+    borderColor: 'rgba(0,0,0,0.08)',
+  },
+  dropdownTriggerText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  dropdownMenu: {
+    marginTop: 4,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  dropdownMenuDark: {
+    backgroundColor: '#1E233B',
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  dropdownMenuLight: {
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(0,0,0,0.05)',
+  },
+  dropdownMenuItem: {
+    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.03)',
+  },
+  dropdownMenuItemActive: {
+    backgroundColor: colors.primary,
+  },
+  dropdownMenuItemText: {
+    fontSize: 13,
+  },
+  dropdownMenuItemTextActive: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  formDivider: {
+    width: '100%',
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    marginVertical: spacing.lg,
+  },
+  formSubmitButton: {
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    padding: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  formSubmitButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  formCancelButton: {
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  formCancelButtonText: {
+    color: colors.textSecondary,
+    fontSize: 13,
     fontWeight: 'bold',
   },
 });
