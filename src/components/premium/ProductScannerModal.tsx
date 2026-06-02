@@ -78,6 +78,9 @@ export interface DiyRecipe {
   ingredients: string[];
   steps: string[];
   preservation: string;
+  shoppingList: { item: string; price: string }[];
+  estimatedTotalCost: string;
+  economicTip: string;
 }
 
 export const detectCategory = (name: string, brand: string): string => {
@@ -167,7 +170,15 @@ export const getDiyDupeRecipe = (category: string, porosity: string, texture: st
         'Applique sur le cuir chevelu mouillé et masse doucement. Laisse poser 3 à 5 minutes pour profiter des actifs saponifères.',
         'Rince abondamment à l\'eau tiède (ou eau froide pour sceller si ta porosité est forte).'
       ],
-      preservation: '⚠️ À utiliser immédiatement. Ne se conserve pas au-delà de 24h.'
+      preservation: '⚠️ À utiliser immédiatement. Ne se conserve pas au-delà de 24h.',
+      shoppingList: [
+        { item: 'Poudre de Shikakaï Bio (250g)', price: '4,50 €' },
+        { item: 'Tube de Gel d\'Aloe Vera Pur (200ml)', price: '6,50 €' },
+        { item: isLowPoro ? 'Huile de Jojoba Bio (50ml)' : isHighPoro ? 'Huile de Ricin Bio (100ml)' : 'Huile d\'Argan Bio (50ml)', price: '5,00 €' },
+        { item: 'Fleurs d\'Hibiscus séchées (100g)', price: '3,00 €' }
+      ],
+      estimatedTotalCost: '19,00 €',
+      economicTip: '💡 Rentabilité : Ce panier te permet de fabriquer plus de 12 sessions de shampoings frais, soit environ 1,58 € par lavage contre 18 € pour un flacon industriel.'
     };
   }
   
@@ -189,7 +200,14 @@ export const getDiyDupeRecipe = (category: string, porosity: string, texture: st
         'Applique raie par raie sur le cuir chevelu puis étire sur les longueurs.',
         'Enveloppe tes cheveux sous une serviette tiède ou un bonnet chauffant et laisse poser 30 à 45 minutes avant ton shampoing.'
       ],
-      preservation: '🌿 Conserver à l\'abri de la lumière et de la chaleur pendant 6 mois maximum.'
+      preservation: '🌿 Conserver à l\'abri de la lumière et de la chaleur pendant 6 mois maximum.',
+      shoppingList: [
+        { item: isLowPoro ? 'Huile de Jojoba Bio (100ml)' : isHighPoro ? 'Huile de Coco Vierge (200ml)' : 'Huile d\'Argan Bio (100ml)', price: '7,00 €' },
+        { item: 'Huile d\'Amande Douce Bio (100ml)', price: '5,00 €' },
+        { item: 'Huile Essentielle d\'Ylang-Ylang (10ml)', price: '6,00 €' }
+      ],
+      estimatedTotalCost: '18,00 €',
+      economicTip: '💡 Rentabilité : Les flacons achetés permettent de réaliser plus de 10 bains d\'huiles ultra-complets, soit environ 1,80 € par soin contre 25 € pour un sérum équivalent en boutique.'
     };
   }
   
@@ -212,7 +230,15 @@ export const getDiyDupeRecipe = (category: string, porosity: string, texture: st
         'Incorpore énergiquement le miel, l\'huile végétale adaptée à ta porosité et la vitamine E.',
         'Applique sur cheveux lavés et essorés. Laisse poser 45 minutes sous un bonnet de douche, puis rince soigneusement.'
       ],
-      preservation: '❄️ À conserver au réfrigérateur et à utiliser sous 7 jours maximum.'
+      preservation: '❄️ À conserver au réfrigérateur et à utiliser sous 7 jours maximum.',
+      shoppingList: [
+        { item: 'Graines de Lin Bio (500g)', price: '2,50 €' },
+        { item: 'Pot de Miel Bio Sauvage (250g)', price: '4,50 €' },
+        { item: isLowPoro ? 'Huile d\'Argan Bio (50ml)' : isHighPoro ? 'Beurre de Karité Brut (100g)' : 'Huile d\'Olive Extra-Vierge (500ml)', price: '5,50 €' },
+        { item: 'Vitamine E Liquide Bio (10ml)', price: '4,00 €' }
+      ],
+      estimatedTotalCost: '16,50 €',
+      economicTip: '💡 Rentabilité : Le sachet de graines de lin permet de fabriquer plus de 20 masques d\'hydratation profonde. Coût réel de revient : moins de 1,10 € par masque !'
     };
   }
   
@@ -233,7 +259,14 @@ export const getDiyDupeRecipe = (category: string, porosity: string, texture: st
         'Laisse refroidir le gel obtenu, puis fouette-le avec le gel d\'aloe vera et l\'huile végétale choisie.',
         'Applique en petite quantité sur tes locks pour resserrer les racines (retwist) ou sur tes boucles libres pour les définir.'
       ],
-      preservation: '❄️ Conserver obligatoirement au frais et utiliser dans les 10 jours.'
+      preservation: '❄️ Conserver obligatoirement au frais et utiliser dans les 10 jours.',
+      shoppingList: [
+        { item: 'Gombos frais (Magasin exotique ou bio - 250g)', price: '2,00 €' },
+        { item: 'Tube de Gel d\'Aloe Vera Pur (200ml)', price: '6,50 €' },
+        { item: isLowPoro ? 'Huile de Pépins de Raisin (100ml)' : 'Huile de Ricin Bio (100ml)', price: '5,00 €' }
+      ],
+      estimatedTotalCost: '13,50 €',
+      economicTip: '💡 Rentabilité : Ce gel maison évite d\'alourdir tes locks avec de la cire minérale. Coût de revient par session : ~0,90 € contre 22 € pour un gel fixant pro.'
     };
   }
   
@@ -251,7 +284,14 @@ export const getDiyDupeRecipe = (category: string, porosity: string, texture: st
         'Humidifie tes cheveux et applique la pâte sur ton cuir chevelu et tes longueurs en massant brièvement.',
         'Laisse poser 10 minutes (l\'argile ne doit pas sécher complètement), puis rince abondamment.'
       ],
-      preservation: '⚠️ Usage unique immédiat. Ne pas stocker le mélange après préparation.'
+      preservation: '⚠️ Usage unique immédiat. Ne pas stocker le mélange après préparation.',
+      shoppingList: [
+        { item: 'Poudre de Rhassoul du Maroc (250g)', price: '5,50 €' },
+        { item: 'Bouquet de Romarin Frais ou Romarin séché (100g)', price: '2,00 €' },
+        { item: 'Vinaigre de Cidre de Pomme Bio (500ml)', price: '2,50 €' }
+      ],
+      estimatedTotalCost: '10,00 €',
+      economicTip: '💡 Rentabilité : Permet de réaliser plus de 8 clarifications détox mensuelles complètes. Coût de revient réel : ~1,25 € par soin.'
     };
   }
 
@@ -270,7 +310,15 @@ export const getDiyDupeRecipe = (category: string, porosity: string, texture: st
       'Ajoute l\'huile de jojoba et les gouttes de vitamine E, puis secoue vigoureusement pour émulsionner.',
       'Vaporise quotidiennement sur tes longueurs sèches ou humides pour restaurer la souplesse de tes boucles.'
     ],
-    preservation: '❄️ Conserver dans un endroit frais (réfrigérateur recommandé) pendant 2 semaines maximum.'
+    preservation: '❄️ Conserver dans un endroit frais (réfrigérateur recommandé) pendant 2 semaines maximum.',
+    shoppingList: [
+      { item: 'Fleurs d\'Hibiscus Séchées Bio (100g)', price: '3,00 €' },
+      { item: 'Tube de Gel d\'Aloe Vera Pur (200ml)', price: '6,50 €' },
+      { item: 'Huile de Jojoba Bio (50ml)', price: '5,00 €' },
+      { item: 'Vitamine E Liquide Bio (10ml)', price: '4,00 €' }
+    ],
+    estimatedTotalCost: '18,50 €',
+    economicTip: '💡 Rentabilité : Ce panier te permet de fabriquer environ 6 vaporisateurs entiers de leave-in. Coût réel de revient : ~3,08 € le spray contre 15-20 € dans le commerce.'
   };
 };
 
@@ -301,6 +349,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   const [isCameraActive, setIsCameraActive] = useState(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [showScanTip, setShowScanTip] = useState(false);
+  const [showShoppingList, setShowShoppingList] = useState(false);
 
   // Animation laser
   const laserAnim = useRef(new Animated.Value(0)).current;
@@ -692,6 +741,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     setShowScanTip(false);
     setScanStep('idle');
     setActiveFeatureTab('inci');
+    setShowShoppingList(false);
   };
 
   // Generate Personalized Capillary Diagnostic Report
@@ -1565,6 +1615,45 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                           <Text style={styles.recipePreservationTitle}>❄️ Règles de conservation :</Text>
                           <Text style={styles.recipePreservationText}>{recipe.preservation}</Text>
                         </View>
+
+                        <View style={styles.recipeDivider} />
+
+                        {/* Interactive toggle button for shopping list */}
+                        <TouchableOpacity 
+                          style={[
+                            styles.shoppingListToggleButton, 
+                            showShoppingList && styles.shoppingListToggleButtonActive
+                          ]}
+                          activeOpacity={0.8}
+                          onPress={() => setShowShoppingList(!showShoppingList)}
+                        >
+                          <Text style={[
+                            styles.shoppingListToggleButtonText,
+                            showShoppingList && styles.shoppingListToggleButtonTextActive
+                          ]}>
+                            {showShoppingList ? '🛒 Masquer la Liste des Courses' : '🛒 Voir ma Liste des Courses & Coût estimé'}
+                          </Text>
+                        </TouchableOpacity>
+
+                        {showShoppingList && (
+                          <View style={[styles.shoppingListCard, isDark ? styles.shoppingListCardDark : styles.shoppingListCardLight]}>
+                            <Text style={styles.shoppingListTitle}>🛒 Liste des Courses nécessaires :</Text>
+                            {recipe.shoppingList.map((item, idx) => (
+                              <View key={idx} style={styles.shoppingListItem}>
+                                <Text style={[styles.shoppingItemName, isDark ? styles.textLight : styles.textDark]}>• {item.item}</Text>
+                                <Text style={styles.shoppingItemPrice}>{item.price}</Text>
+                              </View>
+                            ))}
+                            <View style={styles.shoppingListDivider} />
+                            <View style={styles.shoppingTotalRow}>
+                              <Text style={[styles.shoppingTotalLabel, isDark ? styles.textLight : styles.textDark]}>Panier Total Approximatif :</Text>
+                              <Text style={styles.shoppingTotalPrice}>{recipe.estimatedTotalCost}</Text>
+                            </View>
+                            <View style={styles.shoppingListTipCard}>
+                              <Text style={styles.shoppingListTip}>{recipe.economicTip}</Text>
+                            </View>
+                          </View>
+                        )}
                       </View>
                     </View>
                   );
@@ -2638,5 +2727,97 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 11,
     lineHeight: 15,
+  },
+  shoppingListToggleButton: {
+    backgroundColor: 'rgba(118, 160, 138, 0.1)',
+    borderColor: '#76A08A',
+    borderWidth: 1,
+    padding: 12,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: spacing.sm,
+  },
+  shoppingListToggleButtonActive: {
+    backgroundColor: '#76A08A',
+  },
+  shoppingListToggleButtonText: {
+    color: '#76A08A',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  shoppingListToggleButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  shoppingListCard: {
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+    borderWidth: 1,
+  },
+  shoppingListCardDark: {
+    backgroundColor: '#1E233B',
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  shoppingListCardLight: {
+    backgroundColor: '#F0F4F1',
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  shoppingListTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#76A08A',
+    marginBottom: spacing.sm,
+  },
+  shoppingListItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  shoppingItemName: {
+    fontSize: 12,
+    flex: 1,
+    lineHeight: 16,
+  },
+  shoppingItemPrice: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: colors.primary,
+    marginLeft: spacing.sm,
+  },
+  shoppingListDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    marginVertical: spacing.sm,
+  },
+  shoppingTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  shoppingTotalLabel: {
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  shoppingTotalPrice: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: colors.primary,
+  },
+  shoppingListTipCard: {
+    backgroundColor: 'rgba(229, 169, 130, 0.08)',
+    borderColor: 'rgba(229, 169, 130, 0.15)',
+    borderWidth: 1,
+    borderRadius: borderRadius.sm,
+    padding: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  shoppingListTip: {
+    color: colors.primary,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: 'bold',
   },
 });
