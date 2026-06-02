@@ -59,6 +59,13 @@ On te fournit deux images d'un produit capillaire :
 - L'Image 1 montre le DEVANT (le recto) du produit.
 - L'Image 2 montre le DOS (le verso) avec la liste des ingrédients INCI.
 
+RÈGLES STRICTES DE CATÉGORISATION ET D'INTERDICTION CAPILLAIRE :
+- Interdiction totale de conseiller d'utiliser un produit de type 'Gel', 'Gelée' ou 'Cire' pour un 'Bain d'huile' ou pour un 'Masque / Soin Profond', même si le produit contient des huiles dans ses ingrédients. Les gels sont formulés avec des agents fixants et gélifiants et ne sont techniquement pas adaptés aux soins profonds ou bains d'huiles.
+- Pour un soin 'Bain d'huile', conseille exclusivement des huiles végétales pures, des beurres ou des sérums huileux.
+- Pour un soin 'Masque / Soin Profond', conseille uniquement des masques capillaires spécifiques.
+- Pour un soin 'Shampoing / Clarification', conseille uniquement des shampoings (avec ou sans sulfates) ou des argiles détox.
+- Pour un soin 'Hydratation / Coiffage', conseille uniquement des leave-in, laits, crèmes, gels ou gelées.
+
 Analyse l'Image 1 pour extraire la Marque et le Nom exact du produit, puis analyse l'Image 2 (la liste INCI) pour exécuter les 4 fonctions Premium (Analyse, Ajout Salle de Bain, Comparateur, Dupe DIY).
 
 Prends en compte le profil capillaire de l'utilisateur :
@@ -103,6 +110,13 @@ Fournis ton analyse en français au format JSON STRICT avec cette structure exac
 
       promptText = `Tu es un expert en cosmétologie capillaire et ingrédients INCI, spécialisé dans les cheveux afro et texturés (crépus, frisés, bouclés, ondulés, locksés). Analyse cette photo qui montre la liste des ingrédients d'un produit capillaire.
 
+RÈGLES STRICTES DE CATÉGORISATION ET D'INTERDICTION CAPILLAIRE :
+- Interdiction totale de conseiller d'utiliser un produit de type 'Gel', 'Gelée' ou 'Cire' pour un 'Bain d'huile' ou pour un 'Masque / Soin Profond', même si le produit contient des huiles dans ses ingrédients. Les gels sont formulés avec des agents fixants et gélifiants et ne sont techniquement pas adaptés aux soins profonds ou bains d'huiles.
+- Pour un soin 'Bain d'huile', conseille exclusivement des huiles végétales pures, des beurres ou des sérums huileux.
+- Pour un soin 'Masque / Soin Profond', conseille uniquement des masques capillaires spécifiques.
+- Pour un soin 'Shampoing / Clarification', conseille uniquement des shampoings (avec ou sans sulfates) ou des argiles détox.
+- Pour un soin 'Hydratation / Coiffage', conseille uniquement des leave-in, laits, crèmes, gels ou gelées.
+
 Prends en compte le profil capillaire de l'utilisateur :
 - Texture : ${texture || 'Crépus'}
 - Porosité : ${porosity || 'Moyenne'}
@@ -132,6 +146,13 @@ Fournis ton analyse en français au format JSON STRICT avec cette structure exac
       // Option 2 : Text-based scan (from barcode lookup)
       promptText = `Tu es un expert en cosmétologie capillaire et ingrédients INCI, spécialisé dans les cheveux afro et texturés (crépus, frisés, bouclés, ondulés, locksés). Analyse cette liste d'ingrédients d'un produit capillaire.
 
+RÈGLES STRICTES DE CATÉGORISATION ET D'INTERDICTION CAPILLAIRE :
+- Interdiction totale de conseiller d'utiliser un produit de type 'Gel', 'Gelée' ou 'Cire' pour un 'Bain d'huile' ou pour un 'Masque / Soin Profond', même si le produit contient des huiles dans ses ingrédients. Les gels sont formulés avec des agents fixants et gélifiants et ne sont techniquement pas adaptés aux soins profonds ou bains d'huiles.
+- Pour un soin 'Bain d'huile', conseille exclusivement des huiles végétales pures, des beurres ou des sérums huileux.
+- Pour un soin 'Masque / Soin Profond', conseille uniquement des masques capillaires spécifiques.
+- Pour un soin 'Shampoing / Clarification', conseille uniquement des shampoings (avec ou sans sulfates) ou des argiles détox.
+- Pour un soin 'Hydratation / Coiffage', conseille uniquement des leave-in, laits, crèmes, gels ou gelées.
+
 Liste des ingrédients :
 ${ingredientsText}
 
@@ -157,6 +178,13 @@ Fournis ton analyse en français au format JSON STRICT avec cette structure exac
     } else {
       // Option 3 : Manual Express Entry Search
       promptText = `Tu es un expert en cosmétologie capillaire et ingrédients INCI, spécialisé dans les cheveux afro et texturés (crépus, frisés, bouclés, ondulés, locksés). L'utilisateur a fait une saisie manuelle car le scan de son produit a échoué.
+
+RÈGLES STRICTES DE CATÉGORISATION ET D'INTERDICTION CAPILLAIRE :
+- Interdiction totale de conseiller d'utiliser un produit de type 'Gel', 'Gelée' ou 'Cire' pour un 'Bain d'huile' ou pour un 'Masque / Soin Profond', même si le produit contient des huiles dans ses ingrédients. Les gels sont formulés avec des agents fixants et gélifiants et ne sont techniquement pas adaptés aux soins profonds ou bains d'huiles.
+- Pour un soin 'Bain d'huile', conseille exclusivement des huiles végétales pures, des beurres ou des sérums huileux.
+- Pour un soin 'Masque / Soin Profond', conseille uniquement des masques capillaires spécifiques.
+- Pour un soin 'Shampoing / Clarification', conseille uniquement des shampoings (avec ou sans sulfates) ou des argiles détox.
+- Pour un soin 'Hydratation / Coiffage', conseille uniquement des leave-in, laits, crèmes, gels ou gelées.
       
 Produit saisi à la main :
 - Marque : ${manualBrand}

@@ -985,7 +985,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                       </View>
                       
                       {(() => {
-                        const matchingBathroomProduct = bathroomProducts.find(bp => matchesCategory(bp.category, care.category));
+                        const matchingBathroomProduct = bathroomProducts.find(bp => matchesCategory(bp.category, care.category, bp.name));
                         if (matchingBathroomProduct) {
                           const isOcclusive = matchingBathroomProduct.ingredients.some(i => 
                             i.toLowerCase().includes('mineral oil') || 
@@ -1664,10 +1664,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                 </Text>
               </View>
 
-              {/* Bathroom Match Callout Box */}
               {(() => {
                 const targetCategory = activeCareItem ? activeCareItem.category : categoryToUse;
-                const matchingProduct = bathroomProducts.find(bp => matchesCategory(bp.category, targetCategory));
+                const matchingProduct = bathroomProducts.find(bp => matchesCategory(bp.category, targetCategory, bp.name));
 
                 if (!matchingProduct) return null;
 

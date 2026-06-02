@@ -111,29 +111,46 @@ export const detectCategory = (name: string, brand: string): string => {
   return 'Soin sans rinçage';
 };
 
-export const matchesCategory = (prodCat: string, agendaCat: string): boolean => {
+export const matchesCategory = (prodCat: string, agendaCat: string, prodName?: string): boolean => {
   const pc = prodCat.toLowerCase();
   const ac = agendaCat.toLowerCase();
-  
-  if (ac.includes('lavage') || ac.includes('shampoing')) {
-    return pc.includes('lavage') || pc.includes('shampoing') || pc.includes('co-wash') || pc.includes('cowash');
+  const name = prodName ? prodName.toLowerCase() : '';
+
+  // Règle absolue: Interdiction totale de proposer un produit de type 'Gel', 'Gelée' ou 'Cire' pour du soin profond (Masque) ou Bain d'huile
+  const isGel = pc.includes('retwist') || pc.includes('gel') || name.includes('gel') || name.includes('gelée') || name.includes('jelly') || name.includes('cire') || name.includes('wax');
+
+  if (ac.includes('bain') || ac.includes('huile')) {
+    if (isGel) return false;
+    // Bain d'huile: uniquement des produits de la catégorie Huiles pures, Beurres ou Sérums huileux (Bain d'huile)
+    return pc === "bain d'huile";
   }
-  if (ac.includes('bain')) {
-    // agenda: Bain d'huile. Match Bain d'huile or pure oil, but NOT creams, milks, or lotions containing oils
-    return pc.includes("bain d'huile") || (pc.includes('huile') && !pc.includes('crème') && !pc.includes('cream') && !pc.includes('lait') && !pc.includes('lotion'));
+
+  if (ac.includes('lavage') || ac.includes('shampoing') || ac.includes('clarif') || ac.includes('détox')) {
+    // Shampoing / Clarification: uniquement des Shampoings (Lavage) ou Argiles/Détox (Clarification)
+    return pc === 'lavage' || pc === 'clarification';
   }
-  if (ac.includes('masque') || ac.includes('hydratant') || ac.includes('protéin')) {
-    return pc.includes('masque') || pc.includes('hydratant') || pc.includes('protéin') || pc.includes('reconstructeur');
+
+  if (ac.includes('masque') || ac.includes('profond')) {
+    if (isGel) return false;
+    // Masque / Soin Profond: uniquement des Masques capillaires (Masque hydratant)
+    return pc === 'masque hydratant';
   }
-  if (ac.includes('sans rinçage') || ac.includes('leave') || ac.includes('lait') || ac.includes('crème') || ac.includes('cream')) {
-    return pc.includes('sans rinçage') || pc.includes('leave') || pc.includes('lait') || pc.includes('crème') || pc.includes('cream') || pc.includes('smoothie');
+
+  if (
+    ac.includes('sans rinçage') || 
+    ac.includes('leave') || 
+    ac.includes('lait') || 
+    ac.includes('crème') || 
+    ac.includes('creme') || 
+    ac.includes('cream') || 
+    ac.includes('coiffage') || 
+    ac.includes('hydratation') || 
+    ac.includes('retwist')
+  ) {
+    // Hydratation / Coiffage: uniquement des Leave-in, Crèmes, Laits (Soin sans rinçage) ou Gels, Gelées (Retwist)
+    return pc === 'soin sans rinçage' || pc === 'retwist';
   }
-  if (ac.includes('retwist')) {
-    return pc.includes('retwist') || pc.includes('gel') || pc.includes('wax') || pc.includes('cire') || pc.includes('locks');
-  }
-  if (ac.includes('clarif')) {
-    return pc.includes('clarif') || pc.includes('détox') || pc.includes('argile') || pc.includes('clay');
-  }
+
   return false;
 };
 
@@ -1718,7 +1735,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     item => item.profileId === activeProfileId &&
                             !item.completed &&
                             item.date >= new Date().toISOString().split('T')[0] &&
-                            matchesCategory(category, item.category)
+                            matchesCategory(category, item.category, displayName)
                   );
 
                   return (
