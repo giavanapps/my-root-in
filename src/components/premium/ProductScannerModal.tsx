@@ -638,8 +638,14 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
             { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
           );
 
+          // Récupérer le base64 généré, avec fallback vers le base64 d'origine de l'image-picker si besoin
+          const base64Str = manipResult.base64 || asset.base64;
+          if (!base64Str) {
+            throw new Error("Impossible de générer le rendu base64 de la photo.");
+          }
+
           // Construire le format data URI requis par l'API
-          const base64Data = `data:image/jpeg;base64,${manipResult.base64}`;
+          const base64Data = `data:image/jpeg;base64,${base64Str}`;
           
           if (step === 'front') {
             setFrontPhoto(base64Data);
@@ -654,13 +660,23 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
         }
       } catch (err: any) {
         console.error("Camera launch error on native:", err);
-        alert("Une erreur est survenue lors de l'ouverture de l'appareil photo.");
+        alert(err.message || "Une erreur est survenue lors de l'ouverture de l'appareil photo.");
       }
     }
   };
 
   const uploadAndAnalyzeDouble = async (front: string, back: string) => {
     try {
+      console.log("uploadAndAnalyzeDouble front payload length:", front ? front.length : "null/undefined");
+      console.log("uploadAndAnalyzeDouble back payload length:", back ? back.length : "null/undefined");
+      
+      if (!front || front.length < 100 || front.includes("undefined")) {
+        throw new Error("La photo du devant (Étape 1) n'a pas pu être convertie correctement. Veuillez recommencer.");
+      }
+      if (!back || back.length < 100 || back.includes("undefined")) {
+        throw new Error("La photo du dos avec ingrédients (Étape 2) n'a pas pu être convertie correctement. Veuillez recommencer.");
+      }
+
       // Toujours utiliser l'URL absolue de Vercel car les URLs relatives échouent sur l'APK natif !
       const apiUrl = 'https://my-root-in-nine.vercel.app/api/scan';
       
