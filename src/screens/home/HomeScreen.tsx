@@ -160,6 +160,94 @@ const careGuidesMap: { [key: string]: CareGuide } = {
   }
 };
 
+interface ShoppingListInfo {
+  shoppingList: { item: string; price: string }[];
+  estimatedTotalCost: string;
+  economicTip: string;
+}
+
+const careShoppingListMap: { [key: string]: ShoppingListInfo } = {
+  'Clarification': {
+    shoppingList: [
+      { item: 'Poudre de Rhassoul du Maroc (250g)', price: '5,50 €' },
+      { item: 'Infusion de Romarin séché (100g)', price: '2,00 €' },
+      { item: 'Vinaigre de Cidre de Pomme Bio (500ml)', price: '2,50 €' }
+    ],
+    estimatedTotalCost: '10,00 €',
+    economicTip: '💡 Rentabilité : Permet de réaliser plus de 8 clarifications mensuelles complètes.'
+  },
+  'Lavage': {
+    shoppingList: [
+      { item: 'Poudre de Shikakaï Bio (250g)', price: '4,50 €' },
+      { item: 'Gel d\'Aloe Vera Pur (200ml)', price: '6,50 €' },
+      { item: 'Fleurs d\'Hibiscus séchées (100g)', price: '3,00 €' }
+    ],
+    estimatedTotalCost: '14,00 €',
+    economicTip: '💡 Rentabilité : Permet de fabriquer plus de 12 sessions de shampoings frais.'
+  },
+  'Bain d\'huile': {
+    shoppingList: [
+      { item: 'Huile de Jojoba Bio (100ml)', price: '7,00 €' },
+      { item: 'Huile d\'Amande Douce Bio (100ml)', price: '5,00 €' },
+      { item: 'Huile Essentielle d\'Ylang-Ylang (10ml)', price: '6,00 €' }
+    ],
+    estimatedTotalCost: '18,00 €',
+    economicTip: '💡 Rentabilité : Permet de réaliser plus de 10 bains d\'huiles ultra-complets.'
+  },
+  'Masque hydratant': {
+    shoppingList: [
+      { item: 'Graines de Lin Bio (500g)', price: '2,50 €' },
+      { item: 'Pot de Miel Bio Sauvage (250g)', price: '4,50 €' },
+      { item: 'Vitamine E Liquide Bio (10ml)', price: '4,00 €' }
+    ],
+    estimatedTotalCost: '11,00 €',
+    economicTip: '💡 Rentabilité : Permet de fabriquer plus de 20 masques d\'hydratation profonde.'
+  },
+  'Masque protéiné': {
+    shoppingList: [
+      { item: 'Protéines de Soie Hydrolysées (10ml)', price: '4,90 €' },
+      { item: 'Gel d\'Aloe Vera Bio (200ml)', price: '6,50 €' },
+      { item: 'Beurre de Karité brut (100g)', price: '5,00 €' }
+    ],
+    estimatedTotalCost: '16,40 €',
+    economicTip: '💡 Rentabilité : Permet de réaliser plus de 15 masques reconstructeurs ciblés.'
+  },
+  'Soin sans rinçage': {
+    shoppingList: [
+      { item: 'Lait capillaire bio fluide (200ml)', price: '12,00 €' },
+      { item: 'Huile de Jojoba Bio (50ml)', price: '5,00 €' }
+    ],
+    estimatedTotalCost: '17,00 €',
+    economicTip: '💡 Rentabilité : Permet d\'assurer plus de 30 applications quotidiennes légères.'
+  },
+  'Co-wash': {
+    shoppingList: [
+      { item: 'Crème Lavante Co-Wash Douce (250ml)', price: '9,50 €' },
+      { item: 'Gel d\'Aloe Vera (100ml)', price: '3,50 €' }
+    ],
+    estimatedTotalCost: '13,00 €',
+    economicTip: '💡 Rentabilité : Permet d\'obtenir plus de 8 lavages co-wash d\'une douceur extrême.'
+  },
+  'Retwist': {
+    shoppingList: [
+      { item: 'Gombos frais (250g)', price: '2,00 €' },
+      { item: 'Gel d\'Aloe Vera Pur (200ml)', price: '6,50 €' },
+      { item: 'Huile de Ricin Bio (100ml)', price: '5,00 €' }
+    ],
+    estimatedTotalCost: '13,50 €',
+    economicTip: '💡 Rentabilité : Zéro accumulation de cires. Permet d\'assurer 5 sessions complètes de retwist.'
+  },
+  'Massage cuir chevelu': {
+    shoppingList: [
+      { item: 'Huile de Jojoba Bio (100ml)', price: '7,00 €' },
+      { item: 'Huile Essentielle de Menthe Poivrée (10ml)', price: '5,50 €' },
+      { item: 'Huile Essentielle de Romarin (10ml)', price: '6,00 €' }
+    ],
+    estimatedTotalCost: '18,50 €',
+    economicTip: '💡 Rentabilité : Sérum de croissance maison équivalent à 4 mois de massages quotidiens.'
+  }
+};
+
 interface LibraryArticle {
   id: string;
   title: string;
@@ -521,6 +609,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
   const [showScanner, setShowScanner] = useState(false);
   const [showPremiumHealthModal, setShowPremiumHealthModal] = useState(false);
   const [showSosSuccessModal, setShowSosSuccessModal] = useState(false);
+  const [showGuideShoppingList, setShowGuideShoppingList] = useState(false);
 
   if (!activeProfile) {
     return (
@@ -1491,6 +1580,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
         onRequestClose={() => {
           setShowCareGuide(false);
           setSelectedCareId('');
+          setShowGuideShoppingList(false);
         }}
       >
         <View style={[styles.modalOverlay, { backgroundColor: isLight ? 'rgba(0, 0, 0, 0.4)' : colors.overlay }]}>
@@ -1502,6 +1592,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                 onPress={() => {
                   setShowCareGuide(false);
                   setSelectedCareId('');
+                  setShowGuideShoppingList(false);
                 }}
               >
                 <Text style={[styles.closeDetailIconText, { color: customTextSec }]}>✕</Text>
@@ -1546,6 +1637,94 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                 </View>
               )}
 
+              {/* Premium Shopping List Section */}
+              {!isPremium ? (
+                <TouchableOpacity
+                  style={[
+                    styles.guideSectionBox,
+                    {
+                      backgroundColor: isLight ? 'rgba(230, 198, 135, 0.08)' : 'rgba(230, 198, 135, 0.04)',
+                      borderColor: 'rgba(230, 198, 135, 0.25)',
+                      borderWidth: 1.2,
+                      marginTop: 4,
+                      marginBottom: 12,
+                      padding: 14,
+                      borderRadius: 16
+                    }
+                  ]}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setShowCareGuide(false);
+                    setSelectedCareId('');
+                    setShowPaywall(true);
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.accent }}>
+                      🔒 Liste des courses & Budget (Premium)
+                    </Text>
+                    <View style={{ backgroundColor: 'rgba(230, 198, 135, 0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                      <Text style={{ fontSize: 8, fontWeight: 'bold', color: colors.accent }}>DÉBLOQUER ➔</Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 11, color: customTextSec, lineHeight: 15 }}>
+                    Obtiens instantanément la liste détaillée des ingrédients et ustensiles requis pour réaliser ce soin à la maison, ainsi que le coût total approximatif du panier d'achat !
+                  </Text>
+                </TouchableOpacity>
+              ) : (() => {
+                const shoppingListInfo = careShoppingListMap[guideKey];
+                if (!shoppingListInfo) return null;
+
+                return (
+                  <View style={{ marginTop: 4, marginBottom: 12 }}>
+                    <TouchableOpacity
+                      style={[
+                        styles.guideShoppingToggleButton,
+                        showGuideShoppingList && styles.guideShoppingToggleButtonActive
+                      ]}
+                      activeOpacity={0.8}
+                      onPress={() => setShowGuideShoppingList(!showGuideShoppingList)}
+                    >
+                      <Text style={[
+                        styles.guideShoppingToggleButtonText,
+                        showGuideShoppingList && styles.guideShoppingToggleButtonTextActive
+                      ]}>
+                        {showGuideShoppingList ? '🛒 Masquer la Liste des Courses' : '🛒 Voir ma Liste des Courses & Coût estimé'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {showGuideShoppingList && (
+                      <View style={[
+                        styles.guideShoppingCard,
+                        { 
+                          backgroundColor: isLight ? '#F5F9F6' : '#17221C',
+                          borderColor: isLight ? 'rgba(92, 138, 107, 0.15)' : 'rgba(92, 138, 107, 0.3)'
+                        }
+                      ]}>
+                        <Text style={[styles.guideShoppingTitle, { color: colors.secondary }]}>🛒 Ingrédients & Matériel requis :</Text>
+                        {shoppingListInfo.shoppingList.map((item, idx) => (
+                          <View key={idx} style={styles.guideShoppingListItem}>
+                            <Text style={[styles.guideShoppingItemName, { color: customText }]}>• {item.item}</Text>
+                            <Text style={[styles.guideShoppingItemPrice, { color: colors.primary }]}>{item.price}</Text>
+                          </View>
+                        ))}
+                        <View style={[styles.guideShoppingDivider, { backgroundColor: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)' }]} />
+                        <View style={styles.guideShoppingTotalRow}>
+                          <Text style={[styles.guideShoppingTotalLabel, { color: customText }]}>Estimation Panier Total :</Text>
+                          <Text style={[styles.guideShoppingTotalPrice, { color: colors.primary }]}>{shoppingListInfo.estimatedTotalCost}</Text>
+                        </View>
+                        <View style={[
+                          styles.guideShoppingTipCard,
+                          { backgroundColor: isLight ? 'rgba(229, 169, 130, 0.08)' : 'rgba(229, 169, 130, 0.04)' }
+                        ]}>
+                          <Text style={[styles.guideShoppingTip, { color: colors.primary }]}>{shoppingListInfo.economicTip}</Text>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                );
+              })()}
+
               {/* Étapes numérotées */}
               <View style={styles.stepsContainer}>
                 <Text style={[styles.guideSubtitle, { color: customText }]}>👣 Étapes à suivre :</Text>
@@ -1588,6 +1767,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                   }
                   setShowCareGuide(false);
                   setSelectedCareId('');
+                  setShowGuideShoppingList(false);
                 }}
                 disabled={!activeCareItem || activeCareItem.completed}
                 variant="primary"
@@ -1598,6 +1778,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                 onPress={() => {
                   setShowCareGuide(false);
                   setSelectedCareId('');
+                  setShowGuideShoppingList(false);
                 }}
                 variant="outline"
                 style={{ flex: 1 }}
@@ -2799,5 +2980,81 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '900',
     color: '#FFFFFF',
+  },
+  guideShoppingToggleButton: {
+    backgroundColor: 'rgba(118, 160, 138, 0.1)',
+    borderColor: '#76A08A',
+    borderWidth: 1,
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 8,
+  },
+  guideShoppingToggleButtonActive: {
+    backgroundColor: '#76A08A',
+  },
+  guideShoppingToggleButtonText: {
+    color: '#76A08A',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  guideShoppingToggleButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  guideShoppingCard: {
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 6,
+    borderWidth: 1,
+  },
+  guideShoppingTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  guideShoppingListItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 5,
+  },
+  guideShoppingItemName: {
+    fontSize: 12,
+    flex: 1,
+    lineHeight: 16,
+  },
+  guideShoppingItemPrice: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  guideShoppingDivider: {
+    height: 1,
+    marginVertical: 8,
+  },
+  guideShoppingTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  guideShoppingTotalLabel: {
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  guideShoppingTotalPrice: {
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  guideShoppingTipCard: {
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 6,
+  },
+  guideShoppingTip: {
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: 'bold',
   },
 });
