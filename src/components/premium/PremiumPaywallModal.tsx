@@ -13,40 +13,38 @@ export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visibl
   const { themeMode, setPremiumStatus, isPremium, activeProfile } = useAppState();
   const isDark = themeMode === 'dark';
 
-  const [activePreview, setActivePreview] = useState<'inci' | 'add' | 'compare' | 'diy' | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
 
   const handleSimulatePurchase = () => {
     setPremiumStatus(true);
-  };
-
-  const handleFeatureClick = (type: 'inci' | 'add' | 'compare' | 'diy') => {
-    setActivePreview(type);
+    onClose();
+    if (onOpenScanner) {
+      setTimeout(() => {
+        onOpenScanner();
+      }, 300);
+    }
   };
 
   const benefits = [
     {
-      type: 'inci' as const,
       icon: '🔬',
       title: 'Analyse INCI & Diagnostic IA',
-      desc: 'Analyse moléculaire de la formule INCI et diagnostic complet (Pour/Contre) adapté à tes cuticules. [Prévisualiser ➔]',
+      desc: 'Analyse moléculaire de la formule INCI et diagnostic complet (Pour/Contre) adapté à tes cuticules.',
     },
     {
-      type: 'add' as const,
       icon: '📅',
       title: 'Agenda Proactif & Cabinet Virtuel',
-      desc: 'Range tes flacons dans Ma Salle de Bain et laisse l\'IA injecter automatiquement des soins suggérés dans ton calendrier. [Prévisualiser ➔]',
+      desc: 'Range tes flacons dans Ma Salle de Bain et laisse l\'IA injecter automatiquement des soins suggérés dans ton calendrier.',
     },
     {
-      type: 'compare' as const,
       icon: '🧐',
       title: 'Comparateur Anti-Gaspillage',
-      desc: 'Scan en rayon pour détecter instantanément si tu possèdes déjà un produit équivalent à la maison. [Prévisualiser ➔]',
+      desc: 'Scan en rayon pour détecter instantanément si tu possèdes déjà un produit équivalent à la maison.',
     },
     {
-      type: 'diy' as const,
       icon: '🌿',
       title: 'Alternative Naturelle DIY (Dupe Végétal)',
-      desc: 'Conçois des recettes végétales saines (plantes, poudres, huiles) sur-mesure pour ton type de cheveu. [Prévisualiser ➔]',
+      desc: 'Conçois des recettes végétales saines (plantes, poudres, huiles) sur-mesure pour ton type de cheveu.',
     },
   ];
 
@@ -92,168 +90,39 @@ export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visibl
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
             {/* Benefits List */}
             <Text style={[styles.sectionSubtitle, isDark ? styles.textLight : styles.textDark]}>
-              ✨ Clique sur une option ci-dessous pour y accéder :
+              Découvre les fonctionnalités premium incluses dans ton abonnement :
             </Text>
 
             {benefits.map((b, i) => (
-              <TouchableOpacity 
+              <View 
                 key={i} 
                 style={[
                   styles.benefitCard,
-                  isDark ? styles.benefitCardDark : styles.benefitCardLight,
-                  activePreview === b.type && styles.benefitCardSelected
+                  isDark ? styles.benefitCardDark : styles.benefitCardLight
                 ]}
-                activeOpacity={0.7}
-                onPress={() => handleFeatureClick(b.type)}
               >
                 <Text style={styles.benefitIcon}>{b.icon}</Text>
                 <View style={styles.benefitTextContainer}>
                   <Text style={[styles.benefitTitle, isDark ? styles.textLight : styles.textDark]}>
                     {b.title}
                   </Text>
-                  <Text style={[styles.benefitDesc, activePreview === b.type ? styles.highlightText : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
+                  <Text style={[styles.benefitDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
                     {b.desc}
                   </Text>
                 </View>
-              </TouchableOpacity>
-            ))}
-
-            {/* INTERACTIVE PREVIEW PANEL */}
-            {activePreview && (
-              <View style={[
-                styles.previewContainer,
-                isDark ? styles.previewContainerDark : styles.previewContainerLight
-              ]}>
-                
-                {/* 🔬 INCI PREVIEW */}
-                {activePreview === 'inci' && (
-                  <View>
-                    <Text style={styles.previewTitle}>🔬 Prévisualisation : Diagnostic INCI IA</Text>
-                    <Text style={[styles.previewDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                      Scanne la formule INCI et obtiens une note précise et un rapport personnalisé des ingrédients adaptés ou à éviter.
-                    </Text>
-
-                    {/* Simulated Score Card */}
-                    <View style={styles.simulatedViewfinder}>
-                      <View style={styles.viewfinderLaser} />
-                      <Text style={styles.viewfinderText}>Mélange Moringa & Coco détecté...</Text>
-                      <Text style={styles.viewfinderBadge}>COMPATIBLE À 94% (BOUCLÉS) ✓</Text>
-                    </View>
-
-                    <TouchableOpacity 
-                      style={styles.previewButton}
-                      onPress={() => {
-                        setActivePreview(null);
-                        onClose();
-                        if (onOpenScanner) onOpenScanner();
-                      }}
-                    >
-                      <Text style={styles.previewButtonText}>Ouvrir le Scanner Réel 🚀</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {/* 📅 PROACTIVE AGENDA PREVIEW */}
-                {activePreview === 'add' && (
-                  <View>
-                    <Text style={styles.previewTitle}>📅 Prévisualisation : Agenda Proactif</Text>
-                    <Text style={[styles.previewDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                      Associe tes flacons virtuels à ton calendrier. L'IA Root'in injecte de manière dynamique des instructions intelligentes.
-                    </Text>
-
-                    {/* Protocol Steps Preview */}
-                    <View style={styles.protocolPreviewBox}>
-                      <Text style={styles.protocolStepText}>🗓️ Soin Lavage (12 Juin) : Shampoing Actiforce 🧴</Text>
-                      <Text style={styles.protocolStepText}>🗓️ Soin Lavage (19 Juin) : Shampoing Actiforce 🧴</Text>
-                    </View>
-
-                    <TouchableOpacity 
-                      style={styles.previewButton}
-                      onPress={() => {
-                        setActivePreview(null);
-                        onClose();
-                        if (onOpenScanner) onOpenScanner();
-                      }}
-                    >
-                      <Text style={styles.previewButtonText}>Ouvrir le Scanner Réel 🚀</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {/* 🧐 COMPARATOR PREVIEW */}
-                {activePreview === 'compare' && (
-                  <View>
-                    <Text style={styles.previewTitle}>🧐 Prévisualisation : Comparateur Magasin</Text>
-                    <Text style={[styles.previewDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                      Flashe un produit en magasin pour savoir s'il est doublon avec un flacon existant déjà dans ton placard.
-                    </Text>
-
-                    <View style={[styles.protocolPreviewBox, { backgroundColor: 'rgba(217, 83, 79, 0.05)', borderColor: 'rgba(217, 83, 79, 0.15)' }]}>
-                      <Text style={[styles.protocolStepText, { color: colors.danger }]}>🚨 NE L'ACHÈTE PAS !</Text>
-                      <Text style={{ fontSize: 11, color: '#A0A5C0', lineHeight: 14 }}>
-                        Ton produit <Text style={{ fontWeight: 'bold', color: '#FFFFFF' }}>Cantu Styling Wax</Text> fait exactement la même chose pour ton profil. Économie réalisée !
-                      </Text>
-                    </View>
-
-                    <TouchableOpacity 
-                      style={styles.previewButton}
-                      onPress={() => {
-                        setActivePreview(null);
-                        onClose();
-                        if (onOpenScanner) onOpenScanner();
-                      }}
-                    >
-                      <Text style={styles.previewButtonText}>Ouvrir le Scanner Réel 🚀</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {/* 🌿 DUPE DIY PREVIEW */}
-                {activePreview === 'diy' && (
-                  <View>
-                    <Text style={styles.previewTitle}>🌿 Prévisualisation : Dupe Végétal DIY</Text>
-                    <Text style={[styles.previewDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                      Génère une alternative végétale 100% saine et naturelle de n'importe quel produit industriel.
-                    </Text>
-
-                    <View style={[styles.protocolPreviewBox, { backgroundColor: 'rgba(118, 160, 138, 0.05)', borderColor: 'rgba(118, 160, 138, 0.15)' }]}>
-                      <Text style={[styles.protocolStepText, { color: colors.secondary }]}>🍃 Dupe : Gel de Gombo & Aloe Vera</Text>
-                      <Text style={{ fontSize: 10, color: '#A0A5C0', lineHeight: 13 }}>
-                        Ingrédients : Gombos frais coupés, Aloe Vera, Huile de Jojoba.
-                      </Text>
-                    </View>
-
-                    <TouchableOpacity 
-                      style={styles.previewButton}
-                      onPress={() => {
-                        setActivePreview(null);
-                        onClose();
-                        if (onOpenScanner) onOpenScanner();
-                      }}
-                    >
-                      <Text style={styles.previewButtonText}>Ouvrir le Scanner Réel 🚀</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                <TouchableOpacity 
-                  style={styles.closePreviewButton}
-                  onPress={() => setActivePreview(null)}
-                >
-                  <Text style={styles.closePreviewButtonText}>✕ Fermer cette prévisualisation</Text>
-                </TouchableOpacity>
               </View>
-            )}
+            ))}
 
             {/* Pricing Section */}
             <View style={styles.pricingSection}>
               <TouchableOpacity 
                 style={[
                   styles.planCard,
-                  styles.planCardActive,
+                  selectedPlan === 'yearly' && styles.planCardActive,
                   isDark ? styles.planCardDark : styles.planCardLight
                 ]}
                 activeOpacity={0.8}
+                onPress={() => setSelectedPlan('yearly')}
               >
                 <View style={styles.planBadgeContainer}>
                   <Text style={styles.planBadgeText}>RECOMMANDÉ</Text>
@@ -263,16 +132,18 @@ export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visibl
                   <Text style={[styles.planPrice, styles.highlightText]}>39,99 € / an</Text>
                 </View>
                 <Text style={[styles.planPeriod, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                  Soit 3,33 €/mois • Économise 44% • 7 jours d'essai gratuit
+                  Soit 3,33 €/mois • Économise plus de 44% • 7 jours d'essai gratuit
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
                 style={[
                   styles.planCard,
+                  selectedPlan === 'monthly' && styles.planCardActive,
                   isDark ? styles.planCardDark : styles.planCardLight
                 ]}
                 activeOpacity={0.8}
+                onPress={() => setSelectedPlan('monthly')}
               >
                 <View style={styles.planHeader}>
                   <Text style={[styles.planTitle, isDark ? styles.textLight : styles.textDark]}>Mensuel</Text>

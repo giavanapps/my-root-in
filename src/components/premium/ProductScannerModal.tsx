@@ -90,6 +90,9 @@ export const detectCategory = (name: string, brand: string): string => {
   if (/\bshampoing\b|\bshampoo\b|\bwash\b|\bcowash\b|\bco-wash\b|\bnettoyant\b/i.test(full)) {
     return 'Lavage';
   }
+  if (/\bgel\b|\bgelée\b|\bjelly\b|\bwax\b|\bcire\b|\bretwist\b|\bstyling\b|\blocks\b/i.test(full)) {
+    return 'Retwist';
+  }
   if (/\bmasque\b|\bmask\b|\btreatment\b|\bdeep\b|\breconstructeur\b/i.test(full)) {
     return 'Masque hydratant';
   }
@@ -98,9 +101,6 @@ export const detectCategory = (name: string, brand: string): string => {
     if (!/\bcream\b|\bcrème\b|\bcreme\b|\blotion\b|\blait\b|\bsmoothie\b/i.test(full)) {
       return "Bain d'huile";
     }
-  }
-  if (/\bgel\b|\bwax\b|\bcire\b|\bretwist\b|\bstyling\b|\blocks\b/i.test(full)) {
-    return 'Retwist';
   }
   if (/\bleave\b|\blait\b|\bcrème\b|\bcreme\b|\bcream\b|\blotion\b|\bsmoothie\b|\bconditioner\b|\baprès-shampoing\b|\bapres-shampoing\b/i.test(full)) {
     return 'Soin sans rinçage';
@@ -1873,9 +1873,17 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                   );
                 })()}
 
-                {/* Tab 4: Dupe Végétal DIY */}
                 {activeFeatureTab === 'diy' && (() => {
-                  const category = detectCategory(displayName, displayBrand);
+                  let category = detectCategory(displayName, displayBrand);
+                  // Règle absolue : Si le produit scanné est de type Gel/Gelée/Jelly, on force le dupe à être une recette de texture identique (Retwist / Gel)
+                  const isGelProduct = displayName.toLowerCase().includes('gel') || 
+                                       displayName.toLowerCase().includes('gelée') || 
+                                       displayName.toLowerCase().includes('jelly') || 
+                                       displayBrand.toLowerCase().includes('gel');
+                  if (isGelProduct) {
+                    category = 'Retwist';
+                  }
+
                   const porosity = activeProfile?.diagnostic?.porosity || 'Moyenne';
                   const texture = activeProfile?.diagnostic?.texture || 'Crépus';
                   const recipe = getDiyDupeRecipe(category, porosity, texture);

@@ -9,6 +9,7 @@ import { HomeScreen } from './src/screens/home/HomeScreen';
 import { ProfileScreen } from './src/screens/profile/ProfileScreen';
 import { CalendarScreen } from './src/screens/calendar/CalendarScreen';
 import { BathroomScreen } from './src/screens/bathroom/BathroomScreen';
+import { PremiumPaywallModal } from './src/components/premium/PremiumPaywallModal';
 
 type ActiveScreen = 'auth' | 'diagnostic' | 'home';
 type ActiveTab = 'dashboard' | 'calendar' | 'bathroom' | 'profile';
@@ -19,8 +20,9 @@ function MainApp() {
   const [tempUserName, setTempUserName] = useState('');
   const [isEditingDiagnostic, setIsEditingDiagnostic] = useState(false);
   const [autoOpenCalendarModal, setAutoOpenCalendarModal] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
 
-  const { themeMode, activeProfile, profiles, isLoading, masterEmail } = useAppState();
+  const { themeMode, activeProfile, profiles, isLoading, masterEmail, isPremium } = useAppState();
 
   // Automatically handle routing after login / fetch completes
   useEffect(() => {
@@ -166,7 +168,13 @@ function MainApp() {
               <TouchableOpacity 
                 activeOpacity={0.8}
                 style={styles.tabItem} 
-                onPress={() => setActiveTab('bathroom')}
+                onPress={() => {
+                  if (isPremium) {
+                    setActiveTab('bathroom');
+                  } else {
+                    setShowPaywall(true);
+                  }
+                }}
               >
                 <Text style={[styles.tabIcon, { opacity: activeTab === 'bathroom' ? 1 : 0.6 }]}>
                   🧴
@@ -199,6 +207,12 @@ function MainApp() {
           </View>
         )}
       </View>
+
+      {/* 💎 Premium Paywall Modal Overlay */}
+      <PremiumPaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+      />
     </SafeAreaView>
   );
 }

@@ -855,7 +855,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
           style={[styles.scannerWidgetCard, { backgroundColor: customCard, borderColor: customBorder }]}
           activeOpacity={0.8}
           onPress={() => {
-            setShowScanner(true);
+            if (isPremium) {
+              setShowScanner(true);
+            } else {
+              setShowPaywall(true);
+            }
           }}
         >
           <View style={styles.scannerWidgetLeft}>
