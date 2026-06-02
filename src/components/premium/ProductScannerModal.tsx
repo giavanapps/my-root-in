@@ -1189,7 +1189,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     <View style={{ alignItems: 'center', marginTop: 12 }}>
                       <View style={{ backgroundColor: 'rgba(229, 169, 130, 0.1)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginBottom: 16, width: '100%' }}>
                         <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.primary, textAlign: 'center' }}>
-                          📸 Étape 1 : l'utilisatrice doit prendre le devant du produit
+                          📸 Étape 1 : Prendre le devant du produit en photo
                         </Text>
                       </View>
                       
@@ -1216,7 +1216,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
 
                       <View style={{ backgroundColor: 'rgba(229, 169, 130, 0.1)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginBottom: 16, width: '100%' }}>
                         <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.primary, textAlign: 'center' }}>
-                          📸 Étape 2 : pour prendre le dos avec les ingrédients
+                          📸 Étape 2 : Prendre le dos du produit en photo (ingrédients)
                         </Text>
                       </View>
                       
