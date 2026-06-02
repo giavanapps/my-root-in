@@ -841,7 +841,28 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     </View>
                   </TouchableOpacity>
 
-                  {/* Card 2: Ranger */}
+                  {/* Card 2: DIY Dupe */}
+                  <TouchableOpacity
+                    style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
+                    activeOpacity={0.9}
+                    onPress={() => {
+                      setActiveFeatureTab('diy');
+                      setScannerMode('select_method');
+                    }}
+                  >
+                    <Text style={styles.modeCardIcon}>🌿</Text>
+                    <View style={styles.modeCardTextContainer}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Dupe Végétal DIY</Text>
+                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#A892B3', backgroundColor: 'rgba(168, 146, 179, 0.15)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3 }}>RECETTE NATURELLE</Text>
+                      </View>
+                      <Text style={[styles.modeCardSubtitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                        Conçois une alternative saine, 100% naturelle et économique sous forme de recette maison sur-mesure pour ton type de cheveu.
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Card 3: Ranger */}
                   <TouchableOpacity
                     style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
                     activeOpacity={0.9}
@@ -862,7 +883,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     </View>
                   </TouchableOpacity>
 
-                  {/* Card 3: Comparateur */}
+                  {/* Card 4: Comparateur */}
                   <TouchableOpacity
                     style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
                     activeOpacity={0.9}
@@ -879,27 +900,6 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                       </View>
                       <Text style={[styles.modeCardSubtitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
                         Flashe un produit en magasin pour comparer sa formule et détecter instantanément si tu as déjà un doublon identique à la maison.
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  {/* Card 4: DIY Dupe */}
-                  <TouchableOpacity
-                    style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
-                    activeOpacity={0.9}
-                    onPress={() => {
-                      setActiveFeatureTab('diy');
-                      setScannerMode('select_method');
-                    }}
-                  >
-                    <Text style={styles.modeCardIcon}>🌿</Text>
-                    <View style={styles.modeCardTextContainer}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Dupe Végétal DIY</Text>
-                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#A892B3', backgroundColor: 'rgba(168, 146, 179, 0.15)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3 }}>RECETTE NATURELLE</Text>
-                      </View>
-                      <Text style={[styles.modeCardSubtitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                        Conçois une alternative saine, 100% naturelle et économique sous forme de recette maison sur-mesure pour ton type de cheveu.
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -1258,6 +1258,14 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
+                    style={[styles.tabBarButton, activeFeatureTab === 'diy' && styles.tabBarButtonActive]}
+                    onPress={() => setActiveFeatureTab('diy')}
+                  >
+                    <Text style={[styles.tabBarButtonText, activeFeatureTab === 'diy' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
+                      🌿 Dupe DIY
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
                     style={[styles.tabBarButton, activeFeatureTab === 'add' && styles.tabBarButtonActive]}
                     onPress={() => setActiveFeatureTab('add')}
                   >
@@ -1271,14 +1279,6 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                   >
                     <Text style={[styles.tabBarButtonText, activeFeatureTab === 'compare' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
                       🧐 Comparer
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.tabBarButton, activeFeatureTab === 'diy' && styles.tabBarButtonActive]}
-                    onPress={() => setActiveFeatureTab('diy')}
-                  >
-                    <Text style={[styles.tabBarButtonText, activeFeatureTab === 'diy' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
-                      🌿 Dupe DIY
                     </Text>
                   </TouchableOpacity>
                 </View>
