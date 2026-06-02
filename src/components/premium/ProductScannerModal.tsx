@@ -1781,7 +1781,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
 
                       {/* Proactive Agenda Sync Info */}
                       <View style={[styles.proactiveCard, isDark ? styles.proactiveCardDark : styles.proactiveCardLight]}>
-                        <Text style={styles.proactiveTitle}>📅 L'Agenda Proactif & Intelligent :</Text>
+                        <Text style={styles.proactiveTitle}>📅 Ajout à ma Salle de Bain & Calendrier :</Text>
                         <Text style={[styles.proactiveDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
                           En l'ajoutant à ton placard, l'IA Root'in injecte automatiquement ce produit dans tes futures étapes de soins du calendrier correspondantes.
                         </Text>

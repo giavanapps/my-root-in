@@ -33,8 +33,8 @@ export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visibl
     },
     {
       icon: '📅',
-      title: 'Agenda Proactif & Cabinet Virtuel',
-      desc: 'Range tes flacons dans Ma Salle de Bain et laisse l\'IA injecter automatiquement des soins suggérés dans ton calendrier.',
+      title: 'Ajouter à ma Salle de Bain',
+      desc: 'Range tes flacons dans ta Salle de Bain virtuelle et laisse l\'IA planifier automatiquement tes prochains soins dans ton calendrier.',
     },
     {
       icon: '🧐',
