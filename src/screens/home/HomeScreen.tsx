@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Modal, SafeAreaView, ActivityIndicator, Platform, Image } from 'react-native';
 import { colors, borderRadius } from '../../theme/colors';
 import { useAppState } from '../../store/AppStateContext';
@@ -607,11 +607,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
   
   // Premium and Scanner Modals active states
   const [showPaywall, setShowPaywall] = useState(false);
-  const [showLocalPaywall, setShowLocalPaywall] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [showPremiumHealthModal, setShowPremiumHealthModal] = useState(false);
   const [showSosSuccessModal, setShowSosSuccessModal] = useState(false);
   const [showGuideShoppingList, setShowGuideShoppingList] = useState(false);
+
+  // Auto-expand the shopping list as soon as the user purchases Premium
+  useEffect(() => {
+    if (isPremium && showCareGuide) {
+      setShowGuideShoppingList(true);
+    }
+  }, [isPremium, showCareGuide]);
 
   if (!activeProfile) {
     return (
@@ -1628,7 +1634,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
           setShowCareGuide(false);
           setSelectedCareId('');
           setShowGuideShoppingList(false);
-          setShowLocalPaywall(false);
         }}
       >
         <View style={[styles.modalOverlay, { backgroundColor: isLight ? 'rgba(0, 0, 0, 0.4)' : colors.overlay }]}>
@@ -1641,7 +1646,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                   setShowCareGuide(false);
                   setSelectedCareId('');
                   setShowGuideShoppingList(false);
-                  setShowLocalPaywall(false);
                 }}
               >
                 <Text style={[styles.closeDetailIconText, { color: customTextSec }]}>✕</Text>
@@ -1764,7 +1768,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                   ]}
                   activeOpacity={0.8}
                   onPress={() => {
-                    setShowLocalPaywall(true);
+                    setShowPaywall(true);
                   }}
                 >
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
@@ -1876,7 +1880,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                   setShowCareGuide(false);
                   setSelectedCareId('');
                   setShowGuideShoppingList(false);
-                  setShowLocalPaywall(false);
                 }}
                 disabled={!activeCareItem || activeCareItem.completed}
                 variant="primary"
@@ -1888,134 +1891,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                   setShowCareGuide(false);
                   setSelectedCareId('');
                   setShowGuideShoppingList(false);
-                  setShowLocalPaywall(false);
                 }}
                 variant="outline"
                 style={{ flex: 1 }}
               />
             </View>
-
-            {showLocalPaywall && (
-              <View style={[StyleSheet.absoluteFill, { 
-                backgroundColor: isLight ? '#FFFFFF' : '#0E111F', 
-                borderRadius: 28, 
-                padding: 24, 
-                zIndex: 999, 
-                justifyContent: 'center', 
-                alignItems: 'center' 
-              }]}>
-                {/* Pop-up header */}
-                <View style={{ width: '100%', alignItems: 'center', marginBottom: 20 }}>
-                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.accent, backgroundColor: 'rgba(230, 198, 135, 0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, overflow: 'hidden', marginBottom: 12 }}>
-                    💎 SOIN OPTIMISÉ PREMIUM
-                  </Text>
-                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: customText, textAlign: 'center', marginBottom: 6 }}>
-                    Débloque ta Liste de Courses & Budget
-                  </Text>
-                  <Text style={{ fontSize: 12, color: customTextSec, textAlign: 'center', lineHeight: 16, paddingHorizontal: 10 }}>
-                    Active l'abonnement Premium pour obtenir instantanément tous les secrets de ce soin et de ta routine !
-                  </Text>
-                </View>
-
-                {/* Core Premium benefits highlighted */}
-                <View style={{ width: '100%', marginBottom: 20, gap: 12 }}>
-                  {/* Benefit 1: Courses */}
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
-                    <Text style={{ fontSize: 20 }}>🛒</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 12.5, fontWeight: 'bold', color: customText }}>Liste de courses actuelle & Budget</Text>
-                      <Text style={{ fontSize: 11, color: customTextSec, lineHeight: 14 }}>
-                        Ingrédients exacts requis pour {currentGuide.title.toLowerCase()} et estimation du coût total.
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Benefit 2: Scanner IA */}
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
-                    <Text style={{ fontSize: 20 }}>📸</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 12.5, fontWeight: 'bold', color: customText }}>Scanner IA Double-Étape Recto/Verso</Text>
-                      <Text style={{ fontSize: 11, color: customTextSec, lineHeight: 14 }}>
-                        Analyse moléculaire de la marque, du nom (recto) et de la liste INCI (verso) pour éviter toute erreur d'identification.
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Benefit 3: Salle de bain */}
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
-                    <Text style={{ fontSize: 20 }}>🧼</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 12.5, fontWeight: 'bold', color: customText }}>Placard Virtuel "Ma Salle de Bain"</Text>
-                      <Text style={{ fontSize: 11, color: customTextSec, lineHeight: 14 }}>
-                        Enregistre tes produits et reçois des alertes proactives de compatibilité et d'occlusion sur tes prochains soins.
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Simulated Purchase Button */}
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: colors.primary,
-                    width: '100%',
-                    paddingVertical: 12,
-                    borderRadius: 12,
-                    alignItems: 'center',
-                    shadowColor: colors.primary,
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 8,
-                    elevation: 5,
-                    marginBottom: 12
-                  }}
-                  activeOpacity={0.9}
-                  onPress={() => {
-                    setPremiumStatus(true);
-                    setShowLocalPaywall(false);
-                    setShowGuideShoppingList(true);
-                  }}
-                >
-                  <Text style={{ color: '#0B0D17', fontSize: 13.5, fontWeight: 'bold' }}>
-                    Commencer mon essai de 7 jours 🚀
-                  </Text>
-                </TouchableOpacity>
-
-                {/* Developer Secret Bypass Section in Local paywall */}
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: 'rgba(230, 198, 135, 0.08)',
-                    borderColor: 'rgba(230, 198, 135, 0.3)',
-                    borderWidth: 1,
-                    borderStyle: 'dashed',
-                    width: '100%',
-                    paddingVertical: 8,
-                    borderRadius: 10,
-                    alignItems: 'center',
-                    marginBottom: 12
-                  }}
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    setPremiumStatus(true);
-                    setShowLocalPaywall(false);
-                    setShowGuideShoppingList(true);
-                  }}
-                >
-                  <Text style={{ color: colors.accent, fontSize: 10.5, fontWeight: 'bold' }}>
-                    🛠️ Développeur : Activer Premium Root'in
-                  </Text>
-                </TouchableOpacity>
-
-                {/* Close local paywall button */}
-                <TouchableOpacity 
-                  style={{ paddingVertical: 6 }}
-                  onPress={() => setShowLocalPaywall(false)}
-                >
-                  <Text style={{ color: customTextSec, fontSize: 11.5, fontWeight: '600', textDecorationLine: 'underline' }}>
-                    ✕ Retour au soin
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
           </View>
 
           {/* ⏰ INDIVIDUAL TIME PICKER OVERLAY */}
