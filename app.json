@@ -21,7 +21,8 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.SCHEDULE_EXACT_ALARM",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "plugins": [
@@ -30,6 +31,14 @@
         {
           "photosPermission": "L'application a besoin d'accéder à vos photos pour analyser vos produits.",
           "cameraPermission": "L'application a besoin d'accéder à l'appareil photo pour scanner vos produits."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sounds/vapo_soundmore.mp3"
+          ]
         }
       ]
     ],

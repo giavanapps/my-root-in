@@ -23,6 +23,7 @@ export interface RoutineItem {
   date: string;
   completed: boolean;
   reminderTime?: string;
+  isCustom?: boolean;
 }
 
 const getNotificationBody = (name: string, category: string, tone: 'Doux' | 'Motivant' | 'Direct'): string => {
@@ -100,15 +101,15 @@ export const NotificationService = {
     if (Platform.OS === 'web') return;
     
     try {
-      // 1. Configurer le canal de notification Android avec haute importance pour jouer du son
+      // 1. Configurer le canal de notification Android avec haute importance et le son du vaporisateur
       if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('default', {
-          name: 'Rappels de soins',
+        await Notifications.setNotificationChannelAsync('my-root-in-reminders-v2', {
+          name: 'Rappels de soins Root\'In',
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#E5A982', // Couleur Terracotta
           showBadge: true,
-          sound: 'default', // utilise le son par défaut
+          sound: 'vapo_soundmore.mp3',
         });
       }
 
@@ -142,18 +143,17 @@ export const NotificationService = {
         const triggerDate = new Date(year, month - 1, day, itemHour, itemMinute, 0);
 
         if (triggerDate.getTime() > Date.now()) {
-          const secondsFromNow = Math.max(1, Math.round((triggerDate.getTime() - Date.now()) / 1000));
           await Notifications.scheduleNotificationAsync({
             content: {
               title: "My Root'In 🌿 Rappel de Soin",
               body: getNotificationBody(profileName, item.category, tone),
-              sound: true,
+              sound: 'vapo_soundmore.mp3',
               data: { routineId: item.id, category: item.category },
             },
             trigger: { 
-              type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, 
-              seconds: secondsFromNow,
-              channelId: 'default' // obligatoire pour le son sur Android 8+
+              type: Notifications.SchedulableTriggerInputTypes.DATE, 
+              date: triggerDate,
+              channelId: 'my-root-in-reminders-v2',
             },
           });
         }

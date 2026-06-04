@@ -389,13 +389,16 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     addBathroomProduct, 
     bathroomProducts, 
     routine, 
-    activeProfileId 
+    activeProfileId,
+    scanHistory,
+    addScanHistoryItem
   } = useAppState();
   const isDark = themeMode === 'dark';
 
   const [scanStep, setScanStep] = useState<'idle' | 'scanning' | 'result' | 'scan_error' | 'manual_express'>('idle');
   const [activeFeatureTab, setActiveFeatureTab] = useState<'inci' | 'add' | 'compare' | 'diy'>('inci');
   const [selectedProduct, setSelectedProduct] = useState<MockProduct | null>(null);
+  const [showFullHistory, setShowFullHistory] = useState(false);
 
   // Vrai scan IA states
   const [isAnalyzingReal, setIsAnalyzingReal] = useState(false);
@@ -587,6 +590,18 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     
     // Simulate active scanning delay of 2.5 seconds
     setTimeout(() => {
+      const comp = getCompatibilityAnalysis(product);
+      addScanHistoryItem({
+        brand: product.brand,
+        name: product.name,
+        image: product.image,
+        ingredients: product.ingredients,
+        score: comp.score,
+        title: comp.title,
+        description: comp.description,
+        color: comp.color || colors.success,
+        inciReport: product.inciReport
+      });
       setScanStep('result');
     }, 2500);
   };
@@ -716,7 +731,20 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
       }
 
       const result = await response.json();
+      const displayImage = front || 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop';
+      result.image = displayImage;
       setRealProductAnalysis(result);
+      addScanHistoryItem({
+        brand: result.brand || 'Marque Inconnue',
+        name: result.name || 'Produit Inconnu',
+        image: displayImage,
+        ingredients: result.ingredients || [],
+        score: result.score || 80,
+        title: result.title || 'Compatible 🌿',
+        description: result.description || '',
+        color: result.color,
+        inciReport: result.inciReport
+      });
       setScanStep('result');
     } catch (err: any) {
       console.error('Scan failed:', err);
@@ -828,7 +856,21 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
       if (productName && productName !== "Produit Inconnu") result.name = productName;
       if (product.image_url) result.image = product.image_url;
 
+      const displayImage = result.image || 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop';
+      result.image = displayImage;
+
       setRealProductAnalysis(result);
+      addScanHistoryItem({
+        brand: result.brand || 'Marque Inconnue',
+        name: result.name || 'Produit Inconnu',
+        image: displayImage,
+        ingredients: result.ingredients || [],
+        score: result.score || 80,
+        title: result.title || 'Compatible 🌿',
+        description: result.description || '',
+        color: result.color,
+        inciReport: result.inciReport
+      });
       setScanStep('result');
 
     } catch (err: any) {
@@ -873,7 +915,20 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
       }
 
       const result = await response.json();
+      const displayImage = 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop';
+      result.image = displayImage;
       setRealProductAnalysis(result);
+      addScanHistoryItem({
+        brand: result.brand || manualBrand.trim() || 'Marque Inconnue',
+        name: result.name || manualName.trim() || 'Produit Inconnu',
+        image: displayImage,
+        ingredients: result.ingredients || [],
+        score: result.score || 80,
+        title: result.title || 'Compatible 🌿',
+        description: result.description || '',
+        color: result.color,
+        inciReport: result.inciReport
+      });
       setScanStep('result');
     } catch (err: any) {
       console.error('Manual express submit failed:', err);
@@ -909,6 +964,25 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     setBackPhoto(null);
     setCaptureStep('front');
     frontPhotoRef.current = null;
+  };
+
+  const handleLoadFromHistory = (item: any) => {
+    const simulatedAnalysis = {
+      brand: item.brand,
+      name: item.name,
+      image: item.image,
+      ingredients: item.ingredients,
+      score: item.score,
+      title: item.title,
+      description: item.description,
+      color: item.color,
+      inciReport: item.inciReport
+    };
+    setRealProductAnalysis(simulatedAnalysis);
+    setSelectedProduct(null);
+    setScanStep('result');
+    setActiveFeatureTab('inci');
+    setShowFullHistory(false);
   };
 
   // Generate Personalized Capillary Diagnostic Report
@@ -1120,6 +1194,58 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                       </Text>
                     </View>
                   </TouchableOpacity>
+
+                  {/* Scan History Section (5 most recent) */}
+                  {(() => {
+                    const profileHistory = scanHistory.filter(h => h.profileId === activeProfileId);
+                    const topScans = profileHistory.slice(0, 5);
+                    if (profileHistory.length === 0) return null;
+
+                    return (
+                      <View style={styles.historyContainer}>
+                        <View style={styles.historyHeader}>
+                          <Text style={[styles.historyTitle, isDark ? styles.textLight : styles.textDark]}>
+                            🕒 Historique des scans
+                          </Text>
+                        </View>
+                        <View style={styles.historyList}>
+                          {topScans.map((item) => (
+                            <TouchableOpacity
+                              key={item.id}
+                              style={[styles.historyCard, isDark ? styles.historyCardDark : styles.historyCardLight]}
+                              activeOpacity={0.8}
+                              onPress={() => handleLoadFromHistory(item)}
+                            >
+                              <Image source={{ uri: item.image || 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop' }} style={styles.historyItemImage} />
+                              <View style={styles.historyItemInfo}>
+                                <Text style={styles.historyItemBrand}>{item.brand}</Text>
+                                <Text style={[styles.historyItemName, isDark ? styles.textLight : styles.textDark]} numberOfLines={1}>
+                                  {item.name}
+                                </Text>
+                                <Text style={styles.historyItemDate}>
+                                  Scan du {new Date(item.timestamp).toLocaleDateString('fr-FR')} à {new Date(item.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                                </Text>
+                              </View>
+                              <View style={[styles.historyItemScoreBadge, { borderColor: item.color || colors.primary }]}>
+                                <Text style={[styles.historyItemScoreText, { color: item.color || colors.primary }]}>
+                                  {item.score}%
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+
+                        {profileHistory.length > 5 && (
+                          <TouchableOpacity
+                            style={[styles.viewAllHistoryButton, isDark ? styles.viewAllHistoryButtonDark : styles.viewAllHistoryButtonLight]}
+                            onPress={() => setShowFullHistory(true)}
+                          >
+                            <Text style={styles.viewAllHistoryButtonText}>Voir tout l'historique ➔</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    );
+                  })()}
                 </View>
               )}
 
@@ -1587,7 +1713,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
             const displayBrand = isReal ? realProductAnalysis.brand : selectedProduct?.brand;
             const displayName = isReal ? realProductAnalysis.name : selectedProduct?.name;
             const displayImage = isReal 
-              ? 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop' 
+              ? (realProductAnalysis.image || 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop') 
               : selectedProduct?.image;
 
             const scoreColor = report.color || (
@@ -1988,6 +2114,63 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                 </TouchableOpacity>
 
               </ScrollView>
+            );
+          })()}
+
+          {/* FULL HISTORY OVERLAY */}
+          {showFullHistory && (() => {
+            const profileHistory = scanHistory.filter(h => h.profileId === activeProfileId);
+            return (
+              <View style={[StyleSheet.absoluteFillObject, isDark ? styles.fullHistoryContainerDark : styles.fullHistoryContainerLight, { zIndex: 999 }]}>
+                {/* Header */}
+                <View style={styles.header}>
+                  <TouchableOpacity 
+                    onPress={() => setShowFullHistory(false)} 
+                    style={styles.headerLeftButton}
+                  >
+                    <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 13 }}>⬅️ Retour</Text>
+                  </TouchableOpacity>
+                  <Text style={[styles.headerTitle, isDark ? styles.textLight : styles.textDark]}>
+                    Historique Complet 📋
+                  </Text>
+                  <TouchableOpacity onPress={() => setShowFullHistory(false)} style={styles.closeButton}>
+                    <Text style={isDark ? styles.textLight : styles.textDark}>Fermer</Text>
+                  </TouchableOpacity>
+                </View>
+                
+                <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+                  <Text style={[styles.introText, isDark ? styles.textMutedDark : styles.textMutedLight, { marginBottom: spacing.md }]}>
+                    Sélectionne un produit scanné pour afficher ses 4 fonctions Premium associées :
+                  </Text>
+                  
+                  <View style={styles.historyList}>
+                    {profileHistory.map((item) => (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={[styles.historyCard, isDark ? styles.historyCardDark : styles.historyCardLight]}
+                        activeOpacity={0.8}
+                        onPress={() => handleLoadFromHistory(item)}
+                      >
+                        <Image source={{ uri: item.image || 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop' }} style={styles.historyItemImage} />
+                        <View style={styles.historyItemInfo}>
+                          <Text style={styles.historyItemBrand}>{item.brand}</Text>
+                          <Text style={[styles.historyItemName, isDark ? styles.textLight : styles.textDark]} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                          <Text style={styles.historyItemDate}>
+                            Scan du {new Date(item.timestamp).toLocaleDateString('fr-FR')} à {new Date(item.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                          </Text>
+                        </View>
+                        <View style={[styles.historyItemScoreBadge, { borderColor: item.color || colors.primary }]}>
+                          <Text style={[styles.historyItemScoreText, { color: item.color || colors.primary }]}>
+                            {item.score}%
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
             );
           })()}
         </View>
@@ -3345,5 +3528,107 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 13,
     fontWeight: 'bold',
+  },
+  historyContainer: {
+    marginTop: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  historyTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  historyList: {
+    gap: spacing.sm,
+  },
+  historyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    marginBottom: 4,
+  },
+  historyCardDark: {
+    backgroundColor: '#16192A',
+    borderColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  historyCardLight: {
+    backgroundColor: '#F8F9FA',
+    borderColor: 'rgba(0, 0, 0, 0.04)',
+  },
+  historyItemImage: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.sm,
+    marginRight: spacing.md,
+  },
+  historyItemInfo: {
+    flex: 1,
+  },
+  historyItemBrand: {
+    fontSize: 8,
+    color: colors.primary,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+  },
+  historyItemName: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    marginVertical: 1,
+  },
+  historyItemDate: {
+    fontSize: 9,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  historyItemScoreBadge: {
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginLeft: spacing.sm,
+  },
+  historyItemScoreText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  viewAllHistoryButton: {
+    marginTop: spacing.md,
+    paddingVertical: 12,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  viewAllHistoryButtonDark: {
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  viewAllHistoryButtonLight: {
+    backgroundColor: '#FAFBFC',
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  viewAllHistoryButtonText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  fullHistoryContainerDark: {
+    backgroundColor: '#0E111F',
+    borderTopLeftRadius: borderRadius.lg,
+    borderTopRightRadius: borderRadius.lg,
+  },
+  fullHistoryContainerLight: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: borderRadius.lg,
+    borderTopRightRadius: borderRadius.lg,
   },
 });

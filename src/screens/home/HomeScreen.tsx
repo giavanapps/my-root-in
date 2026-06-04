@@ -1,18 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Modal, SafeAreaView, ActivityIndicator, Platform, Image } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Modal, ActivityIndicator, Platform, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, borderRadius } from '../../theme/colors';
 import { useAppState } from '../../store/AppStateContext';
 import { avatarImageMap } from '../onboarding/DiagnosticScreen';
 import { DynamicHeader } from '../../components/home/DynamicHeader';
 import { CircularGauge } from '../../components/common/CircularGauge';
 import { QuickAction } from '../../components/home/QuickAction';
-import { CatchUpCard } from '../../components/home/CatchUpCard';
 import { FeaturedAdvice } from '../../components/home/FeaturedAdvice';
 import { Button } from '../../components/common/Button';
 import { TimePickerModal } from '../../components/common/TimePickerModal';
 import { PremiumPaywallModal } from '../../components/premium/PremiumPaywallModal';
 import { ProductScannerModal, matchesCategory } from '../../components/premium/ProductScannerModal';
 import { DatePickerModal } from '../../components/common/DatePickerModal';
+import { RoutineItem } from '../../store/NotificationService';
 
 interface CareGuide {
   title: string;
@@ -585,12 +586,30 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
     toggleRoutineCompleted,
     deleteRoutineItem,
     updateRoutineItemTime,
+    updateRoutineItemDate,
     isPremium,
     setPremiumStatus,
     regularityScore,
     shiftRoutineDates,
     bathroomProducts
   } = useAppState();
+
+  const isLight = themeMode === 'light';
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const getCurrentTimeRounded15 = () => {
+    const now = new Date();
+    let hours = now.getHours();
+    let minutes = now.getMinutes();
+    const roundedMinutes = Math.round(minutes / 15) * 15;
+    if (roundedMinutes === 60) {
+      minutes = 0;
+      hours = (hours + 1) % 24;
+    } else {
+      minutes = roundedMinutes;
+    }
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  };
 
   const [showHealthDetail, setShowHealthDetail] = useState(false);
   const [sosSuccessMessage, setSosSuccessMessage] = useState('');
@@ -612,12 +631,51 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
   const [showSosSuccessModal, setShowSosSuccessModal] = useState(false);
   const [showGuideShoppingList, setShowGuideShoppingList] = useState(false);
 
+  // Local states for Smart Shift and Overdue Cares Modals
+  const [pendingShift, setPendingShift] = useState<{
+    careId: string;
+    newDate: string;
+    deltaDays: number;
+    newTime?: string;
+  } | null>(null);
+  const [showSmartShiftModal, setShowSmartShiftModal] = useState(false);
+  const [showOverdueModal, setShowOverdueModal] = useState(false);
+  const [overdueCare, setOverdueCare] = useState<RoutineItem | null>(null);
+  const [showRescheduleDatePicker, setShowRescheduleDatePicker] = useState(false);
+  const [showRescheduleTimePicker, setShowRescheduleTimePicker] = useState(false);
+  const [rescheduledDate, setRescheduledDate] = useState<string>('');
+
+  // Ref to guard against onClose and onSave race conditions in the rescheduling flow
+  const rescheduleSavingRef = useRef(false);
+
   // Auto-expand the shopping list as soon as the user purchases Premium
   useEffect(() => {
     if (isPremium && showCareGuide) {
       setShowGuideShoppingList(true);
     }
   }, [isPremium, showCareGuide]);
+
+  // Overdue care detection effect (auto-checks for uncompleted cares from yesterday or earlier)
+  useEffect(() => {
+    if (!activeProfile || !routine) return;
+
+    // Guard: do not open the overdue modal if we are actively rescheduling or in the smart shift modal
+    if (showRescheduleDatePicker || showRescheduleTimePicker || showSmartShiftModal || pendingShift) {
+      return;
+    }
+    
+    const pastUncompleted = routine
+      .filter(r => r.profileId === activeProfile.id && !r.completed && r.date < todayStr)
+      .sort((a, b) => a.date.localeCompare(b.date));
+      
+    if (pastUncompleted.length > 0) {
+      setOverdueCare(pastUncompleted[0]);
+      setShowOverdueModal(true);
+    } else {
+      setOverdueCare(null);
+      setShowOverdueModal(false);
+    }
+  }, [routine, activeProfile?.id, todayStr, showRescheduleDatePicker, showRescheduleTimePicker, showSmartShiftModal, pendingShift]);
 
   if (!activeProfile) {
     return (
@@ -633,8 +691,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
     setShowSosSuccessModal(true);
   };
 
-  const isLight = themeMode === 'light';
-  const todayStr = new Date().toISOString().split('T')[0];
   const customBg = isLight ? '#F5F6FA' : colors.background;
 
   // Find today's uncompleted task (for guides matching)
@@ -721,9 +777,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
   const firstCareDate = allUpcomingCares[0]?.date || todayStr;
 
   const handleShiftRoutine = (selectedDate: string) => {
-    const deltaDays = getDaysBetween(firstCareDate, selectedDate);
+    if (!allUpcomingCares || allUpcomingCares.length === 0) return;
+    const firstCare = allUpcomingCares[0];
+    const deltaDays = getDaysBetween(firstCare.date, selectedDate);
     if (deltaDays !== 0) {
-      shiftRoutineDates(activeProfile.id, deltaDays);
+      setPendingShift({
+        careId: firstCare.id,
+        newDate: selectedDate,
+        deltaDays: deltaDays
+      });
+      setShowSmartShiftModal(true);
     }
   };
 
@@ -852,9 +915,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
 
         {/* Central interactive Quick Action button */}
         <QuickAction onPress={onNavigateToCalendar} />
-
-        {/* Ephemeral catch-up block (conditional) */}
-        <CatchUpCard />
 
         {/* 🔍 Premium Product Scanner Widget Card */}
         <TouchableOpacity
@@ -1151,6 +1211,172 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
         onClose={() => setShowDatePicker(false)}
         onSave={handleShiftRoutine}
         title="Démarrer ma routine le... 📅"
+        useNativeModal={false}
+      />
+
+      {/* 📅 Pop-up de Décalage Intelligent */}
+      <Modal
+        visible={showSmartShiftModal && pendingShift !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setPendingShift(null);
+          setShowSmartShiftModal(false);
+        }}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: isLight ? 'rgba(0, 0, 0, 0.4)' : colors.overlay }]}>
+          <View style={[styles.feedbackCard, { backgroundColor: customCard, borderColor: customBorder }]}>
+            <Text style={styles.feedbackEmoji}>📅</Text>
+            <Text style={[styles.feedbackTitle, { color: customText }]}>Décalage de la routine</Text>
+            <Text style={[styles.feedbackSubtitle, { color: customTextSec, marginBottom: 20, textAlign: 'center', lineHeight: 20 }]}>
+              {pendingShift && `Tu as décalé ton soin de ${Math.abs(pendingShift.deltaDays)} jour${Math.abs(pendingShift.deltaDays) > 1 ? 's' : ''}. Veux-tu également repousser le reste de tes soins prévus pour conserver le même écart de jours entre chaque étape de ta routine ?`}
+            </Text>
+
+            <View style={{ width: '100%', gap: 12 }}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[styles.modalButton, styles.modalButtonPrimary]}
+                onPress={() => {
+                  if (pendingShift) {
+                    updateRoutineItemDate(pendingShift.careId, pendingShift.newDate);
+                    if (pendingShift.newTime) {
+                      updateRoutineItemTime(pendingShift.careId, pendingShift.newTime);
+                    }
+                    shiftRoutineDates(activeProfile.id, pendingShift.deltaDays);
+                  }
+                  setPendingShift(null);
+                  setShowSmartShiftModal(false);
+                }}
+              >
+                <Text style={styles.modalButtonPrimaryText}>Oui, décaler toute la routine</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[styles.modalButton, styles.modalButtonSecondary, { borderColor: customBorder }]}
+                onPress={() => {
+                  if (pendingShift) {
+                    updateRoutineItemDate(pendingShift.careId, pendingShift.newDate);
+                    if (pendingShift.newTime) {
+                      updateRoutineItemTime(pendingShift.careId, pendingShift.newTime);
+                    }
+                  }
+                  setPendingShift(null);
+                  setShowSmartShiftModal(false);
+                }}
+              >
+                <Text style={[styles.modalButtonSecondaryText, { color: colors.primary }]}>Non, décaler uniquement ce soin</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ⏳ Pop-up de Gestion des Soins Passés/Oubliés */}
+      <Modal
+        visible={showOverdueModal && overdueCare !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowOverdueModal(false)}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: isLight ? 'rgba(0, 0, 0, 0.4)' : colors.overlay }]}>
+          <View style={[styles.feedbackCard, { backgroundColor: customCard, borderColor: customBorder }]}>
+            <Text style={styles.feedbackEmoji}>⏳</Text>
+            <Text style={[styles.feedbackTitle, { color: customText }]}>Soin manqué détecté</Text>
+            <Text style={[styles.feedbackSubtitle, { color: customTextSec, marginBottom: 20, textAlign: 'center', lineHeight: 20 }]}>
+              {overdueCare && `Tu n'as pas pu faire ton soin "${overdueCare.category}" (${overdueCare.product}) hier. Que veux-tu faire ?`}
+            </Text>
+
+            <View style={{ width: '100%', gap: 12 }}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[styles.modalButton, styles.modalButtonPrimary]}
+                onPress={() => {
+                  if (overdueCare) {
+                    setRescheduledDate(todayStr); // Par défaut aujourd'hui
+                    setShowOverdueModal(false);
+                    setShowRescheduleDatePicker(true);
+                  }
+                }}
+              >
+                <Text style={styles.modalButtonPrimaryText}>Le reporter</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[styles.modalButton, styles.modalButtonSecondary, { borderColor: isLight ? '#FF8C8C' : '#E53E3E' }]}
+                onPress={() => {
+                  if (overdueCare) {
+                    deleteRoutineItem(overdueCare.id);
+                  }
+                  setShowOverdueModal(false);
+                }}
+              >
+                <Text style={[styles.modalButtonSecondaryText, { color: isLight ? '#E53E3E' : '#FF8C8C' }]}>Supprimer/Annuler</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 📅 Date Picker pour le Report */}
+      <DatePickerModal
+        visible={showRescheduleDatePicker && overdueCare !== null}
+        initialDate={todayStr}
+        onClose={() => {
+          if (rescheduleSavingRef.current) {
+            rescheduleSavingRef.current = false;
+            return;
+          }
+          setShowRescheduleDatePicker(false);
+          setShowOverdueModal(true);
+        }}
+        onSave={(selectedDate) => {
+          rescheduleSavingRef.current = true;
+          setRescheduledDate(selectedDate);
+          setShowRescheduleDatePicker(false);
+          setShowRescheduleTimePicker(true);
+        }}
+        title="Reporter le soin au... 📅"
+        useNativeModal={false}
+      />
+
+      <TimePickerModal
+        visible={showRescheduleTimePicker && overdueCare !== null}
+        initialTime={getCurrentTimeRounded15()}
+        onClose={() => {
+          if (rescheduleSavingRef.current) {
+            rescheduleSavingRef.current = false;
+            return;
+          }
+          setShowRescheduleTimePicker(false);
+          setShowRescheduleDatePicker(true);
+        }}
+        onSave={(selectedTime) => {
+          rescheduleSavingRef.current = true;
+          setShowRescheduleTimePicker(false);
+          if (overdueCare) {
+            const isCustomCare = 
+              overdueCare.isCustom ||
+              overdueCare.category === 'Soin personnalisé' ||
+              (overdueCare.recurrence && (overdueCare.recurrence === 'Unique' || overdueCare.recurrence.includes('Unique')));
+
+            if (isCustomCare) {
+              updateRoutineItemDate(overdueCare.id, rescheduledDate);
+              updateRoutineItemTime(overdueCare.id, selectedTime);
+            } else {
+              const deltaDays = getDaysBetween(overdueCare.date, rescheduledDate);
+              setPendingShift({
+                careId: overdueCare.id,
+                newDate: rescheduledDate,
+                newTime: selectedTime,
+                deltaDays: deltaDays
+              });
+              setShowSmartShiftModal(true);
+            }
+          }
+        }}
+        title="Choisir l'heure de rappel ⏰"
         useNativeModal={false}
       />
 
@@ -1902,7 +2128,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
           {activeCareItem && (
             <TimePickerModal
               visible={showTimePicker}
-              initialTime={activeCareItem.reminderTime || activeProfile.notifications.time || '08:30'}
+              initialTime={getCurrentTimeRounded15()}
               onClose={() => setShowTimePicker(false)}
               onSave={(time) => {
                 updateRoutineItemTime(activeCareItem.id, time);
@@ -2267,6 +2493,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
 };
 
 const styles = StyleSheet.create({
+  modalButton: {
+    width: '100%',
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonPrimary: {
+    backgroundColor: colors.primary,
+  },
+  modalButtonSecondary: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.2,
+  },
+  modalButtonPrimaryText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  modalButtonSecondaryText: {
+    fontWeight: '800',
+    fontSize: 14,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background,

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, TextInput, Switch, Modal, Alert, Dimensions, SafeAreaView, Platform, Linking, Image } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, TextInput, Switch, Modal, Alert, Dimensions, Platform, Linking, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, borderRadius } from '../../theme/colors';
 import { useAppState, Profile } from '../../store/AppStateContext';
 import { NotificationService } from '../../store/NotificationService';
+import * as Notifications from 'expo-notifications';
 import { Button } from '../../components/common/Button';
 import { avatarList, avatarImageMap } from '../onboarding/DiagnosticScreen';
 import { TimePickerModal } from '../../components/common/TimePickerModal';
@@ -151,6 +153,50 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
       window.alert('Notifications sauvegardées : Vos réglages ont été mis à jour.');
     } else {
       Alert.alert('Notifications sauvegardées', 'Vos réglages ont été mis à jour.');
+    }
+  };
+
+  const handleTestNotification = async () => {
+    if (Platform.OS === 'web') {
+      window.alert("Test sonore simulé : Pshhht ! Le vaporisateur fonctionne. C'est l'heure de ton soin ! 💨");
+      return;
+    }
+    const status = await NotificationService.requestPermissions();
+    if (status !== 'granted') {
+      Alert.alert("Permission refusée", "Vous devez autoriser les notifications dans les réglages système pour tester.");
+      return;
+    }
+    
+    try {
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('my-root-in-reminders', {
+          name: 'Rappels de soins Root\'In',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#E5A982', // Terracotta
+          showBadge: true,
+          sound: 'vapo_sound.mp3',
+        });
+      }
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "My Root'In 🌿 Test Sonore",
+          body: "Pshhht ! Le vaporisateur fonctionne. C'est l'heure de ton soin ! 💨",
+          sound: 'vapo_sound.mp3',
+          data: { test: true },
+        },
+        trigger: { 
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: 5,
+          channelId: 'my-root-in-reminders',
+        },
+      });
+
+      Alert.alert("Test programmé", "Verrouille ton écran ou place l'application en arrière-plan. La notification va sonner dans 5 secondes ! 💨");
+    } catch (error) {
+      console.warn("Error scheduling test notification:", error);
+      Alert.alert("Erreur", "Impossible de planifier la notification de test.");
     }
   };
 
@@ -477,6 +523,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
                 variant="primary"
                 style={styles.saveNotifBtn}
               />
+              {__DEV__ && (
+                <Button
+                  title="🔔 Tester la notification (5s)"
+                  onPress={handleTestNotification}
+                  variant="outline"
+                  style={{ marginTop: 12, borderColor: colors.primary }}
+                />
+              )}
             </View>
           )}
         </View>

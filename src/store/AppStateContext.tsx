@@ -62,6 +62,7 @@ export interface RoutineItem {
   isPastOverdue?: boolean;
   enableNotificationReminder?: boolean;
   reminderTime?: string; // "HH:MM"
+  isCustom?: boolean;
 }
 
 export interface BathroomProduct {
@@ -80,6 +81,25 @@ export interface BathroomProduct {
   };
 }
 
+export interface ScanHistoryItem {
+  id: string;
+  profileId: string;
+  timestamp: string; // ISO date string
+  brand: string;
+  name: string;
+  image?: string;
+  ingredients: string[];
+  score: number;
+  title: string;
+  description: string;
+  color?: string;
+  inciReport?: {
+    good: string[];
+    neutral: string[];
+    avoid: string[];
+  };
+}
+
 interface AppStateContextType {
   profiles: Profile[];
   activeProfileId: string;
@@ -91,6 +111,9 @@ interface AppStateContextType {
   bathroomProducts: BathroomProduct[];
   addBathroomProduct: (product: Omit<BathroomProduct, 'id'>) => void;
   deleteBathroomProduct: (id: string) => void;
+  scanHistory: ScanHistoryItem[];
+  addScanHistoryItem: (item: Omit<ScanHistoryItem, 'id' | 'timestamp' | 'profileId'>) => void;
+  deleteScanHistoryItem: (id: string) => void;
   themeMode: 'dark' | 'light';
   masterEmail: string;
   isLoading: boolean;
@@ -122,6 +145,7 @@ interface AppStateContextType {
   toggleRoutineCompleted: (id: string) => void;
   deleteRoutineItem: (id: string) => void;
   updateRoutineItemTime: (id: string, time: string) => void;
+  updateRoutineItemDate: (id: string, date: string) => void;
   shiftRoutineDates: (profileId: string, daysToShift: number) => void;
   
   // Settings & Profile Management Methods
@@ -398,6 +422,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [logs, setLogs] = useState<ActionLog[]>([]);
 
   const [bathroomProducts, setBathroomProducts] = useState<BathroomProduct[]>([]);
+  const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([]);
 
   // Startup session lock to prevent race conditions
   const [isSavedCredentialsLoaded, setIsSavedCredentialsLoaded] = useState(false);
@@ -449,6 +474,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           if (data.themeMode) setThemeMode(data.themeMode);
           if (data.isPremium !== undefined) setIsPremium(data.isPremium);
           if (data.bathroomProducts) setBathroomProducts(data.bathroomProducts);
+          if (data.scanHistory) setScanHistory(data.scanHistory);
         } else {
           // Document does not exist in Cloud, initialize it with current local state
           await setDoc(docRef, {
@@ -460,6 +486,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             logs,
             isPremium,
             bathroomProducts,
+            scanHistory: [],
             updatedAt: new Date().toISOString()
           });
         }
@@ -488,6 +515,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           logs,
           isPremium,
           bathroomProducts,
+          scanHistory,
           updatedAt: new Date().toISOString()
         }, { merge: true });
       } catch (error) {
@@ -496,7 +524,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     syncToFirestore();
-  }, [profiles, routine, logs, activeProfileId, themeMode, isLoading, masterEmail, isPremium, bathroomProducts]);
+  }, [profiles, routine, logs, activeProfileId, themeMode, isLoading, masterEmail, isPremium, bathroomProducts, scanHistory]);
 
   // Derived active properties
   const activeProfile = profiles.find(p => p.id === activeProfileId);
@@ -888,6 +916,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       completed: false,
       enableNotificationReminder: enableNotification ?? true,
       reminderTime: reminderTime,
+      isCustom: true,
     };
     setRoutine(prev => [...prev, newItem]);
   };
@@ -901,17 +930,31 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }));
   };
 
+  const updateRoutineItemDate = (id: string, date: string) => {
+    setRoutine(prev => prev.map(item => {
+      if (item.id === id) {
+        return { ...item, date };
+      }
+      return item;
+    }));
+  };
+
   const shiftRoutineDates = (profileId: string, daysToShift: number) => {
     const clampedShift = Math.max(-30, Math.min(30, daysToShift));
     if (clampedShift === 0) return;
 
     setRoutine(prev => prev.map(item => {
       // Only shift uncompleted cares for the active profile
-      // Exception: do NOT shift manual/free cares (recurrence === 'Unique')
+      // Exception: do NOT shift manual/free cares (isCustom, category === 'Soin personnalisé' or recurrence contains 'Unique')
+      const isCustomCare = 
+        item.isCustom || 
+        item.category === 'Soin personnalisé' ||
+        (item.recurrence && (item.recurrence === 'Unique' || item.recurrence.includes('Unique')));
+
       if (
         item.profileId === profileId &&
         !item.completed &&
-        item.recurrence !== 'Unique'
+        !isCustomCare
       ) {
         // Shift date by clampedShift days
         const oldDate = new Date(item.date);
@@ -1021,6 +1064,28 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const deleteBathroomProduct = (id: string) => {
     setBathroomProducts(prev => prev.filter(p => p.id !== id));
+  };
+
+  const addScanHistoryItem = (itemData: Omit<ScanHistoryItem, 'id' | 'timestamp' | 'profileId'>) => {
+    const newId = uuid();
+    const newHistoryItem: ScanHistoryItem = {
+      ...itemData,
+      id: newId,
+      profileId: activeProfileId,
+      timestamp: new Date().toISOString()
+    };
+    
+    setScanHistory(prev => {
+      // Avoid exact duplicates scanned in the same few seconds
+      if (prev.some(p => p.brand.toLowerCase() === newHistoryItem.brand.toLowerCase() && p.name.toLowerCase() === newHistoryItem.name.toLowerCase() && p.profileId === activeProfileId && Math.abs(new Date(p.timestamp).getTime() - new Date(newHistoryItem.timestamp).getTime()) < 3000)) {
+        return prev;
+      }
+      return [newHistoryItem, ...prev]; // newest first
+    });
+  };
+
+  const deleteScanHistoryItem = (id: string) => {
+    setScanHistory(prev => prev.filter(item => item.id !== id));
   };
 
   const completePorosity = (porosityValue: 'Faible' | 'Moyenne' | 'Forte') => {
@@ -1140,6 +1205,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setRoutine([]);
     setLogs([]);
     setIsPremium(false);
+    setScanHistory([]);
     onComplete(); // callback to redirect to auth screen
   };
 
@@ -1159,6 +1225,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       bathroomProducts,
       addBathroomProduct,
       deleteBathroomProduct,
+      scanHistory,
+      addScanHistoryItem,
+      deleteScanHistoryItem,
       themeMode,
       masterEmail,
       isLoading,
@@ -1183,6 +1252,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       toggleRoutineCompleted,
       deleteRoutineItem,
       updateRoutineItemTime,
+      updateRoutineItemDate,
       shiftRoutineDates,
       
       renameProfile,

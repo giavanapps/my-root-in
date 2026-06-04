@@ -182,8 +182,22 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
   const [selectedGuideCategory, setSelectedGuideCategory] = useState('');
   
   const [selectedCareId, setSelectedCareId] = useState<string>('');
+  const getCurrentTimeRounded = () => {
+    const now = new Date();
+    let hours = now.getHours();
+    let minutes = now.getMinutes();
+    const roundedMinutes = Math.round(minutes / 15) * 15;
+    if (roundedMinutes === 60) {
+      minutes = 0;
+      hours = (hours + 1) % 24;
+    } else {
+      minutes = roundedMinutes;
+    }
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  };
+
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [manualReminderTime, setManualReminderTime] = useState(activeProfile?.notifications?.time || '08:30');
+  const [manualReminderTime, setManualReminderTime] = useState(getCurrentTimeRounded());
   const [showManualTimePicker, setShowManualTimePicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -204,6 +218,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
   useEffect(() => {
     if (showAddModal) {
       setCustomDateStr(selectedDateStr);
+      setManualReminderTime(getCurrentTimeRounded());
     }
   }, [showAddModal, selectedDateStr]);
 
@@ -340,7 +355,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
     setCustomCategory('Soin personnalisé');
     setCustomProduct('');
     setEnableNotification(true);
-    setManualReminderTime(activeProfile?.notifications?.time || '08:30');
+    setManualReminderTime(getCurrentTimeRounded());
     setManualError('');
     setShowAddModal(false);
 
@@ -1085,7 +1100,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
           {activeCareItem && (
             <TimePickerModal
               visible={showTimePicker}
-              initialTime={activeCareItem.reminderTime || activeProfile.notifications.time || '08:30'}
+              initialTime={getCurrentTimeRounded()}
               onClose={() => setShowTimePicker(false)}
               onSave={(time) => {
                 updateRoutineItemTime(activeCareItem.id, time);

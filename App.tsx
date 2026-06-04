@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { colors } from './src/theme/colors';
 import { AppStateProvider, useAppState } from './src/store/AppStateContext';
@@ -219,9 +220,11 @@ function MainApp() {
 
 export default function App() {
   return (
-    <AppStateProvider>
-      <MainApp />
-    </AppStateProvider>
+    <SafeAreaProvider>
+      <AppStateProvider>
+        <MainApp />
+      </AppStateProvider>
+    </SafeAreaProvider>
   );
 }
 

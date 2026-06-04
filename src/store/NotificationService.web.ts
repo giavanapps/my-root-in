@@ -10,6 +10,7 @@ export interface RoutineItem {
   date: string;
   completed: boolean;
   reminderTime?: string;
+  isCustom?: boolean;
 }
 
 export const NotificationService = {

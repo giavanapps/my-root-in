@@ -24,8 +24,23 @@ export const TimePickerModal: React.FC<TimePickerModalProps> = ({
   const isLight = themeMode === 'light';
 
   // Parse initial time
-  const [hour, setHour] = useState(8);
-  const [minute, setMinute] = useState(30);
+  const getCurrentTimeRounded = () => {
+    const now = new Date();
+    let hours = now.getHours();
+    let minutes = now.getMinutes();
+    const roundedMinutes = Math.round(minutes / 15) * 15;
+    if (roundedMinutes === 60) {
+      minutes = 0;
+      hours = (hours + 1) % 24;
+    } else {
+      minutes = roundedMinutes;
+    }
+    return { hours, minutes };
+  };
+
+  const defaultTime = getCurrentTimeRounded();
+  const [hour, setHour] = useState(defaultTime.hours);
+  const [minute, setMinute] = useState(defaultTime.minutes);
 
   useEffect(() => {
     if (visible && initialTime) {
@@ -34,6 +49,10 @@ export const TimePickerModal: React.FC<TimePickerModalProps> = ({
         setHour(h);
         setMinute(m);
       }
+    } else if (visible) {
+      const current = getCurrentTimeRounded();
+      setHour(current.hours);
+      setMinute(current.minutes);
     }
   }, [visible, initialTime]);
 
