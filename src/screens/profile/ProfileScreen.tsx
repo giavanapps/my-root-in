@@ -169,7 +169,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
     
     try {
       if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('my-root-in-reminders-v3', {
+        await Notifications.setNotificationChannelAsync('my-root-in-reminders-v4', {
           name: 'Rappels de soins Root\'In',
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
@@ -189,7 +189,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
         trigger: { 
           type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
           seconds: 5,
-          channelId: 'my-root-in-reminders-v3',
+          channelId: 'my-root-in-reminders-v4',
         },
       });
 

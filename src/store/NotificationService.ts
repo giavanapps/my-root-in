@@ -103,7 +103,7 @@ export const NotificationService = {
     try {
       // 1. Configurer le canal de notification Android avec haute importance et le son du vaporisateur
       if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('my-root-in-reminders-v3', {
+        await Notifications.setNotificationChannelAsync('my-root-in-reminders-v4', {
           name: 'Rappels de soins Root\'In',
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
@@ -153,7 +153,7 @@ export const NotificationService = {
             trigger: { 
               type: Notifications.SchedulableTriggerInputTypes.DATE, 
               date: triggerDate,
-              channelId: 'my-root-in-reminders-v3',
+              channelId: 'my-root-in-reminders-v4',
             },
           });
         }
