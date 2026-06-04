@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { NotificationService } from './NotificationService';
 import { db } from './firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
@@ -1194,6 +1194,16 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const deleteMasterAccount = async (onComplete: () => void) => {
+    if (masterEmail) {
+      try {
+        const docRef = doc(db, 'accounts', masterEmail.toLowerCase().trim());
+        await deleteDoc(docRef);
+        console.log("Master account deleted from Firestore successfully.");
+      } catch (error) {
+        console.error("Error deleting document from Firestore:", error);
+      }
+    }
+
     try {
       await AsyncStorage.removeItem('masterEmail');
       await AsyncStorage.removeItem('masterPassword');
