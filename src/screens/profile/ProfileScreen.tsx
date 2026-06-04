@@ -169,13 +169,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
     
     try {
       if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('my-root-in-reminders', {
+        await Notifications.setNotificationChannelAsync('my-root-in-reminders-v3', {
           name: 'Rappels de soins Root\'In',
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#E5A982', // Terracotta
           showBadge: true,
-          sound: 'vapo_sound.mp3',
+          sound: 'vapo_soundmore.mp3',
         });
       }
 
@@ -183,13 +183,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
         content: {
           title: "My Root'In 🌿 Test Sonore",
           body: "Pshhht ! Le vaporisateur fonctionne. C'est l'heure de ton soin ! 💨",
-          sound: 'vapo_sound.mp3',
+          sound: 'vapo_soundmore.mp3',
           data: { test: true },
         },
         trigger: { 
           type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
           seconds: 5,
-          channelId: 'my-root-in-reminders',
+          channelId: 'my-root-in-reminders-v3',
         },
       });
 
