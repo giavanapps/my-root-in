@@ -82,6 +82,7 @@ function MainApp() {
             userName={tempUserName} 
             isEditing={isEditingDiagnostic}
             onFinishDiagnostic={finishDiagnostic} 
+            onCancel={() => setCurrentScreen('home')}
           />
         )}
         

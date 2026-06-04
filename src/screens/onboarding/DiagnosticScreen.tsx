@@ -12,6 +12,7 @@ interface DiagnosticScreenProps {
   userName: string;
   onFinishDiagnostic: () => void;
   isEditing?: boolean;
+  onCancel?: () => void;
 }
 
 export const avatarImageMap: { [key: string]: any } = {
@@ -40,7 +41,7 @@ export const avatarList = [
   { id: 'avatar_8' },
 ];
 
-export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, onFinishDiagnostic, isEditing = false }) => {
+export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, onFinishDiagnostic, isEditing = false, onCancel }) => {
   const { addProfile, updateDiagnostic, changeAvatar, activeProfile } = useAppState();
 
   // Local state for diagnostic steps
@@ -217,6 +218,18 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Top Header Row with Cancel Option if Editing */}
+      {isEditing && onCancel && (
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 6 }}>
+          <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#888D9F' }}>Édition du Diagnostic</Text>
+          <TouchableOpacity 
+            onPress={onCancel}
+            style={{ backgroundColor: 'rgba(217, 83, 79, 0.1)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
+          >
+            <Text style={{ color: '#D9534F', fontSize: 11, fontWeight: 'bold' }}>✕ Annuler</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       {/* Top Progress bar */}
       <View style={styles.progressContainer}>
         <View style={styles.progressBarBackground}>
