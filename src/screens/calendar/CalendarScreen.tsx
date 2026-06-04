@@ -315,7 +315,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
   // Get status dots for a date string YYYY-MM-DD
   const getDateStatuses = (dateStr: string) => {
     const todayStr = new Date().toISOString().split('T')[0];
-    const items = routine.filter(r => r.profileId === activeProfile.id && r.date === dateStr);
+    const items = routine.filter(r => r.profileId === activeProfile.id && r.date === dateStr && !(r.completed && r.date < todayStr));
     
     let hasCompleted = false;
     let hasMissed = false;
@@ -480,12 +480,12 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
     return cells;
   };
 
+  const todayStr = new Date().toISOString().split('T')[0];
+
   // Get active routines list for the selected date
   const activeDateRoutines = routine.filter(
-    r => r.profileId === activeProfile.id && r.date === selectedDateStr
+    r => r.profileId === activeProfile.id && r.date === selectedDateStr && !(r.completed && r.date < todayStr)
   );
-
-  const todayStr = new Date().toISOString().split('T')[0];
   const isPastDate = selectedDateStr < todayStr;
   const isFutureDate = selectedDateStr > todayStr;
 
