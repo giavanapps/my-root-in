@@ -167,7 +167,11 @@ export const useAppState = () => {
   return context;
 };
 
-const uuid = () => Math.random().toString(36).substring(2, 9);
+let uuidCounter = 0;
+const uuid = () => {
+  uuidCounter += 1;
+  return `${Date.now().toString(36)}-${uuidCounter}-${Math.random().toString(36).substring(2, 9)}`;
+};
 
 const getHairCareColumn = (diagnostic: HairDiagnostic): 'naturel' | 'chimique' | 'locks' | 'crepus' | 'raides' => {
   if (diagnostic.texture === 'Locksés') {

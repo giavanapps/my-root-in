@@ -769,10 +769,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
     return Math.round(diffMs / (1000 * 60 * 60 * 24));
   };
 
-  // Filter future uncompleted cares (upcoming scheduled)
+  // Filter future uncompleted cares (upcoming scheduled) sorted by date then time
+  const defaultTime = activeProfile.notifications?.time || "08:30";
   const allUpcomingCares = routine
     .filter(r => r.profileId === activeProfile.id && !r.completed && r.date >= todayStr)
-    .sort((a, b) => a.date.localeCompare(b.date));
+    .sort((a, b) => {
+      if (a.date !== b.date) {
+        return a.date.localeCompare(b.date);
+      }
+      const timeA = a.reminderTime || defaultTime;
+      const timeB = b.reminderTime || defaultTime;
+      return timeA.localeCompare(timeB);
+    });
 
   const firstCareDate = allUpcomingCares[0]?.date || todayStr;
 

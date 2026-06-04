@@ -335,6 +335,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
   };
 
   const handleAddManualCare = () => {
+    if (!showAddModal) return; // Prevent double submission
     if (!customProduct.trim()) {
       setManualError('Veuillez entrer le nom du soin/produit.');
       return;
