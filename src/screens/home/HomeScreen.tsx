@@ -769,17 +769,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
     return Math.round(diffMs / (1000 * 60 * 60 * 24));
   };
 
-  // Filter future uncompleted cares (upcoming scheduled) sorted by date then time
+  // Filter future uncompleted cares (upcoming scheduled) sorted by absolute proximity in time
   const defaultTime = activeProfile.notifications?.time || "08:30";
+  const nowMs = Date.now();
+  const getCareDateTime = (careDate: string, careTime?: string) => {
+    const [year, month, day] = careDate.split('-').map(Number);
+    const [hour, minute] = (careTime || defaultTime).split(':').map(Number);
+    // Note: Month is 0-indexed in JS Date
+    return new Date(year, month - 1, day, hour, minute, 0).getTime();
+  };
+
   const allUpcomingCares = routine
     .filter(r => r.profileId === activeProfile.id && !r.completed && r.date >= todayStr)
     .sort((a, b) => {
-      if (a.date !== b.date) {
-        return a.date.localeCompare(b.date);
-      }
-      const timeA = a.reminderTime || defaultTime;
-      const timeB = b.reminderTime || defaultTime;
-      return timeA.localeCompare(timeB);
+      const diffA = Math.abs(getCareDateTime(a.date, a.reminderTime) - nowMs);
+      const diffB = Math.abs(getCareDateTime(b.date, b.reminderTime) - nowMs);
+      return diffA - diffB;
     });
 
   const firstCareDate = allUpcomingCares[0]?.date || todayStr;
