@@ -1069,7 +1069,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
               <Button
                 title={
                   activeCareItem
-                    ? (activeCareItem.completed ? "Soin déjà enregistré" : "Enregistrer ce soin comme fait 🌿")
+                    ? (activeCareItem.completed ? "Soin déjà enregistré" : "Soin effectué")
                     : "Aucun soin prévu"
                 }
                 onPress={() => {

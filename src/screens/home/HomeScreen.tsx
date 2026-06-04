@@ -648,12 +648,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
   // Ref to guard against onClose and onSave race conditions in the rescheduling flow
   const rescheduleSavingRef = useRef(false);
 
-  // Auto-expand the shopping list as soon as the user purchases Premium
-  useEffect(() => {
-    if (isPremium && showCareGuide) {
-      setShowGuideShoppingList(true);
-    }
-  }, [isPremium, showCareGuide]);
+  // Shopping list starts hidden by default for all users, including premium
 
   // Overdue care detection effect (auto-checks for uncompleted cares from yesterday or earlier)
   useEffect(() => {
@@ -2115,7 +2110,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
               <Button
                 title={
                   activeCareItem
-                    ? (activeCareItem.completed ? "Soin déjà enregistré" : "Enregistrer ce soin comme fait 🌿")
+                    ? (activeCareItem.completed ? "Soin déjà enregistré" : "Soin effectué")
                     : "Aucun soin prévu"
                 }
                 onPress={() => {
