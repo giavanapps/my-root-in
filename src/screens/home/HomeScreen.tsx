@@ -787,12 +787,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
       return diffA - diffB;
     });
 
+  // Filter only shiftable routine cares (exclude custom/manual ones) for routine start shifting
+  const shiftableUpcomingCares = allUpcomingCares.filter(item => {
+    const isCustomCare = 
+      item.isCustom || 
+      item.category === 'Soin personnalisé' ||
+      (item.recurrence && (item.recurrence === 'Unique' || item.recurrence.includes('Unique')));
+    return !isCustomCare;
+  });
+
   const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-  const firstCareDate = allUpcomingCares[0]?.date || tomorrowStr;
+  const firstCareDate = shiftableUpcomingCares[0]?.date || tomorrowStr;
 
   const handleShiftRoutine = (selectedDate: string) => {
-    if (!allUpcomingCares || allUpcomingCares.length === 0) return;
-    const firstCare = allUpcomingCares[0];
+    if (!shiftableUpcomingCares || shiftableUpcomingCares.length === 0) return;
+    const firstCare = shiftableUpcomingCares[0];
     const deltaDays = getDaysBetween(firstCare.date, selectedDate);
     if (deltaDays !== 0) {
       setPendingShift({
