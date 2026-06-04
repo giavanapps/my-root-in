@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Modal, TextInput, Platform, Switch } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Modal, TextInput, Platform, Switch, Animated, PanResponder } from 'react-native';
 import { colors, borderRadius } from '../../theme/colors';
 import { useAppState, RoutineItem } from '../../store/AppStateContext';
 import { Button } from '../../components/common/Button';
@@ -152,6 +152,122 @@ const careGuidesMap: { [key: string]: CareGuide } = {
   }
 };
 
+interface SwipeableCareItemProps {
+  children: React.ReactNode;
+  onDelete: () => void;
+  isSwipeable: boolean;
+  isLight: boolean;
+}
+
+const SwipeableCareItem: React.FC<SwipeableCareItemProps> = ({ children, onDelete, isSwipeable, isLight }) => {
+  const translateX = React.useRef(new Animated.Value(0)).current;
+  const buttonWidth = 80;
+
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        if (!isSwipeable) return false;
+        return Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        let newX = gestureState.dx;
+        if (newX > 0) newX = 0;
+        if (newX < -buttonWidth * 1.5) {
+          newX = -buttonWidth * 1.5 + (newX + buttonWidth * 1.5) * 0.3;
+        }
+        translateX.setValue(newX);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx < -buttonWidth / 2) {
+          Animated.spring(translateX, {
+            toValue: -buttonWidth,
+            useNativeDriver: true,
+            bounciness: 4,
+          }).start();
+        } else {
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 4,
+          }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(translateX, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+      }
+    })
+  ).current;
+
+  React.useEffect(() => {
+    if (!isSwipeable) {
+      translateX.setValue(0);
+    }
+  }, [isSwipeable]);
+
+  if (!isSwipeable) {
+    return <View style={{ marginVertical: 6 }}>{children}</View>;
+  }
+
+  return (
+    <View style={{ position: 'relative', overflow: 'hidden', marginVertical: 6, borderRadius: 16 }}>
+      <View style={{
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        right: 0,
+        width: buttonWidth,
+        backgroundColor: colors.danger,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderTopRightRadius: 16,
+        borderBottomRightRadius: 16,
+      }}>
+        <TouchableOpacity
+          onPress={() => {
+            Animated.timing(translateX, {
+              toValue: 0,
+              duration: 150,
+              useNativeDriver: true,
+            }).start(() => {
+              onDelete();
+            });
+          }}
+          activeOpacity={0.7}
+          style={{
+            width: '100%',
+            height: '100%',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <Text style={{
+            color: '#FFFFFF',
+            fontWeight: '800',
+            fontSize: 13,
+            letterSpacing: 0.5,
+          }}>
+            Effacer
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <Animated.View
+        style={{
+          transform: [{ translateX }],
+          backgroundColor: isLight ? '#F5F6FA' : colors.background,
+        }}
+        {...panResponder.panHandlers}
+      >
+        {children}
+      </Animated.View>
+    </View>
+  );
+};
+
 interface CalendarScreenProps {
   autoOpenAddModal?: boolean;
   onCloseAutoOpen?: () => void;
@@ -164,7 +280,8 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
     themeMode,
     addCustomRoutineItem,
     toggleRoutineCompleted,
-    updateRoutineItemTime
+    updateRoutineItemTime,
+    deleteRoutineItem
   } = useAppState();
 
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -650,141 +767,149 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
                   checkboxBorderColor = colors.primary;
                 }
 
+                const isSwipeable = isCompleted || isMissed;
+
                 return (
-                  <View 
-                    key={item.id} 
-                    style={[
-                      styles.taskCard,
-                      { 
-                        borderColor: cardBorderColor, 
-                        backgroundColor: cardBg,
-                        borderWidth: 1.5,
-                        borderRadius: 16,
-                        padding: 16,
-                        marginVertical: 6,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                      }
-                    ]}
+                  <SwipeableCareItem
+                    key={item.id}
+                    isSwipeable={isSwipeable}
+                    isLight={isLight}
+                    onDelete={() => deleteRoutineItem(item.id)}
                   >
-                    <TouchableOpacity 
-                      style={{ flex: 1, marginRight: 12 }}
-                      activeOpacity={0.7}
-                      onPress={() => {
-                        setSelectedCareId(item.id);
-                        setSelectedGuideCategory(item.category);
-                        setShowCareGuide(true);
-                      }}
-                    >
-                      {/* BOLD STATE BADGE */}
-                      <View style={{ flexDirection: 'row', marginBottom: 6 }}>
-                        {isCompleted && (
-                          <View style={{
-                            backgroundColor: isLight ? '#D0E9D5' : 'rgba(92, 138, 107, 0.3)',
-                            paddingHorizontal: 8,
-                            paddingVertical: 3,
-                            borderRadius: 6,
-                          }}>
-                            <Text style={{
-                              color: isLight ? '#2E693F' : '#82C394',
-                              fontSize: 9.5,
-                              fontWeight: '900',
-                              letterSpacing: 0.5,
-                            }}>
-                              ✓ SOIN RÉALISÉ 🎉
-                            </Text>
-                          </View>
-                        )}
-                        {isMissed && (
-                          <View style={{
-                            backgroundColor: isLight ? '#FCE8E6' : 'rgba(217, 83, 79, 0.25)',
-                            paddingHorizontal: 8,
-                            paddingVertical: 3,
-                            borderRadius: 6,
-                          }}>
-                            <Text style={{
-                              color: isLight ? '#C92A2A' : '#FFA8A8',
-                              fontSize: 9.5,
-                              fontWeight: '900',
-                              letterSpacing: 0.5,
-                            }}>
-                              ⚠️ EN RETARD (A FAIRE)
-                            </Text>
-                          </View>
-                        )}
-                        {isUpcoming && (
-                          <View style={{
-                            backgroundColor: isLight ? 'rgba(229, 169, 130, 0.15)' : 'rgba(229, 169, 130, 0.08)',
-                            paddingHorizontal: 8,
-                            paddingVertical: 3,
-                            borderRadius: 6,
-                            borderColor: 'rgba(229, 169, 130, 0.25)',
-                            borderWidth: 0.5,
-                          }}>
-                            <Text style={{
-                              color: colors.primary,
-                              fontSize: 9.5,
-                              fontWeight: '900',
-                              letterSpacing: 0.5,
-                            }}>
-                              📅 SOIN PRÉVU à {item.reminderTime || activeProfile.notifications.time || '08:30'}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-
-                      <Text style={[
-                        styles.taskCategory, 
-                        { color: customText },
-                        isCompleted && { textDecorationLine: 'line-through', opacity: 0.7, fontStyle: 'italic' }
-                      ]}>
-                        {item.category}
-                      </Text>
-                      <Text style={[
-                        styles.taskProduct, 
-                        { color: customTextSec },
-                        isCompleted && { opacity: 0.7, fontStyle: 'italic' }
-                      ]}>
-                        {item.product}
-                      </Text>
-                      
-                      <Text style={{ fontSize: 9.5, color: colors.secondary, fontWeight: '700', marginTop: 4 }}>
-                        ⚡ Freq : {item.recurrence}
-                        {item.enableNotificationReminder && (
-                          <Text style={{ color: isLight ? '#555' : colors.textMuted, fontWeight: '600' }}>  •  🔔 Rappel activé</Text>
-                        )}
-                      </Text>
-                    </TouchableOpacity>
-
-                    {/* Checkbox Trigger */}
-                    <TouchableOpacity
-                      activeOpacity={0.8}
+                    <View 
                       style={[
-                        styles.taskCheckbox,
+                        styles.taskCard,
                         { 
-                          borderColor: checkboxBorderColor, 
-                          backgroundColor: checkboxBg,
-                          width: 28,
-                          height: 28,
-                          borderRadius: 8,
-                          borderWidth: 2,
+                          borderColor: cardBorderColor, 
+                          backgroundColor: cardBg,
+                          borderWidth: 1.5,
+                          borderRadius: 16,
+                          padding: 16,
+                          marginVertical: 0,
+                          flexDirection: 'row',
                           alignItems: 'center',
-                          justifyContent: 'center',
+                          justifyContent: 'space-between',
                         }
                       ]}
-                      onPress={() => toggleRoutineCompleted(item.id)}
                     >
-                      {isCompleted && (
-                        <Text style={{ 
-                          color: '#FFFFFF', 
-                          fontWeight: '900', 
-                          fontSize: 15,
-                          lineHeight: 18,
-                        }}>✓</Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
+                      <TouchableOpacity 
+                        style={{ flex: 1, marginRight: 12 }}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          setSelectedCareId(item.id);
+                          setSelectedGuideCategory(item.category);
+                          setShowCareGuide(true);
+                        }}
+                      >
+                        {/* BOLD STATE BADGE */}
+                        <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+                          {isCompleted && (
+                            <View style={{
+                              backgroundColor: isLight ? '#D0E9D5' : 'rgba(92, 138, 107, 0.3)',
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 6,
+                            }}>
+                              <Text style={{
+                                color: isLight ? '#2E693F' : '#82C394',
+                                fontSize: 9.5,
+                                fontWeight: '900',
+                                letterSpacing: 0.5,
+                              }}>
+                                ✓ SOIN RÉALISÉ 🎉
+                              </Text>
+                            </View>
+                          )}
+                          {isMissed && (
+                            <View style={{
+                              backgroundColor: isLight ? '#FCE8E6' : 'rgba(217, 83, 79, 0.25)',
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 6,
+                            }}>
+                              <Text style={{
+                                color: isLight ? '#C92A2A' : '#FFA8A8',
+                                fontSize: 9.5,
+                                fontWeight: '900',
+                                letterSpacing: 0.5,
+                              }}>
+                                ⚠️ EN RETARD (A FAIRE)
+                              </Text>
+                            </View>
+                          )}
+                          {isUpcoming && (
+                            <View style={{
+                              backgroundColor: isLight ? 'rgba(229, 169, 130, 0.15)' : 'rgba(229, 169, 130, 0.08)',
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 6,
+                              borderColor: 'rgba(229, 169, 130, 0.25)',
+                              borderWidth: 0.5,
+                            }}>
+                              <Text style={{
+                                color: colors.primary,
+                                fontSize: 9.5,
+                                fontWeight: '900',
+                                letterSpacing: 0.5,
+                              }}>
+                                📅 SOIN PRÉVU à {item.reminderTime || activeProfile.notifications.time || '08:30'}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+
+                        <Text style={[
+                          styles.taskCategory, 
+                          { color: customText },
+                          isCompleted && { textDecorationLine: 'line-through', opacity: 0.7, fontStyle: 'italic' }
+                        ]}>
+                          {item.category}
+                        </Text>
+                        <Text style={[
+                          styles.taskProduct, 
+                          { color: customTextSec },
+                          isCompleted && { opacity: 0.7, fontStyle: 'italic' }
+                        ]}>
+                          {item.product}
+                        </Text>
+                        
+                        <Text style={{ fontSize: 9.5, color: colors.secondary, fontWeight: '700', marginTop: 4 }}>
+                          ⚡ Freq : {item.recurrence}
+                          {item.enableNotificationReminder && (
+                            <Text style={{ color: isLight ? '#555' : colors.textMuted, fontWeight: '600' }}>  •  🔔 Rappel activé</Text>
+                          )}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* Checkbox Trigger */}
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        style={[
+                          styles.taskCheckbox,
+                          { 
+                            borderColor: checkboxBorderColor, 
+                            backgroundColor: checkboxBg,
+                            width: 28,
+                            height: 28,
+                            borderRadius: 8,
+                            borderWidth: 2,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }
+                        ]}
+                        onPress={() => toggleRoutineCompleted(item.id)}
+                      >
+                        {isCompleted && (
+                          <Text style={{ 
+                            color: '#FFFFFF', 
+                            fontWeight: '900', 
+                            fontSize: 15,
+                            lineHeight: 18,
+                          }}>✓</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </SwipeableCareItem>
                 );
               })}
             </View>
