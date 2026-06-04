@@ -22,7 +22,8 @@
       "permissions": [
         "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.CAMERA",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
@@ -47,8 +48,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": "47e1e3a7-5bfe-4bcc-9413-e05cff9dec7b"
+        "projectId": "8d103741-79aa-4959-a228-32fe11ecee5b"
       }
-    }
+    },
+    "owner": "ladyvanessa972"
   }
 }

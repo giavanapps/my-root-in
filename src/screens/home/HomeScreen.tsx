@@ -249,6 +249,102 @@ const careShoppingListMap: { [key: string]: ShoppingListInfo } = {
   }
 };
 
+const isProductDiy = (productName: string, category: string): boolean => {
+  const cat = category ? category.toLowerCase() : '';
+  if (cat.includes('bain') || cat.includes('massage')) {
+    return true; // Bain d'huile and Massage are naturally DIY (raw natural oils)
+  }
+  if (!productName) return false;
+  const prod = productName.toLowerCase();
+  return (
+    prod.includes('diy') ||
+    prod.includes('recette') ||
+    prod.includes('maison') ||
+    prod.includes('argile') ||
+    prod.includes('rhassoul') ||
+    prod.includes('shikakaï') ||
+    prod.includes('shikakai') ||
+    prod.includes('graines de lin') ||
+    prod.includes('poudre') ||
+    prod.includes('naturel') ||
+    prod.includes('huiles') ||
+    prod.includes('aloe vera pur') ||
+    prod.includes('aloe vera maison')
+  );
+};
+
+const careClassiqueShoppingListMap: { [key: string]: ShoppingListInfo } = {
+  'Clarification': {
+    shoppingList: [
+      { item: 'Shampoing Clarifiant ou Détox du commerce', price: '9,50 €' }
+    ],
+    estimatedTotalCost: '9,50 €',
+    economicTip: '💡 Conseil : Privilégiez un shampoing détoxifiant doux sans silicones pour libérer la fibre capillaire sans décaper.'
+  },
+  'Lavage': {
+    shoppingList: [
+      { item: 'Shampoing Doux Hydratant (du commerce)', price: '8,50 €' },
+      { item: 'Brosse stimulante massante (Optionnel)', price: '5,00 €' }
+    ],
+    estimatedTotalCost: '13,50 €',
+    economicTip: '💡 Conseil : Choisissez un shampoing doux adapté à votre porosité pour préserver le sébum naturel du scalp.'
+  },
+  'Bain d\'huile': {
+    shoppingList: [
+      { item: 'Huile de Jojoba Bio (100ml)', price: '7,00 €' },
+      { item: 'Huile d\'Amande Douce Bio (100ml)', price: '5,00 €' }
+    ],
+    estimatedTotalCost: '12,00 €',
+    economicTip: '💡 Conseil : Appliquez de préférence sur cheveux légèrement humides pour sceller l\'hydratation.'
+  },
+  'Masque hydratant': {
+    shoppingList: [
+      { item: 'Masque Hydratant Profond du commerce', price: '12,90 €' },
+      { item: 'Bonnet auto-chauffant ou Charlotte réutilisable', price: '6,00 €' }
+    ],
+    estimatedTotalCost: '18,90 €',
+    economicTip: '💡 Conseil : L\'utilisation d\'un bonnet chauffant ouvre les écailles de vos cuticules et double l\'efficacité de votre soin.'
+  },
+  'Masque protéiné': {
+    shoppingList: [
+      { item: 'Masque Reconstructeur ou Kératine du commerce', price: '14,50 €' },
+      { item: 'Bonnet auto-chauffant ou Charlotte réutilisable', price: '6,00 €' }
+    ],
+    estimatedTotalCost: '20,50 €',
+    economicTip: '💡 Conseil : Espacez les masques protéinés de 4 à 6 semaines pour éviter de saturer et rigidifier la fibre.'
+  },
+  'Soin sans rinçage': {
+    shoppingList: [
+      { item: 'Lait Capillaire Hydratant ou Leave-In', price: '11,00 €' }
+    ],
+    estimatedTotalCost: '11,00 €',
+    economicTip: '💡 Conseil : Appliquez sur cheveux humides section par section pour maximiser la définition sans effet carton.'
+  },
+  'Co-wash': {
+    shoppingList: [
+      { item: 'Crème Lavante Co-Wash Douce du commerce', price: '9,50 €' }
+    ],
+    estimatedTotalCost: '9,50 €',
+    economicTip: '💡 Conseil : Le co-wash permet de laver tout en douceur les cheveux très secs ou de rafraîchir les boucles en milieu de semaine.'
+  },
+  'Retwist': {
+    shoppingList: [
+      { item: 'Gel de Coiffage ou Gel d\'Aloe Vera du commerce', price: '7,50 €' },
+      { item: 'Pinces crocodiles en métal (Pack de 10)', price: '4,00 €' }
+    ],
+    estimatedTotalCost: '11,50 €',
+    economicTip: '💡 Conseil : Évitez les cires épaisses de coiffage pour prévenir l\'accumulation de résidus incrustés dans vos locks.'
+  },
+  'Massage cuir chevelu': {
+    shoppingList: [
+      { item: 'Huile de Jojoba Bio (100ml)', price: '7,00 €' },
+      { item: 'Huile Essentielle de Menthe Poivrée (10ml)', price: '5,50 €' }
+    ],
+    estimatedTotalCost: '12,50 €',
+    economicTip: '💡 Conseil : Massez avec la pulpe des doigts (pas les ongles) pendant 5 minutes pour stimuler la circulation sanguine.'
+  }
+};
+
 interface LibraryArticle {
   id: string;
   title: string;
@@ -2028,8 +2124,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                   </Text>
                 </TouchableOpacity>
               ) : (() => {
-                const shoppingListInfo = careShoppingListMap[guideKey];
+                const productName = activeCareItem ? activeCareItem.product : (currentGuide.products || '');
+                const isDiy = isProductDiy(productName, guideKey);
+                const shoppingListInfo = isDiy ? careShoppingListMap[guideKey] : careClassiqueShoppingListMap[guideKey];
                 if (!shoppingListInfo) return null;
+
+                const cardBg = isDiy 
+                  ? (isLight ? '#F5F9F6' : '#17221C') 
+                  : (isLight ? '#F5F7FA' : '#1A1F2C');
+                const cardBorder = isDiy 
+                  ? (isLight ? 'rgba(92, 138, 107, 0.15)' : 'rgba(92, 138, 107, 0.3)')
+                  : (isLight ? 'rgba(80, 100, 120, 0.12)' : 'rgba(80, 100, 120, 0.25)');
 
                 return (
                   <View style={{ marginTop: 4, marginBottom: 12 }}>
@@ -2053,11 +2158,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                       <View style={[
                         styles.guideShoppingCard,
                         { 
-                          backgroundColor: isLight ? '#F5F9F6' : '#17221C',
-                          borderColor: isLight ? 'rgba(92, 138, 107, 0.15)' : 'rgba(92, 138, 107, 0.3)'
+                          backgroundColor: cardBg,
+                          borderColor: cardBorder
                         }
                       ]}>
-                        <Text style={[styles.guideShoppingTitle, { color: colors.secondary }]}>🛒 Ingrédients & Matériel requis :</Text>
+                        <Text style={[styles.guideShoppingTitle, { color: colors.secondary }]}>
+                          {isDiy ? '🛒 Ingrédients & Matériel requis :' : '🛒 Liste d\'achat estimée :'}
+                        </Text>
                         {shoppingListInfo.shoppingList.map((item, idx) => (
                           <View key={idx} style={styles.guideShoppingListItem}>
                             <Text style={[styles.guideShoppingItemName, { color: customText }]}>• {item.item}</Text>
