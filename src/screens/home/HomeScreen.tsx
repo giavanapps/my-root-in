@@ -787,7 +787,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
       return diffA - diffB;
     });
 
-  const firstCareDate = allUpcomingCares[0]?.date || todayStr;
+  const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  const firstCareDate = allUpcomingCares[0]?.date || tomorrowStr;
 
   const handleShiftRoutine = (selectedDate: string) => {
     if (!allUpcomingCares || allUpcomingCares.length === 0) return;
