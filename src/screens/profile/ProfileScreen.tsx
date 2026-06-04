@@ -610,7 +610,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>🎭 Choisir mon nouvel avatar</Text>
             
-            <ScrollView contentContainerStyle={styles.avatarGridScroll}>
+            <ScrollView style={styles.avatarScrollView} contentContainerStyle={styles.avatarGridScroll}>
               <View style={styles.avatarGrid}>
                 {avatarList.map(item => (
                   <TouchableOpacity
@@ -1032,8 +1032,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
-  avatarGridScroll: {
+  avatarScrollView: {
     maxHeight: 250,
+    width: '100%',
+  },
+  avatarGridScroll: {
+    paddingBottom: 8,
   },
   avatarGrid: {
     flexDirection: 'row',
