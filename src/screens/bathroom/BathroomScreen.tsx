@@ -46,7 +46,7 @@ export const BathroomScreen: React.FC = () => {
       <View style={[styles.headerBlock, { backgroundColor: customCard, borderColor: customBorder }]}>
         <Text style={[styles.headerTitle, { color: customText }]}>🧴 Ma Salle de Bain</Text>
         <Text style={[styles.headerSubtitle, { color: customTextSec }]}>
-          Ton placard virtuel de produits capillaires testés et approuvés
+          Cet endroit sert à scanner et enregistrer les produits réels de ta salle de bain. Tu pourras ensuite voir s'ils sont compatibles avec tes cheveux et les associer à tes futurs soins du calendrier.
         </Text>
       </View>
 
@@ -67,7 +67,7 @@ export const BathroomScreen: React.FC = () => {
             <Text style={styles.emptyEmoji}>🛁</Text>
             <Text style={[styles.emptyTitle, { color: customText }]}>Ton placard virtuel est vide</Text>
             <Text style={[styles.emptyDesc, { color: customTextSec }]}>
-              Scanne tes produits dans ton placard ou en magasin pour activer l'assistant intelligent et optimiser ta routine !
+              Cet endroit sert à scanner et enregistrer tous les produits physiques présents dans ta salle de bain. Scanne-les pour vérifier leur compatibilité et les lier à tes soins !
             </Text>
             <Button
               title="📷 Scanner mon premier flacon"
@@ -145,6 +145,7 @@ export const BathroomScreen: React.FC = () => {
       <ProductScannerModal 
         visible={showScanner} 
         onClose={() => setShowScanner(false)} 
+        directPlacardMode={true}
       />
     </SafeAreaView>
   );

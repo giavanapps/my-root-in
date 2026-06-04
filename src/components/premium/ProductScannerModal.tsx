@@ -8,6 +8,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 interface ProductScannerModalProps {
   visible: boolean;
   onClose: () => void;
+  directPlacardMode?: boolean;
 }
 
 interface MockProduct {
@@ -382,7 +383,7 @@ const compressImageWeb = (base64Str: string, maxWidth = 1024, maxHeight = 1024, 
   });
 };
 
-export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visible, onClose }) => {
+export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visible, onClose, directPlacardMode }) => {
   const { 
     activeProfile, 
     themeMode, 
@@ -433,10 +434,19 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
 
   // Reset scanner mode when the modal is closed
   useEffect(() => {
-    if (!visible) {
+    if (visible) {
+      if (directPlacardMode) {
+        setActiveFeatureTab('add');
+        setScannerMode('photo');
+        setCaptureStep('front');
+        setFrontPhoto(null);
+        setBackPhoto(null);
+        frontPhotoRef.current = null;
+      }
+    } else {
       handleReset();
     }
-  }, [visible]);
+  }, [visible, directPlacardMode]);
 
   const html5QrCodeRef = useRef<any>(null);
 
@@ -948,12 +958,12 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     setIsAnalyzingReal(false);
     setIsSearchingBarcode(false);
     setBarcodeInput('');
-    setScannerMode(null);
+    setScannerMode(directPlacardMode ? 'photo' : null);
     setIsCameraActive(true);
     setCameraError(null);
     setShowScanTip(false);
     setScanStep('idle');
-    setActiveFeatureTab('inci');
+    setActiveFeatureTab(directPlacardMode ? 'add' : 'inci');
     setShowShoppingList(false);
     setManualBrand('');
     setManualName('');
@@ -1071,7 +1081,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
               <TouchableOpacity onPress={handleReset} style={styles.headerLeftButton}>
                 <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 13 }}>⬅️ Nouveau Scan</Text>
               </TouchableOpacity>
-            ) : scanStep === 'idle' && scannerMode !== null ? (
+            ) : scanStep === 'idle' && scannerMode !== null && !directPlacardMode ? (
               <TouchableOpacity 
                 onPress={() => {
                   setScannerMode(null);
@@ -1086,7 +1096,9 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
               </TouchableOpacity>
             ) : (
               <Text style={[styles.headerTitle, isDark ? styles.textLight : styles.textDark]}>
-                {scanStep === 'idle' ? 'Root\'in IA Scanner 🔬' : 'Analyse en cours...'}
+                {scanStep === 'idle' 
+                  ? (directPlacardMode ? 'Scanner ma Salle de Bain 📷' : 'Root\'in IA Scanner 🔬')
+                  : 'Analyse en cours...'}
               </Text>
             )}
             
@@ -1301,15 +1313,17 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
               {scannerMode === 'photo' && (
                 <View>
                   {/* Back button */}
-                  <TouchableOpacity style={styles.backModeButton} onPress={() => {
-                    setScannerMode(null);
-                    setFrontPhoto(null);
-                    setBackPhoto(null);
-                    setCaptureStep('front');
-                    frontPhotoRef.current = null;
-                  }}>
-                    <Text style={styles.backModeButtonText}>⬅️ Retour aux fonctions</Text>
-                  </TouchableOpacity>
+                  {!directPlacardMode && (
+                    <TouchableOpacity style={styles.backModeButton} onPress={() => {
+                      setScannerMode(null);
+                      setFrontPhoto(null);
+                      setBackPhoto(null);
+                      setCaptureStep('front');
+                      frontPhotoRef.current = null;
+                    }}>
+                      <Text style={styles.backModeButtonText}>⬅️ Retour aux fonctions</Text>
+                    </TouchableOpacity>
+                  )}
 
                   {captureStep === 'front' ? (
                     <View style={{ alignItems: 'center', marginTop: 12 }}>
