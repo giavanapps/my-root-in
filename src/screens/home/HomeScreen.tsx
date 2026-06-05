@@ -859,11 +859,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
   };
 
   const getDaysBetween = (date1: string, date2: string): number => {
-    const d1 = new Date(date1);
-    const d2 = new Date(date2);
-    d1.setHours(12, 0, 0, 0);
-    d2.setHours(12, 0, 0, 0);
-    const diffMs = d2.getTime() - d1.getTime();
+    const [y1, m1, d1] = date1.split('-').map(Number);
+    const [y2, m2, d2] = date2.split('-').map(Number);
+    const dt1 = new Date(y1, m1 - 1, d1, 12, 0, 0, 0);
+    const dt2 = new Date(y2, m2 - 1, d2, 12, 0, 0, 0);
+    const diffMs = dt2.getTime() - dt1.getTime();
     return Math.round(diffMs / (1000 * 60 * 60 * 24));
   };
 
@@ -1359,11 +1359,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                 style={[styles.modalButton, styles.modalButtonPrimary]}
                 onPress={() => {
                   if (pendingShift) {
-                    updateRoutineItemDate(pendingShift.careId, pendingShift.newDate);
-                    if (pendingShift.newTime) {
-                      updateRoutineItemTime(pendingShift.careId, pendingShift.newTime);
-                    }
-                    shiftRoutineDates(activeProfile.id, pendingShift.deltaDays);
+                    shiftRoutineDates(activeProfile.id, pendingShift.deltaDays, pendingShift.careId, pendingShift.newTime);
                   }
                   setPendingShift(null);
                   setShowSmartShiftModal(false);
@@ -1377,10 +1373,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                 style={[styles.modalButton, styles.modalButtonSecondary, { borderColor: customBorder }]}
                 onPress={() => {
                   if (pendingShift) {
-                    updateRoutineItemDate(pendingShift.careId, pendingShift.newDate);
-                    if (pendingShift.newTime) {
-                      updateRoutineItemTime(pendingShift.careId, pendingShift.newTime);
-                    }
+                    updateRoutineItemDate(pendingShift.careId, pendingShift.newDate, pendingShift.newTime);
                   }
                   setPendingShift(null);
                   setShowSmartShiftModal(false);

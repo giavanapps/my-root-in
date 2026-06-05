@@ -152,8 +152,8 @@ interface AppStateContextType {
   toggleRoutineCompleted: (id: string) => void;
   deleteRoutineItem: (id: string) => void;
   updateRoutineItemTime: (id: string, time: string) => void;
-  updateRoutineItemDate: (id: string, date: string) => void;
-  shiftRoutineDates: (profileId: string, daysToShift: number) => void;
+  updateRoutineItemDate: (id: string, date: string, time?: string) => void;
+  shiftRoutineDates: (profileId: string, daysToShift: number, targetCareId?: string, targetTime?: string) => void;
   
   // Settings & Profile Management Methods
   renameProfile: (id: string, newName: string) => void;
@@ -941,39 +941,52 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }));
   };
 
-  const updateRoutineItemDate = (id: string, date: string) => {
+  const updateRoutineItemDate = (id: string, date: string, time?: string) => {
     setRoutine(prev => prev.map(item => {
       if (item.id === id) {
-        return { ...item, date };
+        const updated = { ...item, date };
+        if (time) {
+          updated.reminderTime = time;
+          updated.enableNotificationReminder = true;
+        }
+        return updated;
       }
       return item;
     }));
   };
 
-  const shiftRoutineDates = (profileId: string, daysToShift: number) => {
+  const shiftRoutineDates = (profileId: string, daysToShift: number, targetCareId?: string, targetTime?: string) => {
     const clampedShift = Math.max(-30, Math.min(30, daysToShift));
-    if (clampedShift === 0) return;
 
     setRoutine(prev => prev.map(item => {
+      let updatedItem = item;
+      // If this is the target care of the shift, update its time if targetTime is provided
+      if (targetCareId && item.id === targetCareId && targetTime) {
+        updatedItem = { ...item, reminderTime: targetTime, enableNotificationReminder: true };
+      }
+
       // Only shift uncompleted cares for the active profile
       // Exception: do NOT shift manual/free cares (isCustom, category === 'Soin personnalisé' or recurrence contains 'Unique')
       const isCustomCare = 
-        item.isCustom || 
-        item.category === 'Soin personnalisé' ||
-        (item.recurrence && (item.recurrence === 'Unique' || item.recurrence.includes('Unique')));
+        updatedItem.isCustom || 
+        updatedItem.category === 'Soin personnalisé' ||
+        (updatedItem.recurrence && (updatedItem.recurrence === 'Unique' || updatedItem.recurrence.includes('Unique')));
 
       if (
-        item.profileId === profileId &&
-        !item.completed &&
+        updatedItem.profileId === profileId &&
+        !updatedItem.completed &&
         !isCustomCare
       ) {
-        // Shift date by clampedShift days
-        const oldDate = new Date(item.date);
-        oldDate.setDate(oldDate.getDate() + clampedShift);
-        const newDateStr = getLocalDateString(oldDate);
-        return { ...item, date: newDateStr };
+        if (clampedShift !== 0) {
+          // Parse date safely to avoid timezone shifting
+          const [y, m, d] = updatedItem.date.split('-').map(Number);
+          const dateObj = new Date(y, m - 1, d, 12, 0, 0, 0); // Local noon is safe from DST and timezone shifts
+          dateObj.setDate(dateObj.getDate() + clampedShift);
+          const newDateStr = getLocalDateString(dateObj);
+          return { ...updatedItem, date: newDateStr };
+        }
       }
-      return item;
+      return updatedItem;
     }));
   };
 
