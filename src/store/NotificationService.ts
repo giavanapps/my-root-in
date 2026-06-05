@@ -14,6 +14,13 @@ if (Platform.OS !== 'web') {
   });
 }
 
+const getLocalDateString = (d: Date = new Date()) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export interface RoutineItem {
   id: string;
   profileId: string;
@@ -116,7 +123,7 @@ export const NotificationService = {
       // 2. Wipe previous alarms to avoid duplication
       await this.cancelAllReminders();
 
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = getLocalDateString();
 
       // 3. Filter uncompleted cares scheduled for today or in the future
       const upcomingCares = routineItems.filter(

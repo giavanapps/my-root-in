@@ -6,6 +6,13 @@ import { Button } from '../../components/common/Button';
 import { TimePickerModal } from '../../components/common/TimePickerModal';
 import { DatePickerModal } from '../../components/common/DatePickerModal';
 
+const getLocalDateString = (d: Date = new Date()) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 interface CareGuide {
   title: string;
   duration: string;
@@ -163,11 +170,16 @@ const SwipeableCareItem: React.FC<SwipeableCareItemProps> = ({ children, onDelet
   const translateX = React.useRef(new Animated.Value(0)).current;
   const buttonWidth = 80;
 
+  const isSwipeableRef = React.useRef(isSwipeable);
+  React.useEffect(() => {
+    isSwipeableRef.current = isSwipeable;
+  }, [isSwipeable]);
+
   const panResponder = React.useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        if (!isSwipeable) return false;
+        if (!isSwipeableRef.current) return false;
         return Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
       },
       onPanResponderMove: (_, gestureState) => {
@@ -285,7 +297,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
   } = useAppState();
 
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDateStr, setSelectedDateStr] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDateStr, setSelectedDateStr] = useState(getLocalDateString());
   const [viewMode, setViewMode] = useState<'monthly' | 'weekly'>('monthly');
 
   // Manual care addition modal states
@@ -321,7 +333,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
   // Side-effect to auto-open modal if navigated from HomeScreen bubble shortcut
   useEffect(() => {
     if (autoOpenAddModal) {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalDateString();
       setSelectedDateStr(today);
       setCustomDateStr(today);
       setShowAddModal(true);
@@ -431,7 +443,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
 
   // Get status dots for a date string YYYY-MM-DD
   const getDateStatuses = (dateStr: string) => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateString();
     const items = routine.filter(r => r.profileId === activeProfile.id && r.date === dateStr && !(r.completed && r.date < todayStr));
     
     let hasCompleted = false;
@@ -502,7 +514,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const isSelected = selectedDateStr === dateStr;
-      const isToday = new Date().toISOString().split('T')[0] === dateStr;
+      const isToday = getLocalDateString() === dateStr;
       
       const { hasCompleted, hasMissed, hasUpcoming } = getDateStatuses(dateStr);
 
@@ -553,9 +565,9 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
       const weekDay = new Date(monday);
       weekDay.setDate(monday.getDate() + i);
 
-      const dateStr = weekDay.toISOString().split('T')[0];
+      const dateStr = getLocalDateString(weekDay);
       const isSelected = selectedDateStr === dateStr;
-      const isToday = new Date().toISOString().split('T')[0] === dateStr;
+      const isToday = getLocalDateString() === dateStr;
       const dayNum = weekDay.getDate();
 
       const { hasCompleted, hasMissed, hasUpcoming } = getDateStatuses(dateStr);
@@ -597,7 +609,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
     return cells;
   };
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
 
   // Get active routines list for the selected date
   const activeDateRoutines = routine.filter(

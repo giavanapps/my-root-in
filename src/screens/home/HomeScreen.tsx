@@ -15,6 +15,13 @@ import { ProductScannerModal, matchesCategory } from '../../components/premium/P
 import { DatePickerModal } from '../../components/common/DatePickerModal';
 import { RoutineItem } from '../../store/NotificationService';
 
+const getLocalDateString = (d: Date = new Date()) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 interface CareGuide {
   title: string;
   duration: string;
@@ -691,7 +698,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
   } = useAppState();
 
   const isLight = themeMode === 'light';
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
 
   const getCurrentTimeRounded15 = () => {
     const now = new Date();
@@ -887,7 +894,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
     return !isCustomCare;
   });
 
-  const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  const tomorrowStr = getLocalDateString(new Date(Date.now() + 86400000));
   const firstCareDate = shiftableUpcomingCares[0]?.date || tomorrowStr;
 
   const handleShiftRoutine = (selectedDate: string) => {

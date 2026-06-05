@@ -6,6 +6,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 // Types
+export const getLocalDateString = (d: Date = new Date()) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export interface HairDiagnostic {
   texture: 'Ondulés' | 'Bouclés' | 'Frisés' | 'Crépus' | 'Locksés' | 'Raides';
   porosity: 'Faible' | 'Moyenne' | 'Forte' | null;
@@ -318,7 +325,7 @@ const generateRoutineCalendar = (profileId: string, diagnostic: HairDiagnostic, 
 
   // 3. Loop over 30 days
   for (let day = 0; day < 30; day++) {
-    const dateStr = new Date(todayMs + (day + 1) * 86400000).toISOString().split('T')[0];
+    const dateStr = getLocalDateString(new Date(todayMs + (day + 1) * 86400000));
     const dayTasks: { category: string; product?: string; recurrence: string }[] = [];
 
     if (day === 0 || day === 30) {
@@ -382,7 +389,7 @@ const generateRoutineCalendar = (profileId: string, diagnostic: HairDiagnostic, 
   }
 
   if (diagnostic.porosity === null) {
-    const j7Str = new Date(todayMs + 7 * 86400000).toISOString().split('T')[0];
+    const j7Str = getLocalDateString(new Date(todayMs + 7 * 86400000));
     items.push({
       id: uuid(),
       profileId,
@@ -538,7 +545,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Dynamic regularity score calculation:
   // Count only scheduled cares with date <= todayStr. Rest days are ignored.
-  const todayStrForScore = new Date().toISOString().split('T')[0];
+  const todayStrForScore = getLocalDateString();
   const activeRoutinesForScore = activeProfileId
     ? routine.filter(r => r.profileId === activeProfileId && r.date <= todayStrForScore)
     : [];
@@ -582,7 +589,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     history?: HairHistory
   ) => {
     const newId = uuid();
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateString();
     
     const newProfile: Profile = {
       id: newId,
@@ -610,7 +617,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const completeTodayAction = (category: string) => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateString();
     
     setRoutine(prev => prev.map(item => {
       if (item.profileId === activeProfileId && item.date === todayStr && item.category === category) {
@@ -663,7 +670,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const newScore = calculatedScore;
     const delta = newScore - oldScore;
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateString();
 
     // Update Profiles State
     setProfiles(prev => prev.map(p => {
@@ -691,7 +698,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (feedback === 'Secs') {
       // 2 days in the future
       const in2Days = new Date(Date.now() + 2 * 86400000);
-      const in2DaysStr = in2Days.toISOString().split('T')[0];
+      const in2DaysStr = getLocalDateString(in2Days);
       const newRoutineItem: RoutineItem = {
         id: uuid(),
         profileId: activeProfileId,
@@ -706,7 +713,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } else if (feedback === 'Lourds') {
       // 5 days in the future
       const in5Days = new Date(Date.now() + 5 * 86400000);
-      const in5DaysStr = in5Days.toISOString().split('T')[0];
+      const in5DaysStr = getLocalDateString(in5Days);
       const newRoutineItem: RoutineItem = {
         id: uuid(),
         profileId: activeProfileId,
@@ -841,7 +848,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const triggerSosBooster = () => {
     if (!activeProfile) return;
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateString();
     setRoutine(prev => prev.filter(r => !(r.profileId === activeProfileId && r.date > todayStr)));
 
     const protocols = [
@@ -857,7 +864,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     ];
 
     const newRoutineItems: RoutineItem[] = protocols.map(proto => {
-      const date = new Date(Date.now() + proto.day * 86400000).toISOString().split('T')[0];
+      const date = getLocalDateString(new Date(Date.now() + proto.day * 86400000));
       return {
         id: uuid(),
         profileId: activeProfileId,
@@ -892,7 +899,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return p;
     }));
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateString();
     // Remove all future non-completed routine items for this profile
     setRoutine(prev => prev.filter(r => !(r.profileId === activeProfileId && r.date > todayStr && !r.completed)));
 
@@ -963,7 +970,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         // Shift date by clampedShift days
         const oldDate = new Date(item.date);
         oldDate.setDate(oldDate.getDate() + clampedShift);
-        const newDateStr = oldDate.toISOString().split('T')[0];
+        const newDateStr = getLocalDateString(oldDate);
         return { ...item, date: newDateStr };
       }
       return item;
@@ -991,7 +998,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (
         item.profileId === activeProfileId &&
         !item.completed &&
-        item.date >= new Date().toISOString().split('T')[0]
+        item.date >= getLocalDateString()
       ) {
         // Map product categories to agenda categories
         const matchesCategory = (prodCat: string, agendaCat: string, prodName?: string): boolean => {
@@ -1110,7 +1117,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }));
 
     if (updatedDiag) {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = getLocalDateString();
       // Remove all future non-completed routine items for this profile
       setRoutine(prev => prev.filter(r => !(r.profileId === activeProfileId && r.date > todayStr && !r.completed)));
 
