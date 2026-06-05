@@ -377,14 +377,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
               </View>
             )}
           </View>
-
-          {/* Refaire diagnostic capillaire bouton majeur */}
-          <Button
-            title="🔄 Mettre à jour mon diagnostic capillaire"
-            onPress={onRefireDiagnostic}
-            variant="primary"
-            style={styles.evolveBtn}
-          />
         </View>
 
         {/* ============================================================== */}
