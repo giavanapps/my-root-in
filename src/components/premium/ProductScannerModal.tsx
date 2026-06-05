@@ -421,7 +421,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   const frontPhotoRef = useRef<string | null>(null);
 
   // Code-barres states
-  const [scannerMode, setScannerMode] = useState<'photo' | 'barcode' | 'select_method' | null>(null);
+  const [scannerMode, setScannerMode] = useState<'photo' | 'barcode' | 'select_method' | 'diy_select' | null>(null);
   const [barcodeInput, setBarcodeInput] = useState('');
   const [isSearchingBarcode, setIsSearchingBarcode] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(true);
@@ -1006,6 +1006,26 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     setShowFullHistory(false);
   };
 
+  const handleLoadFromHistoryForDiy = (item: any) => {
+    const simulatedAnalysis = {
+      brand: item.brand,
+      name: item.name,
+      image: item.image,
+      ingredients: item.ingredients,
+      score: item.score,
+      title: item.title,
+      description: item.description,
+      color: item.color,
+      inciReport: item.inciReport
+    };
+    setRealProductAnalysis(simulatedAnalysis);
+    setSelectedProduct(null);
+    setScanStep('result');
+    setActiveFeatureTab('diy');
+    setScannerMode(null);
+    setShowFullHistory(false);
+  };
+
   // Generate Personalized Capillary Diagnostic Report
   const getCompatibilityAnalysis = (product: MockProduct) => {
     const texture = activeProfile?.diagnostic?.texture || 'Crépus';
@@ -1161,7 +1181,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     activeOpacity={0.9}
                     onPress={() => {
                       setActiveFeatureTab('diy');
-                      setScannerMode('photo');
+                      setScannerMode('diy_select');
                     }}
                   >
                     <Text style={styles.modeCardIcon}>🌿</Text>
@@ -1266,6 +1286,93 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                             <Text style={styles.viewAllHistoryButtonText}>Voir tout l'historique ➔</Text>
                           </TouchableOpacity>
                         )}
+                      </View>
+                    );
+                  })()}
+                </View>
+              )}
+
+              {/* DIY SELECT MODE */}
+              {scannerMode === 'diy_select' && (
+                <View>
+                  {/* Back button */}
+                  <TouchableOpacity style={styles.backModeButton} onPress={() => setScannerMode(null)}>
+                    <Text style={styles.backModeButtonText}>⬅️ Retour aux fonctions</Text>
+                  </TouchableOpacity>
+
+                  <Text style={[styles.dashboardPrompt, isDark ? styles.textLight : styles.textDark, { textAlign: 'left', marginBottom: spacing.md }]}>
+                    Sélectionne un produit précédemment scanné pour en concevoir un dupe naturel, ou effectue une nouvelle analyse :
+                  </Text>
+
+                  {/* Actions to scan new */}
+                  <View style={{ flexDirection: 'row', gap: 12, marginBottom: spacing.lg }}>
+                    <TouchableOpacity
+                      style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight, { flex: 1, flexDirection: 'column', padding: 16, alignItems: 'center' }]}
+                      activeOpacity={0.9}
+                      onPress={() => setScannerMode('photo')}
+                    >
+                      <Text style={[styles.modeCardIcon, { marginBottom: 8, fontSize: 24 }]}>📷</Text>
+                      <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark, { fontSize: 13, textAlign: 'center' }]}>Prendre en photo</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight, { flex: 1, flexDirection: 'column', padding: 16, alignItems: 'center' }]}
+                      activeOpacity={0.9}
+                      onPress={() => setScannerMode('barcode')}
+                    >
+                      <Text style={[styles.modeCardIcon, { marginBottom: 8, fontSize: 24 }]}>🏷️</Text>
+                      <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark, { fontSize: 13, textAlign: 'center' }]}>Flasher Code-barres</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Scrollable Scan History Section */}
+                  {(() => {
+                    const profileHistory = scanHistory.filter(h => h.profileId === activeProfileId);
+                    if (profileHistory.length === 0) {
+                      return (
+                        <View style={{ padding: 20, alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={[isDark ? styles.textMutedDark : styles.textMutedLight, { textAlign: 'center', fontSize: 14 }]}>
+                            Aucun scan précédent trouvé pour ce profil. Scanne un produit pour commencer !
+                          </Text>
+                        </View>
+                      );
+                    }
+
+                    return (
+                      <View style={styles.historyContainer}>
+                        <View style={styles.historyHeader}>
+                          <Text style={[styles.historyTitle, isDark ? styles.textLight : styles.textDark]}>
+                            🕒 Sélectionner dans tes scans passés
+                          </Text>
+                        </View>
+                        <ScrollView style={{ maxHeight: 280 }} nestedScrollEnabled={true}>
+                          <View style={styles.historyList}>
+                            {profileHistory.map((item) => (
+                              <TouchableOpacity
+                                key={item.id}
+                                style={[styles.historyCard, isDark ? styles.historyCardDark : styles.historyCardLight]}
+                                activeOpacity={0.8}
+                                onPress={() => handleLoadFromHistoryForDiy(item)}
+                              >
+                                <Image source={{ uri: item.image || 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop' }} style={styles.historyItemImage} />
+                                <View style={styles.historyItemInfo}>
+                                  <Text style={styles.historyItemBrand}>{item.brand}</Text>
+                                  <Text style={[styles.historyItemName, isDark ? styles.textLight : styles.textDark]} numberOfLines={1}>
+                                    {item.name}
+                                  </Text>
+                                  <Text style={styles.historyItemDate}>
+                                    Scan du {new Date(item.timestamp).toLocaleDateString('fr-FR')}
+                                  </Text>
+                                </View>
+                                <View style={[styles.historyItemScoreBadge, { borderColor: item.color || colors.primary }]}>
+                                  <Text style={[styles.historyItemScoreText, { color: item.color || colors.primary }]}>
+                                    {item.score}%
+                                  </Text>
+                                </View>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        </ScrollView>
                       </View>
                     );
                   })()}

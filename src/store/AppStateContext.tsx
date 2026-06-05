@@ -619,6 +619,14 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const completeTodayAction = (category: string) => {
     const todayStr = getLocalDateString();
     
+    // Find if the routine item for today that is being completed is custom
+    const targetItem = routine.find(item => 
+      item.profileId === activeProfileId && 
+      item.date === todayStr && 
+      item.category === category &&
+      !item.completed
+    );
+
     setRoutine(prev => prev.map(item => {
       if (item.profileId === activeProfileId && item.date === todayStr && item.category === category) {
         return { ...item, completed: true };
@@ -637,9 +645,40 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setLastLoggedCategory(category);
     setLastValidatedCare({ category, date: todayStr });
 
-    setTimeout(() => {
-      setShowFeedbackQuiz(true);
-    }, 600);
+    const isCustom = targetItem?.isCustom || category === 'Soin personnalisé' || targetItem?.recurrence === 'Unique';
+
+    if (!isCustom) {
+      setTimeout(() => {
+        setShowFeedbackQuiz(true);
+      }, 600);
+    } else {
+      // Custom/personalized care: bypass feedback quiz and update metrics directly
+      if (activeProfile) {
+        const oldScore = activeProfile.healthScore;
+        const newHydration = Math.min(100, activeProfile.hydration + 10);
+        const newNutrition = Math.min(100, activeProfile.nutrition + 10);
+        const newScore = Math.round((newHydration + newNutrition + activeProfile.scalp) / 3);
+        const delta = newScore - oldScore;
+
+        setProfiles(prev => prev.map(p => {
+          if (p.id === activeProfileId) {
+            return {
+              ...p,
+              hydration: newHydration,
+              nutrition: newNutrition,
+              healthScore: newScore,
+            };
+          }
+          return p;
+        }));
+
+        setLastFeedbackDelta(delta);
+        setLastFeedbackReason("Soin personnalisé complété avec succès ! Prends soin de toi au quotidien.");
+        setTimeout(() => {
+          setShowCareSummary(true);
+        }, 600);
+      }
+    }
   };
 
   const submitFeedback = (feedback: 'Secs' | 'Top' | 'Lourds') => {
@@ -892,12 +931,32 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         };
         setLogs(prev => [...prev, newLog]);
 
+        const isCustom = targetItem?.isCustom || targetCategory === 'Soin personnalisé' || targetItem?.recurrence === 'Unique';
+
         // Open feedback popup for any completed care item!
         setLastLoggedCategory(targetCategory);
         setLastValidatedCare({ category: targetCategory, date: targetDate });
-        setTimeout(() => {
-          setShowFeedbackQuiz(true);
-        }, 600);
+
+        if (!isCustom) {
+          setTimeout(() => {
+            setShowFeedbackQuiz(true);
+          }, 600);
+        } else {
+          // Custom/personalized care: bypass feedback quiz and calculate delta based on already updated metrics
+          if (activeProfile) {
+            const oldScore = activeProfile.healthScore;
+            const newHydration = Math.min(100, activeProfile.hydration + 10);
+            const newNutrition = Math.min(100, activeProfile.nutrition + 10);
+            const newScore = Math.round((newHydration + newNutrition + activeProfile.scalp) / 3);
+            const delta = newScore - oldScore;
+
+            setLastFeedbackDelta(delta);
+            setLastFeedbackReason("Soin personnalisé complété avec succès ! Prends soin de toi au quotidien.");
+            setTimeout(() => {
+              setShowCareSummary(true);
+            }, 600);
+          }
+        }
       } else {
         setLogs(prev => prev.filter(l => !(l.profileId === targetProfileId && l.date === targetDate && l.category === targetCategory)));
       }

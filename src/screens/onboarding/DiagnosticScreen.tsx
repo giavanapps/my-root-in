@@ -714,19 +714,27 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
       {/* Bottom Button Row */}
       <View style={styles.footer}>
         {step === 9 ? (
-          <View style={styles.softPitchFooterRow}>
-            <Button
-              title="Plus tard"
-              onPress={() => handleFinish(false)}
-              variant="secondary"
-              style={styles.softPitchBtnLeft}
-            />
-            <Button
-              title="Activer les rappels 🔔"
-              onPress={() => handleFinish(true)}
-              variant="primary"
-              style={styles.softPitchBtnRight}
-            />
+          <View style={{ flexDirection: 'column', width: '100%' }}>
+            <View style={styles.softPitchFooterRow}>
+              <Button
+                title="Plus tard"
+                onPress={() => handleFinish(false)}
+                variant="secondary"
+                style={styles.softPitchBtnLeft}
+              />
+              <Button
+                title="Activer les rappels 🔔"
+                onPress={() => handleFinish(true)}
+                variant="primary"
+                style={styles.softPitchBtnRight}
+              />
+            </View>
+            <TouchableOpacity 
+              onPress={handleBack}
+              style={{ alignSelf: 'center', marginTop: 12, padding: 8 }}
+            >
+              <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '700' }}>◀ Retour à l'étape précédente</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <>
