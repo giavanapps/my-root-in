@@ -8,18 +8,24 @@ interface QuickActionProps {
 }
 
 export const QuickAction: React.FC<QuickActionProps> = ({ onPress }) => {
-  const { activeProfile } = useAppState();
+  const { activeProfile, themeMode } = useAppState();
   
   // Animation scale value
   const scaleValue = useRef(new Animated.Value(1)).current;
 
   if (!activeProfile) return null;
 
+  const isLight = themeMode === 'light';
+  const customCard = isLight ? '#FFFFFF' : colors.card;
+  const customBorder = isLight ? 'rgba(0, 0, 0, 0.08)' : colors.cardBorder;
+  const customText = isLight ? '#1C1E26' : colors.textPrimary;
+  const customTextSec = isLight ? '#6A6F82' : colors.textSecondary;
+
   const handlePress = () => {
     // Spring scale feedback animation
     Animated.sequence([
-      Animated.timing(scaleValue, { toValue: 0.9, duration: 100, useNativeDriver: true }),
-      Animated.spring(scaleValue, { toValue: 1.1, friction: 3, tension: 40, useNativeDriver: true }),
+      Animated.timing(scaleValue, { toValue: 0.95, duration: 100, useNativeDriver: true }),
+      Animated.spring(scaleValue, { toValue: 1.02, friction: 3, tension: 40, useNativeDriver: true }),
       Animated.timing(scaleValue, { toValue: 1, duration: 150, useNativeDriver: true }),
     ]).start(() => {
       if (onPress) {
@@ -30,27 +36,23 @@ export const QuickAction: React.FC<QuickActionProps> = ({ onPress }) => {
 
   return (
     <View style={styles.container}>
-      <Animated.View style={{ transform: [{ scale: scaleValue }] }}>
+      <Animated.View style={[styles.animatedWrapper, { transform: [{ scale: scaleValue }] }]}>
         <TouchableOpacity
           activeOpacity={0.8}
           style={[
             styles.actionButton,
-            styles.activeButton,
+            { 
+              backgroundColor: customCard, 
+              borderColor: customBorder,
+              shadowColor: isLight ? 'rgba(0, 0, 0, 0.1)' : 'rgba(0, 0, 0, 0.3)'
+            }
           ]}
           onPress={handlePress}
         >
-          <View style={styles.innerContent}>
-            <Text style={styles.actionEmoji}>✍️</Text>
-            <Text style={styles.actionText}>
-              Mémo Soin
-            </Text>
-            <Text style={[
-              styles.actionSubtext,
-              { color: 'rgba(11, 13, 23, 0.7)', fontSize: 9.5, marginTop: 6, lineHeight: 14 }
-            ]}>
-              Planifier un{"\n"}soin libre 📅
-            </Text>
-          </View>
+          <Text style={[styles.actionTitle, { color: customText }]}>MÉMO SOIN</Text>
+          <Text style={[styles.actionSubtitle, { color: customTextSec }]}>
+            Planifier un soin libre 📆
+          </Text>
         </TouchableOpacity>
       </Animated.View>
     </View>
@@ -59,53 +61,34 @@ export const QuickAction: React.FC<QuickActionProps> = ({ onPress }) => {
 
 const styles = StyleSheet.create({
   container: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 24,
+    marginVertical: 16,
+    width: '100%',
+  },
+  animatedWrapper: {
+    width: '100%',
   },
   actionButton: {
-    width: 170,
-    height: 170,
-    borderRadius: 85,
+    alignSelf: 'stretch',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-    elevation: 8,
-    borderWidth: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  activeButton: {
-    backgroundColor: colors.primary,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    shadowColor: colors.primary,
-  },
-  completedButton: {
-    backgroundColor: colors.card,
-    borderColor: 'rgba(92, 138, 107, 0.4)',
-    shadowColor: colors.secondary,
-  },
-  innerContent: {
-    alignItems: 'center',
-    padding: 10,
-  },
-  actionEmoji: {
-    fontSize: 34,
+  actionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
     marginBottom: 4,
   },
-  actionText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.background, // premium contrast
-    textAlign: 'center',
-  },
-  actionSubtext: {
-    fontSize: 11,
+  actionSubtitle: {
+    fontSize: 13,
     fontWeight: '600',
-    color: 'rgba(11, 13, 23, 0.7)',
-    marginTop: 4,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
 });
