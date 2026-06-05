@@ -97,9 +97,9 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
   }, [userName, isEditing, activeProfile]);
 
   // Option Lists
-  const textureOptions: { value: HairDiagnostic['texture']; desc: string; icon: string }[] = [
+  const textureOptions: { value: HairDiagnostic['texture']; desc: string; icon: any }[] = [
     { value: 'Locksés', desc: 'Mèches emmêlées, évolution organique', icon: '👑' },
-    { value: 'Crépus', desc: 'Forme en Z ou crépuscule compact, rétraction forte', icon: '🦁' },
+    { value: 'Crépus', desc: 'Forme en Z ou crépuscule compact, rétraction forte', icon: require('../../../assets/afrocomb.png') },
     { value: 'Frisés', desc: 'Ressorts serrés, volume marqué', icon: '➰' },
     { value: 'Bouclés', desc: 'Boucles spirales bien définies', icon: '🌀' },
     { value: 'Ondulés', desc: 'Forme en S détendue, légères vagues', icon: '〰️' },
@@ -343,7 +343,11 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
                 ]}
                 onPress={() => setTexture(option.value)}
               >
-                <Text style={styles.optionIcon}>{option.icon}</Text>
+                {typeof option.icon === 'string' ? (
+                  <Text style={styles.optionIcon}>{option.icon}</Text>
+                ) : (
+                  <Image source={option.icon} style={styles.optionIconImage} resizeMode="contain" />
+                )}
                 <View style={styles.optionTextWrapper}>
                   <Text style={[styles.optionTitle, texture === option.value && styles.selectedOptionTitle]}>
                     {option.value}
@@ -871,6 +875,11 @@ const styles = StyleSheet.create({
   },
   optionIcon: {
     fontSize: 24,
+    marginRight: 16,
+  },
+  optionIconImage: {
+    width: 28,
+    height: 28,
     marginRight: 16,
   },
   optionTextWrapper: {
