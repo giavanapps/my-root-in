@@ -3,6 +3,8 @@ import { StyleSheet, View, Text, ScrollView, TouchableOpacity, TextInput, Switch
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, borderRadius } from '../../theme/colors';
 import { useAppState, Profile } from '../../store/AppStateContext';
+import { db } from '../../store/firebase';
+import { collection, addDoc } from 'firebase/firestore';
 import { NotificationService } from '../../store/NotificationService';
 import * as Notifications from 'expo-notifications';
 import { Button } from '../../components/common/Button';
@@ -58,6 +60,83 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
   // Native permissions state checkup
   const [permissionStatus, setPermissionStatus] = useState<'granted' | 'denied' | 'undetermined'>('granted');
   const [showTimePicker, setShowTimePicker] = useState(false);
+
+  // Beta Feedback States
+  const [q1, setQ1] = useState<number | null>(null);
+  const [q2, setQ2] = useState<'Oui' | 'Non' | 'Pas totalement' | null>(null);
+  const [q2Text, setQ2Text] = useState('');
+  const [q3, setQ3] = useState<'Oui' | 'Non' | null>(null);
+  const [q4, setQ4] = useState<'Oui, souvent' | 'Oui, une ou deux fois' | 'Non' | null>(null);
+  const [q5, setQ5] = useState<'Très rapide' | 'Moyen' | 'Lent' | 'Ça a bugué' | null>(null);
+  const [q6, setQ6] = useState<number | null>(null);
+  const [q6Text, setQ6Text] = useState('');
+  const [q7, setQ7] = useState<number | null>(null);
+  const [q8, setQ8] = useState('');
+  const [q9, setQ9] = useState('');
+  const [q10, setQ10] = useState('');
+  const [q11, setQ11] = useState<'2,99€' | '4,99€' | '7,99€' | 'Je ne paierais pas' | null>(null);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+
+  const handleSubmitFeedback = async () => {
+    if (!activeProfile) return;
+    if (q1 === null || q2 === null || q3 === null || q4 === null || q5 === null || q6 === null || q7 === null || q11 === null) {
+      if (Platform.OS === 'web') {
+        window.alert("Veuillez répondre à toutes les questions à choix multiples avant d'envoyer.");
+      } else {
+        Alert.alert("Formulaire incomplet", "Veuillez répondre à toutes les questions à choix multiples avant d'envoyer.");
+      }
+      return;
+    }
+
+    setIsSubmittingFeedback(true);
+    try {
+      await addDoc(collection(db, 'beta_feedbacks'), {
+        profileId: activeProfile.id,
+        profileName: activeProfile.name,
+        submittedAt: new Date().toISOString(),
+        answers: {
+          q1,
+          q2,
+          q2Text,
+          q3,
+          q4,
+          q5,
+          q6,
+          q6Text,
+          q7,
+          q8,
+          q9,
+          q10,
+          q11,
+        }
+      });
+      setFeedbackSuccess(true);
+      // Reset form
+      setQ1(null);
+      setQ2(null);
+      setQ2Text('');
+      setQ3(null);
+      setQ4(null);
+      setQ5(null);
+      setQ6(null);
+      setQ6Text('');
+      setQ7(null);
+      setQ8('');
+      setQ9('');
+      setQ10('');
+      setQ11(null);
+    } catch (err) {
+      console.error('Error submitting feedback:', err);
+      if (Platform.OS === 'web') {
+        window.alert("Une erreur est survenue lors de l'envoi de ton avis. Réessaie.");
+      } else {
+        Alert.alert("Erreur", "Une erreur est survenue lors de l'envoi de ton avis. Réessaie.");
+      }
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
+  };
 
   const checkNotifPermission = async () => {
     const status = await NotificationService.checkPermissions();
@@ -584,6 +663,285 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
               <Text style={styles.panelDesc}>
                 Basculez entre le Mode Sombre pour reposer vos yeux ou le Mode Clair.
               </Text>
+            </View>
+          )}
+        </View>
+
+        {/* 6. AVIS SUR LA BÊTA */}
+        <View style={[styles.accordionItem, { backgroundColor: customCard, borderColor: customBorder }]}>
+          <TouchableOpacity style={styles.accordionHeader} onPress={() => togglePanel('feedback')}>
+            <Text style={[styles.accordionTitle, { color: customText }]}>💬 Donner mon avis sur la Bêta</Text>
+            <Text style={styles.accordionArrow}>{activePanel === 'feedback' ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+          
+          {activePanel === 'feedback' && (
+            <View style={styles.panelContent}>
+              {feedbackSuccess ? (
+                <View style={styles.feedbackSuccessContainer}>
+                  <Text style={styles.successEmoji}>🎉</Text>
+                  <Text style={[styles.successTitle, { color: customText }]}>Avis envoyé !</Text>
+                  <Text style={[styles.successSubtitle, { color: customTextSec }]}>
+                    Merci infiniment d'avoir partagé ton expérience. Tes réponses nous aident à façonneer le futur de My Root'In ! 🌿
+                  </Text>
+                  <Button
+                    title="Remplir à nouveau"
+                    onPress={() => setFeedbackSuccess(false)}
+                    variant="outline"
+                    style={{ marginTop: 12 }}
+                  />
+                </View>
+              ) : (
+                <View style={{ gap: 16 }}>
+                  <Text style={styles.panelDesc}>
+                    Aide-nous à perfectionner My Root'In en répondant à ce questionnaire rapide (11 questions). Tes retours sont précieux !
+                  </Text>
+
+                  {/* PART 1 */}
+                  <View style={styles.feedbackSection}>
+                    <Text style={styles.feedbackSectionTitle}>Partie 1 : Le Diagnostic et la Personnalisation</Text>
+                    
+                    <View style={styles.feedbackQuestionBlock}>
+                      <Text style={[styles.feedbackQuestionText, { color: customText }]}>
+                        Q1 : Lors de votre inscription, avez-vous trouvé les étapes du diagnostic claires et faciles à remplir ?
+                      </Text>
+                      <View style={styles.ratingRow}>
+                        {[1, 2, 3, 4, 5].map(val => (
+                          <TouchableOpacity
+                            key={val}
+                            style={[styles.ratingPill, q1 === val && styles.ratingPillActive]}
+                            onPress={() => setQ1(val)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[styles.ratingPillText, q1 === val && styles.ratingPillTextActive]}>{val}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+
+                    <View style={styles.feedbackQuestionBlock}>
+                      <Text style={[styles.feedbackQuestionText, { color: customText }]}>
+                        Q2 : Les options proposées (types de boucles, locks, porosité) vous ont-elles permis de cibler exactement votre nature de cheveux ?
+                      </Text>
+                      <View style={styles.pillOptionsRow}>
+                        {(['Oui', 'Non', 'Pas totalement'] as const).map(val => (
+                          <TouchableOpacity
+                            key={val}
+                            style={[styles.choicePill, q2 === val && styles.choicePillActive]}
+                            onPress={() => setQ2(val)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[styles.choicePillText, q2 === val && styles.choicePillTextActive]}>{val}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      <TextInput
+                        style={[styles.feedbackTextInput, { color: customText, borderColor: customBorder, backgroundColor: customInputBg }]}
+                        placeholder="Précise ta pensée si tu le souhaites..."
+                        placeholderTextColor={colors.textMuted}
+                        value={q2Text}
+                        onChangeText={setQ2Text}
+                        multiline={true}
+                      />
+                    </View>
+
+                    <View style={styles.feedbackQuestionBlock}>
+                      <Text style={[styles.feedbackQuestionText, { color: customText }]}>
+                        Q3 : Trouveriez-vous utile de pouvoir ajouter des photos de vos cheveux directement dans votre profil pour suivre votre évolution ?
+                      </Text>
+                      <View style={styles.pillOptionsRow}>
+                        {(['Oui', 'Non'] as const).map(val => (
+                          <TouchableOpacity
+                            key={val}
+                            style={[styles.choicePill, q3 === val && styles.choicePillActive]}
+                            onPress={() => setQ3(val)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[styles.choicePillText, q3 === val && styles.choicePillTextActive]}>{val}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* PART 2 */}
+                  <View style={styles.feedbackSection}>
+                    <Text style={styles.feedbackSectionTitle}>Partie 2 : Le Scanner d'ingrédients</Text>
+
+                    <View style={styles.feedbackQuestionBlock}>
+                      <Text style={[styles.feedbackQuestionText, { color: customText }]}>
+                        Q4 : Avez-vous utilisé le scanner d'ingrédients sur vos produits de salle de bain ou en magasin ?
+                      </Text>
+                      <View style={styles.pillOptionsColumn}>
+                        {([
+                          'Oui, souvent',
+                          'Oui, une ou deux fois',
+                          'Non'
+                        ] as const).map(val => (
+                          <TouchableOpacity
+                            key={val}
+                            style={[styles.choicePillLong, q4 === val && styles.choicePillLongActive]}
+                            onPress={() => setQ4(val)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[styles.choicePillText, q4 === val && styles.choicePillTextActive]}>{val}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+
+                    <View style={styles.feedbackQuestionBlock}>
+                      <Text style={[styles.feedbackQuestionText, { color: customText }]}>
+                        Q5 : Le scanner a-t-il été rapide à analyser le produit et à afficher le résultat ?
+                      </Text>
+                      <View style={styles.pillOptionsColumn}>
+                        {([
+                          'Très rapide',
+                          'Moyen',
+                          'Lent',
+                          'Ça a bugué'
+                        ] as const).map(val => (
+                          <TouchableOpacity
+                            key={val}
+                            style={[styles.choicePillLong, q5 === val && styles.choicePillLongActive]}
+                            onPress={() => setQ5(val)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[styles.choicePillText, q5 === val && styles.choicePillTextActive]}>{val}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+
+                    <View style={styles.feedbackQuestionBlock}>
+                      <Text style={[styles.feedbackQuestionText, { color: customText }]}>
+                        Q6 : Les explications du scanner sur les ingrédients (bons ou mauvais pour votre type de cheveu) étaient-elles faciles à comprendre ?
+                      </Text>
+                      <View style={styles.ratingRow}>
+                        {[1, 2, 3, 4, 5].map(val => (
+                          <TouchableOpacity
+                            key={val}
+                            style={[styles.ratingPill, q6 === val && styles.ratingPillActive]}
+                            onPress={() => setQ6(val)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[styles.ratingPillText, q6 === val && styles.ratingPillTextActive]}>{val}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      <TextInput
+                        style={[styles.feedbackTextInput, { color: customText, borderColor: customBorder, backgroundColor: customInputBg }]}
+                        placeholder="Une suggestion ou une explication manquante ?"
+                        placeholderTextColor={colors.textMuted}
+                        value={q6Text}
+                        onChangeText={setQ6Text}
+                        multiline={true}
+                      />
+                    </View>
+                  </View>
+
+                  {/* PART 3 */}
+                  <View style={styles.feedbackSection}>
+                    <Text style={styles.feedbackSectionTitle}>Partie 3 : L'Agenda et les Conseils de Routine</Text>
+
+                    <View style={styles.feedbackQuestionBlock}>
+                      <Text style={[styles.feedbackQuestionText, { color: customText }]}>
+                        Q7 : Les rappels et notifications de l'application vous ont-ils aidée à être plus régulière dans vos soins ?
+                      </Text>
+                      <View style={styles.ratingRow}>
+                        {[1, 2, 3, 4, 5].map(val => (
+                          <TouchableOpacity
+                            key={val}
+                            style={[styles.ratingPill, q7 === val && styles.ratingPillActive]}
+                            onPress={() => setQ7(val)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[styles.ratingPillText, q7 === val && styles.ratingPillTextActive]}>{val}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+
+                    <View style={styles.feedbackQuestionBlock}>
+                      <Text style={[styles.feedbackQuestionText, { color: customText }]}>
+                        Q8 : Que pensez-vous de la clarté des conseils donnés pour chaque étape de votre routine (shampoing, masque, soin sans rinçage, etc.) ?
+                      </Text>
+                      <TextInput
+                        style={[styles.feedbackTextInputLarge, { color: customText, borderColor: customBorder, backgroundColor: customInputBg }]}
+                        placeholder="Trop long ? Pas assez précis ? Dis-nous tout..."
+                        placeholderTextColor={colors.textMuted}
+                        value={q8}
+                        onChangeText={setQ8}
+                        multiline={true}
+                      />
+                    </View>
+
+                    <View style={styles.feedbackQuestionBlock}>
+                      <Text style={[styles.feedbackQuestionText, { color: customText }]}>
+                        Q9 : Quelle fonctionnalité ou quel conseil vous a le plus manqué durant ce test ?
+                      </Text>
+                      <TextInput
+                        style={[styles.feedbackTextInputLarge, { color: customText, borderColor: customBorder, backgroundColor: customInputBg }]}
+                        placeholder="Qu'aimerais-tu ajouter dans l'application ?"
+                        placeholderTextColor={colors.textMuted}
+                        value={q9}
+                        onChangeText={setQ9}
+                        multiline={true}
+                      />
+                    </View>
+                  </View>
+
+                  {/* PART 4 */}
+                  <View style={styles.feedbackSection}>
+                    <Text style={styles.feedbackSectionTitle}>Partie 4 : Avis global et Prix</Text>
+
+                    <View style={styles.feedbackQuestionBlock}>
+                      <Text style={[styles.feedbackQuestionText, { color: customText }]}>
+                        Q10 : Quelle est la fonctionnalité que vous avez préférée dans My Root'In ?
+                      </Text>
+                      <TextInput
+                        style={[styles.feedbackTextInputLarge, { color: customText, borderColor: customBorder, backgroundColor: customInputBg }]}
+                        placeholder="Le scanner ? Le calendrier ? Le Closet virtuel ?..."
+                        placeholderTextColor={colors.textMuted}
+                        value={q10}
+                        onChangeText={setQ10}
+                        multiline={true}
+                      />
+                    </View>
+
+                    <View style={styles.feedbackQuestionBlock}>
+                      <Text style={[styles.feedbackQuestionText, { color: customText }]}>
+                        Q11 : Si l'application devenait payante avec le scanner complet et un suivi de routine ultra-personnalisé, quel prix par mois vous semblerait juste ?
+                      </Text>
+                      <View style={styles.pillOptionsColumn}>
+                        {([
+                          '2,99€',
+                          '4,99€',
+                          '7,99€',
+                          'Je ne paierais pas'
+                        ] as const).map(val => (
+                          <TouchableOpacity
+                            key={val}
+                            style={[styles.choicePillLong, q11 === val && styles.choicePillLongActive]}
+                            onPress={() => setQ11(val)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[styles.choicePillText, q11 === val && styles.choicePillTextActive]}>{val}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Submit Button */}
+                  <Button
+                    title={isSubmittingFeedback ? "Envoi en cours..." : "📤 Envoyer mon avis sur la Bêta"}
+                    onPress={handleSubmitFeedback}
+                    disabled={isSubmittingFeedback}
+                    variant="primary"
+                    style={{ marginTop: 8 }}
+                  />
+                </View>
+              )}
             </View>
           )}
         </View>
@@ -1175,5 +1533,139 @@ const styles = StyleSheet.create({
     color: colors.danger,
     fontSize: 11,
     fontWeight: '700',
+  },
+  // Feedback panel styles
+  feedbackSuccessContainer: {
+    alignItems: 'center',
+    padding: 24,
+    gap: 12,
+  },
+  successEmoji: {
+    fontSize: 48,
+  },
+  successTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  successSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  feedbackSection: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+    paddingBottom: 16,
+    marginBottom: 8,
+    gap: 12,
+  },
+  feedbackSectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  feedbackQuestionBlock: {
+    gap: 8,
+    marginBottom: 12,
+  },
+  feedbackQuestionText: {
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 4,
+  },
+  ratingPill: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  ratingPillActive: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(229, 169, 130, 0.1)',
+  },
+  ratingPillText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  ratingPillTextActive: {
+    color: colors.primary,
+  },
+  pillOptionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 4,
+  },
+  choicePill: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  choicePillActive: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(229, 169, 130, 0.1)',
+  },
+  choicePillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  choicePillTextActive: {
+    color: colors.primary,
+  },
+  pillOptionsColumn: {
+    gap: 8,
+    marginVertical: 4,
+  },
+  choicePillLong: {
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'flex-start',
+  },
+  choicePillLongActive: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(229, 169, 130, 0.1)',
+  },
+  feedbackTextInput: {
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 12,
+    height: 60,
+    textAlignVertical: 'top',
+    marginTop: 4,
+  },
+  feedbackTextInputLarge: {
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 12,
+    height: 80,
+    textAlignVertical: 'top',
+    marginTop: 4,
   },
 });
