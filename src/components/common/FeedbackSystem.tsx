@@ -42,7 +42,7 @@ export const FeedbackSystem: React.FC = () => {
       >
         <View style={[styles.modalOverlay, { backgroundColor: overlayBg }]}>
           <View style={[styles.feedbackCard, { backgroundColor: customCard, borderColor: customBorder }]}>
-            <Text style={styles.feedbackEmoji}>Feedback 📝</Text>
+            <Text style={[styles.feedbackEmoji, { color: customText }]}>Feedback 📝</Text>
             <Text style={[styles.feedbackTitle, { color: customText }]}>Comment se sentent tes cheveux après ce soin ?</Text>
             <Text style={[styles.feedbackSubtitle, { color: customTextSec }]}>
               Ta réponse permet d'ajuster intelligemment tes prochains soins et ta jauge de santé globale.

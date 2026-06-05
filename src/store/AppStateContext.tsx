@@ -180,6 +180,24 @@ const uuid = () => {
   return `${Date.now().toString(36)}-${uuidCounter}-${Math.random().toString(36).substring(2, 9)}`;
 };
 
+const isAppRoutineCategory = (cat: string) => {
+  const normalized = cat.toLowerCase().trim();
+  return (
+    normalized.includes('lavage') ||
+    normalized.includes('masque') ||
+    normalized.includes('clarification') ||
+    normalized.includes('bain d\'huile') ||
+    normalized.includes('bain d’huile') ||
+    normalized.includes('rinçage') ||
+    normalized.includes('rincage') ||
+    normalized.includes('retwist') ||
+    normalized.includes('coupe') ||
+    normalized.includes('dusting') ||
+    normalized.includes('porosité') ||
+    normalized.includes('porosite')
+  );
+};
+
 const getHairCareColumn = (diagnostic: HairDiagnostic): 'naturel' | 'chimique' | 'locks' | 'crepus' | 'raides' => {
   if (diagnostic.texture === 'Locksés') {
     return 'locks';
@@ -645,7 +663,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setLastLoggedCategory(category);
     setLastValidatedCare({ category, date: todayStr });
 
-    const isCustom = targetItem?.isCustom || category === 'Soin personnalisé' || targetItem?.recurrence === 'Unique';
+    const isCustom = !targetItem || targetItem.isCustom || targetItem.recurrence === 'Unique' || !isAppRoutineCategory(category) || category === 'Soin personnalisé';
 
     if (!isCustom) {
       setTimeout(() => {
@@ -931,7 +949,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         };
         setLogs(prev => [...prev, newLog]);
 
-        const isCustom = targetItem?.isCustom || targetCategory === 'Soin personnalisé' || targetItem?.recurrence === 'Unique';
+        const isCustom = !targetItem || targetItem.isCustom || targetItem.recurrence === 'Unique' || !isAppRoutineCategory(targetCategory) || targetCategory === 'Soin personnalisé';
 
         // Open feedback popup for any completed care item!
         setLastLoggedCategory(targetCategory);
