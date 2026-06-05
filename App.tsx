@@ -23,7 +23,7 @@ function MainApp() {
   const [autoOpenCalendarModal, setAutoOpenCalendarModal] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
 
-  const { themeMode, activeProfile, profiles, isLoading, masterEmail, isPremium } = useAppState();
+  const { themeMode, activeProfile, profiles, isLoading, masterEmail, isPremium, logout: logoutSession } = useAppState();
 
   // Automatically handle routing after login / fetch completes
   useEffect(() => {
@@ -56,7 +56,9 @@ function MainApp() {
   };
 
   const logout = () => {
-    setCurrentScreen('auth');
+    logoutSession(() => {
+      setCurrentScreen('auth');
+    });
   };
 
   const isLight = themeMode === 'light';

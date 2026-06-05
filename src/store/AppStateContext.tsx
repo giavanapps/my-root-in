@@ -164,6 +164,7 @@ interface AppStateContextType {
   toggleThemeMode: () => void;
   updateMasterAccount: (email: string, pass: string) => void;
   deleteMasterAccount: (onComplete: () => void) => void;
+  logout: (onComplete: () => void) => void;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -1243,6 +1244,26 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     onComplete(); // callback to redirect to auth screen
   };
 
+  const logout = async (onComplete: () => void) => {
+    try {
+      await AsyncStorage.removeItem('masterEmail');
+      await AsyncStorage.removeItem('masterPassword');
+    } catch (e) {
+      console.error("Error removing credentials from AsyncStorage:", e);
+    }
+    // Reset state completely
+    setMasterEmail('');
+    setMasterPassword('');
+    setIsLoading(false);
+    setProfiles([]);
+    setActiveProfileId('');
+    setRoutine([]);
+    setLogs([]);
+    setIsPremium(false);
+    setScanHistory([]);
+    onComplete(); // callback to redirect to auth screen
+  };
+
   const deleteRoutineItem = (id: string) => {
     setRoutine(prev => prev.filter(item => item.id !== id));
   };
@@ -1296,7 +1317,8 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       updateNotificationsSetting,
       toggleThemeMode,
       updateMasterAccount,
-      deleteMasterAccount
+      deleteMasterAccount,
+      logout
     }}>
       {children}
     </AppStateContext.Provider>
