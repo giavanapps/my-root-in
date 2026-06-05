@@ -28,23 +28,23 @@ export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visibl
   const benefits = [
     {
       icon: '🔬',
-      title: 'Analyse INCI & Diagnostic IA',
-      desc: 'Analyse moléculaire de la formule INCI et diagnostic complet (Pour/Contre) adapté à tes cuticules.',
-    },
-    {
-      icon: '📅',
-      title: 'Ajouter à ma Salle de Bain',
-      desc: 'Range tes flacons dans ta Salle de Bain virtuelle et laisse l\'IA planifier automatiquement tes prochains soins dans ton calendrier.',
-    },
-    {
-      icon: '🧐',
-      title: 'Comparateur Anti-Gaspillage',
-      desc: 'Scan en rayon pour détecter instantanément si tu possèdes déjà un produit équivalent à la maison.',
+      title: 'Analyse Totale & Profil Capillaire',
+      desc: 'Analyse moléculaire complète de la formule INCI et diagnostic personnalisé de compatibilité avec tes cuticules.',
     },
     {
       icon: '🌿',
-      title: 'Alternative Naturelle DIY (Dupe Végétal)',
-      desc: 'Conçois des recettes végétales saines (plantes, poudres, huiles) sur-mesure pour ton type de cheveu.',
+      title: 'Dupe Végétal DIY',
+      desc: 'Conçois une alternative saine, 100% naturelle et économique sous forme de recette maison sur-mesure pour ton type de cheveu.',
+    },
+    {
+      icon: '➕',
+      title: 'Ajouter à ma Salle de Bain',
+      desc: 'Enregistre ton produit dans ton placard virtuel pour que l\'IA intelligente l\'associe automatiquement à tes futurs soins du calendrier.',
+    },
+    {
+      icon: '🧐',
+      title: 'Est-ce que j\'ai un équivalent chez moi ?',
+      desc: 'Flashe un produit en magasin pour comparer sa formule et détecter instantanément si tu as déjà un doublon identique à la maison.',
     },
   ];
 
