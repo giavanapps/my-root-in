@@ -46,7 +46,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
 
   // Local state for diagnostic steps
   const [step, setStep] = useState(1);
-  const totalSteps = isEditing ? 8 : 10; // Name, Avatar, Texture, Porosity, Thickness, Sensitivity, Style, Scalp Condition, History, Notifications (Soft Pitch)
+  const totalSteps = isEditing ? 7 : 9; // Name, Avatar, Texture, Porosity, Thickness, Sensitivity, Scalp Condition, History, Notifications (Soft Pitch)
   const [notifTone, setNotifTone] = useState<'Doux' | 'Motivant' | 'Direct'>('Motivant');
 
   // Hair care history states
@@ -187,7 +187,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
       return;
     }
 
-    if (step === 8) {
+    if (step === 7) {
       if (scalpCondition !== "Aucune de ces situations") {
         setShowMedicalWarning(true);
         return;
@@ -485,36 +485,8 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
           </View>
         )}
 
-        {/* Step 7: Active Style */}
+        {/* Step 7: Condition du cuir chevelu */}
         {step === 7 && (
-          <View style={styles.stepCard}>
-            <Text style={styles.title}>Quel est votre style ou coiffure active en ce moment ? 💇🏾</Text>
-            <Text style={styles.subtitle}>Nous adapterons les rappels d'hydratation et de manipulation en fonction de cela.</Text>
-            
-            {activeStyleOptions.map(option => (
-              <TouchableOpacity
-                key={option.value}
-                activeOpacity={0.8}
-                style={[
-                  styles.optionCard,
-                  activeStyle === option.value && styles.selectedOptionCard,
-                ]}
-                onPress={() => setActiveStyle(option.value)}
-              >
-                <Text style={styles.optionIcon}>{option.icon}</Text>
-                <View style={styles.optionTextWrapper}>
-                  <Text style={[styles.optionTitle, activeStyle === option.value && styles.selectedOptionTitle]}>
-                    {option.value}
-                  </Text>
-                  <Text style={styles.optionDesc}>{option.desc}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* Step 8: Condition du cuir chevelu */}
-        {step === 8 && (
           <View style={styles.stepCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
               <Text style={styles.welcomeText}>Profil : {profileName} </Text>
@@ -555,8 +527,8 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
           </View>
         )}
 
-        {/* Step 9: Hair History Questionnaire */}
-        {step === 9 && (
+        {/* Step 8: Hair History Questionnaire */}
+        {step === 8 && (
           <View style={styles.stepCard}>
             <Text style={styles.welcomeText}>Historique de soins 🌿</Text>
             <Text style={styles.title}>Dis-nous où tu en es</Text>
@@ -671,8 +643,8 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
           </View>
         )}
 
-        {/* Step 10: Onboarding Soft Pitch Notification Permission */}
-        {step === 10 && (
+        {/* Step 9: Onboarding Soft Pitch Notification Permission */}
+        {step === 9 && (
           <View style={styles.stepCard}>
             <Text style={styles.welcomeText}>Dernière étape ! 🔔</Text>
             <Text style={styles.title}>Ne manquez aucun soin de votre routine</Text>
@@ -741,7 +713,7 @@ export const DiagnosticScreen: React.FC<DiagnosticScreenProps> = ({ userName, on
 
       {/* Bottom Button Row */}
       <View style={styles.footer}>
-        {step === 10 ? (
+        {step === 9 ? (
           <View style={styles.softPitchFooterRow}>
             <Button
               title="Plus tard"

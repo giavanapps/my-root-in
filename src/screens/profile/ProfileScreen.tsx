@@ -287,7 +287,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
           <View style={styles.badgeContainer}>
             <View style={styles.badge}><Text style={styles.badgeText}>Texture: {activeProfile.diagnostic.texture}</Text></View>
             <View style={[styles.badge, { backgroundColor: 'rgba(92, 133, 138, 0.1)' }]}><Text style={[styles.badgeText, { color: colors.porosityLow }]}>Porosité: {activeProfile.diagnostic.porosity ?? 'Non définie'}</Text></View>
-            <View style={[styles.badge, { backgroundColor: 'rgba(92, 138, 107, 0.1)' }]}><Text style={[styles.badgeText, { color: colors.secondary }]}>Style: {activeProfile.diagnostic.activeStyle}</Text></View>
             {activeProfile.diagnostic.scalpCondition && 
              activeProfile.diagnostic.scalpCondition !== 'Aucune' && 
              activeProfile.diagnostic.scalpCondition !== 'Aucune de ces situations' && (
@@ -299,9 +298,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
             )}
           </View>
 
-          {/* Changer de coiffure / Style bouton majeur */}
+          {/* Refaire diagnostic capillaire bouton majeur */}
           <Button
-            title="🔄 Faire évoluer mon style / Changer de coiffure"
+            title="🔄 Mettre à jour mon diagnostic capillaire"
             onPress={onRefireDiagnostic}
             variant="primary"
             style={styles.evolveBtn}
