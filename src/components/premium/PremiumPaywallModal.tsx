@@ -398,21 +398,7 @@ const styles = StyleSheet.create({
     color: colors.secondary,
     fontWeight: '600',
   },
-  sosSuccessIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.md,
-    backgroundColor: 'rgba(92, 138, 107, 0.1)',
-    borderRadius: borderRadius.sm,
-    borderColor: '#5C8A6B',
-    borderWidth: 1,
-  },
-  sosSuccessText: {
-    color: '#5C8A6B',
-    fontWeight: 'bold',
-    fontSize: 13,
-  },
+
   previewButton: {
     backgroundColor: colors.primary,
     padding: spacing.md,

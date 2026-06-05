@@ -1766,15 +1766,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     onPress={() => setActiveFeatureTab('inci')}
                   >
                     <Text style={[styles.tabBarButtonText, activeFeatureTab === 'inci' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
-                      🔬 Analyse
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.tabBarButton, activeFeatureTab === 'diy' && styles.tabBarButtonActive]}
-                    onPress={() => setActiveFeatureTab('diy')}
-                  >
-                    <Text style={[styles.tabBarButtonText, activeFeatureTab === 'diy' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
-                      🌿 Dupe DIY
+                      🔬 Analyse INCI
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -1782,7 +1774,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     onPress={() => setActiveFeatureTab('add')}
                   >
                     <Text style={[styles.tabBarButtonText, activeFeatureTab === 'add' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
-                      ➕ Ranger
+                      📅 Salle de Bain
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -1790,7 +1782,15 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     onPress={() => setActiveFeatureTab('compare')}
                   >
                     <Text style={[styles.tabBarButtonText, activeFeatureTab === 'compare' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
-                      🧐 Comparer
+                      🧐 Comparateur
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.tabBarButton, activeFeatureTab === 'diy' && styles.tabBarButtonActive]}
+                    onPress={() => setActiveFeatureTab('diy')}
+                  >
+                    <Text style={[styles.tabBarButtonText, activeFeatureTab === 'diy' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
+                      🌿 Dupe Végétal
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -1866,7 +1866,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                   </View>
                 )}
 
-                {/* Tab 2: Ranger (Ajouter à ma Salle de Bain) */}
+                {/* Tab 2: Ajouter à ma Salle de Bain */}
                 {activeFeatureTab === 'add' && (() => {
                   const category = detectCategory(displayName, displayBrand);
                   const isAlreadyInBathroom = bathroomProducts.some(
@@ -1917,7 +1917,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                             });
                           }}
                         >
-                          <Text style={styles.premiumActionButtonText}>➕ Ranger dans ma Salle de Bain</Text>
+                          <Text style={styles.premiumActionButtonText}>📅 Ajouter à ma Salle de Bain</Text>
                         </TouchableOpacity>
                       )}
 

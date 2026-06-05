@@ -110,7 +110,7 @@ export const CircularGauge: React.FC<CircularGaugeProps> = ({
             {Math.round(percentage)}%
           </Text>
           <Text style={[styles.statusText, { color: currentColors.start }]}>
-            {percentage < 40 ? 'SOS Alerte' : percentage < 70 ? 'À hydrater' : 'Équilibré'}
+            {percentage < 40 ? 'Critique' : percentage < 70 ? 'À hydrater' : 'Équilibré'}
           </Text>
         </View>
       </View>

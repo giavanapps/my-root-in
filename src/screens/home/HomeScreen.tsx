@@ -676,7 +676,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
     showFeedbackQuiz,
     submitFeedback,
     closeFeedbackQuiz,
-    triggerSosBooster,
     completePorosity,
     themeMode,
     lastValidatedCare,
@@ -715,7 +714,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
   };
 
   const [showHealthDetail, setShowHealthDetail] = useState(false);
-  const [sosSuccessMessage, setSosSuccessMessage] = useState('');
   const [showPorosityModal, setShowPorosityModal] = useState(false);
   const [showCareGuide, setShowCareGuide] = useState(false);
   const [showAllAdvice, setShowAllAdvice] = useState(false);
@@ -731,7 +729,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
   const [showPaywall, setShowPaywall] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [showPremiumHealthModal, setShowPremiumHealthModal] = useState(false);
-  const [showSosSuccessModal, setShowSosSuccessModal] = useState(false);
   const [showGuideShoppingList, setShowGuideShoppingList] = useState(false);
 
   // Local states for Smart Shift and Overdue Cares Modals
@@ -802,12 +799,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
       </View>
     );
   }
-
-  const handleSosPress = () => {
-    triggerSosBooster();
-    setShowHealthDetail(false);
-    setShowSosSuccessModal(true);
-  };
 
   const customBg = isLight ? '#F5F6FA' : colors.background;
 
@@ -1794,77 +1785,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
               </Text>
             </TouchableOpacity>
 
-            {/* Success SOS alert feedback */}
-            {sosSuccessMessage ? (
-              <View style={styles.sosAlertBox}>
-                <Text style={styles.sosAlertText}>{sosSuccessMessage}</Text>
-              </View>
-            ) : null}
 
-            {/* SOS Booster Section (Premium & Non-Premium states) */}
-            {isPremium ? (
-              <View style={styles.sosSection}>
-                {activeProfile.healthScore < 40 && (
-                  <View style={styles.sosWarningBox}>
-                    <Text style={styles.sosWarningText}>
-                      ⚠️ Note inférieure à 40% ! Vos cheveux ont besoin d'aide immédiate.
-                    </Text>
-                  </View>
-                )}
-                <Button
-                  title="🆘 Déclencher le SOS Booster 14J"
-                  onPress={handleSosPress}
-                  variant={activeProfile.healthScore < 40 ? "danger" : "primary"}
-                  style={styles.sosButton}
-                />
-              </View>
-            ) : (
-              <View style={styles.sosSection}>
-                {activeProfile.healthScore < 40 ? (
-                  <View style={styles.sosSection}>
-                    <View style={styles.sosWarningBox}>
-                      <Text style={styles.sosWarningText}>
-                        ⚠️ Note inférieure à 40% ! Vos cheveux ont besoin d'aide immédiate.
-                      </Text>
-                    </View>
-                    <Button
-                      title="🔒 Débloquer SOS Booster 14J (Premium)"
-                      onPress={() => {
-                        setShowHealthDetail(false);
-                        setShowPaywall(true);
-                      }}
-                      variant="danger"
-                      style={styles.sosButton}
-                    />
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: 'rgba(230, 198, 135, 0.04)',
-                      borderColor: 'rgba(230, 198, 135, 0.25)',
-                      borderWidth: 1,
-                      borderRadius: 14,
-                      padding: 12,
-                      alignItems: 'center',
-                      marginBottom: 16,
-                      width: '100%'
-                    }}
-                    activeOpacity={0.8}
-                    onPress={() => {
-                      setShowHealthDetail(false);
-                      setShowPaywall(true);
-                    }}
-                  >
-                    <Text style={{ color: colors.accent, fontWeight: '800', fontSize: 12 }}>
-                      🔒 Activer le SOS Booster 14J (Premium)
-                    </Text>
-                    <Text style={{ color: customTextSec, fontSize: 10, marginTop: 2, textAlign: 'center' }}>
-                      Planifie à tout moment des protocoles intensifs de secours capillaire.
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
 
             <Button
               title="Fermer le bilan"
@@ -2580,70 +2501,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
         </View>
       </Modal>
 
-      {/* 🆘 SOS Booster Confirmation Modal */}
-      <Modal
-        visible={showSosSuccessModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowSosSuccessModal(false)}
-      >
-        <View style={[styles.modalOverlay, { backgroundColor: 'rgba(11, 13, 23, 0.85)' }]}>
-          <View style={[styles.detailCard, { backgroundColor: customCard, borderColor: colors.danger, borderWidth: 1.5, maxWidth: 440 }]}>
-            <View style={{ alignItems: 'center', marginBottom: 12 }}>
-              <Text style={{ fontSize: 42, marginBottom: 8 }}>🆘</Text>
-              <Text style={{ fontSize: 18, fontWeight: '900', color: colors.danger, textAlign: 'center' }}>
-                SOS Booster 14J Déclenché !
-              </Text>
-              <Text style={{ fontSize: 11, color: customTextSec, textAlign: 'center', marginTop: 4 }}>
-                Le protocole de soins intensifs a été planifié avec succès dans ton calendrier.
-              </Text>
-            </View>
 
-            {/* Protocol Day by Day Preview List */}
-            <View style={{
-              backgroundColor: isLight ? '#FFF5F5' : 'rgba(217, 83, 79, 0.05)',
-              borderColor: 'rgba(217, 83, 79, 0.15)',
-              borderWidth: 1,
-              borderRadius: 16,
-              padding: 14,
-              marginBottom: 16,
-              gap: 8
-            }}>
-              <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.danger, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>
-                📋 Aperçu du Protocole Intensif :
-              </Text>
-              <View style={{ gap: 6 }}>
-                <Text style={{ fontSize: 11, color: customText }}><Text style={{ fontWeight: 'bold', color: colors.danger }}>• J+1 :</Text> Clarification Détox Bentonite 🔬</Text>
-                <Text style={{ fontSize: 11, color: customText }}><Text style={{ fontWeight: 'bold', color: colors.danger }}>• J+3 :</Text> Lavage Co-Wash + Masque Miel 🍯</Text>
-                <Text style={{ fontSize: 11, color: customText }}><Text style={{ fontWeight: 'bold', color: colors.danger }}>• J+5 :</Text> Soin sans rinçage hydratant 💧</Text>
-                <Text style={{ fontSize: 11, color: customText }}><Text style={{ fontWeight: 'bold', color: colors.danger }}>• J+7 :</Text> Bain aux Huiles Chaudes Coco/Karité 🌿</Text>
-                <Text style={{ fontSize: 11, color: customText }}><Text style={{ fontWeight: 'bold', color: colors.danger }}>• J+10 :</Text> Soin Reconstructeur Protéines (Force) 💪</Text>
-                <Text style={{ fontSize: 11, color: customText }}><Text style={{ fontWeight: 'bold', color: colors.danger }}>• J+14 :</Text> Brume scellée à l'Argan ⚡</Text>
-              </View>
-            </View>
-
-            <Text style={{ fontSize: 10.5, color: customTextSec, textAlign: 'center', marginBottom: 20, lineHeight: 15 }}>
-              💡 Les soins ont été programmés à partir de demain pour laisser respirer tes cheveux aujourd'hui. Rends-toi sur l'onglet calendrier pour les consulter ou modifier leurs heures de rappel individuelles.
-            </Text>
-
-            <View style={{ gap: 8 }}>
-              <Button
-                title="📅 Ouvrir mon Calendrier"
-                onPress={() => {
-                  setShowSosSuccessModal(false);
-                  if (onNavigateToCalendar) onNavigateToCalendar();
-                }}
-                variant="primary"
-              />
-              <Button
-                title="Compris ✓"
-                onPress={() => setShowSosSuccessModal(false)}
-                variant="outline"
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 };
@@ -2955,54 +2813,7 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 5,
   },
-  sosAlertBox: {
-    backgroundColor: 'rgba(92, 138, 107, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(92, 138, 107, 0.3)',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-  },
-  sosAlertText: {
-    color: colors.secondary,
-    fontSize: 12,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  sosSection: {
-    marginBottom: 16,
-  },
-  sosWarningBox: {
-    backgroundColor: 'rgba(217, 83, 79, 0.08)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(217, 83, 79, 0.2)',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 10,
-  },
-  sosWarningText: {
-    color: colors.danger,
-    fontSize: 11,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  sosButton: {
-    marginVertical: 0,
-  },
-  sosHealthyBox: {
-    backgroundColor: 'rgba(92, 138, 107, 0.06)',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-    borderWidth: 0.5,
-    borderColor: 'rgba(92, 138, 107, 0.15)',
-  },
-  sosHealthyText: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    lineHeight: 16,
-    textAlign: 'center',
-  },
+
   closeDetailBtn: {
     marginTop: 6,
   },

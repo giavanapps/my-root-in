@@ -145,7 +145,6 @@ interface AppStateContextType {
   closeFeedbackQuiz: () => void;
   closeCareSummary: () => void;
   handleCatchUp: (completed: boolean) => void;
-  triggerSosBooster: () => void;
   updateDiagnostic: (diagnostic: HairDiagnostic) => void;
   addCustomRoutineItem: (category: string, product: string, date: string, enableNotification?: boolean, reminderTime?: string) => void;
   completePorosity: (porosity: 'Faible' | 'Moyenne' | 'Forte') => void;
@@ -846,51 +845,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  const triggerSosBooster = () => {
-    if (!activeProfile) return;
 
-    const todayStr = getLocalDateString();
-    setRoutine(prev => prev.filter(r => !(r.profileId === activeProfileId && r.date > todayStr)));
-
-    const protocols = [
-      { day: 1, category: 'Clarification', product: 'Shampoing Clarifiant Détox Argile' },
-      { day: 3, category: 'Lavage', product: 'Co-wash Hydratant Doux' },
-      { day: 3, category: 'Masque', product: 'Masque Hydratation Profonde & Miel' },
-      { day: 5, category: 'Soin sans rinçage', product: 'Lait Hydratant Léger & Huile de Jojoba' },
-      { day: 7, category: 'Bain d\'huile', product: 'Bain aux Huiles Chaudes de Coco & Karité' },
-      { day: 8, category: 'Lavage', product: 'Shampoing Protecteur Force' },
-      { day: 10, category: 'Masque', product: 'Soin Reconstructeur Protéines (Force)' },
-      { day: 12, category: 'Soin sans rinçage', product: 'Crème Nourrissante Beurre de Mangue' },
-      { day: 14, category: 'Soin sans rinçage', product: 'Brume Hydratante scellée à l\'huile d\'Argan' },
-    ];
-
-    const newRoutineItems: RoutineItem[] = protocols.map(proto => {
-      const date = getLocalDateString(new Date(Date.now() + proto.day * 86400000));
-      return {
-        id: uuid(),
-        profileId: activeProfileId,
-        category: proto.category,
-        product: proto.product,
-        recurrence: 'Protocole SOS Booster 14J',
-        date,
-        completed: false,
-        enableNotificationReminder: true,
-      };
-    });
-
-    setRoutine(prev => [...prev, ...newRoutineItems]);
-
-    setProfiles(prev => prev.map(p => {
-      if (p.id === activeProfileId) {
-        return {
-          ...p,
-          scalp: Math.min(100, p.scalp + 15),
-          healthScore: Math.round((p.hydration + p.nutrition + Math.min(100, p.scalp + 15)) / 3),
-        };
-      }
-      return p;
-    }));
-  };
 
   const updateDiagnostic = (newDiagnostic: HairDiagnostic) => {
     setProfiles(prev => prev.map(p => {
@@ -1300,7 +1255,6 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       closeFeedbackQuiz,
       closeCareSummary,
       handleCatchUp,
-      triggerSosBooster,
       updateDiagnostic,
       addCustomRoutineItem,
       completePorosity,
