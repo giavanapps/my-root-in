@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import { colors } from '../../theme/colors';
 import { useAppState } from '../../store/AppStateContext';
@@ -13,17 +13,54 @@ const getMockedWeather = (dateStr: string) => {
   for (let i = 0; i < dateStr.length; i++) {
     hash = dateStr.charCodeAt(i) + ((hash << 5) - hash);
   }
-  const index = Math.abs(hash) % 4; // 4 conditions: 0=Humide/Pluie, 1=Sec/Froid, 2=Soleil/Chaud, 3=Vent/Sec
-  switch (index) {
-    case 0:
-      return { condition: 'Pluie/Humide 🌧️', icon: '🌧️', humidity: 85, temp: 17 };
-    case 1:
-      return { condition: 'Froid/Sec ❄️', icon: '❄️', humidity: 30, temp: 4 };
-    case 2:
-      return { condition: 'Soleil/Chaud ☀️', icon: '☀️', humidity: 45, temp: 28 };
-    default:
-      return { condition: 'Venteux/Sec 💨', icon: '💨', humidity: 40, temp: 19 };
+  const index = Math.abs(hash) % 3; // 3 conditions for summer: Rain, Sun, Windy
+  const currentMonth = new Date().getMonth(); // 0-indexed (5 = June)
+  const isSummer = currentMonth >= 5 && currentMonth <= 8; // June to Sept
+  
+  if (isSummer) {
+    switch (index) {
+      case 0:
+        return { condition: 'Pluie/Humide 🌧️', icon: '🌧️', humidity: 80, temp: 21 };
+      case 1:
+        return { condition: 'Soleil/Chaud ☀️', icon: '☀️', humidity: 45, temp: 26 };
+      default:
+        return { condition: 'Venteux/Sec 💨', icon: '💨', humidity: 40, temp: 22 };
+    }
+  } else {
+    // Winter/Autumn/Spring
+    const isWinter = currentMonth >= 11 || currentMonth <= 1; // Dec, Jan, Feb
+    const indexWinter = Math.abs(hash) % 4;
+    switch (indexWinter) {
+      case 0:
+        return { condition: 'Pluie/Humide 🌧️', icon: '🌧️', humidity: 85, temp: 12 };
+      case 1:
+        return { condition: isWinter ? 'Froid/Sec ❄️' : 'Soleil/Chaud ☀️', icon: isWinter ? '❄️' : '☀️', humidity: isWinter ? 35 : 50, temp: isWinter ? 4 : 16 };
+      case 2:
+        return { condition: 'Soleil/Doux ☀️', icon: '☀️', humidity: 55, temp: 18 };
+      default:
+        return { condition: 'Venteux/Sec 💨', icon: '💨', humidity: 40, temp: 11 };
+    }
   }
+};
+
+const mapWmoToWeather = (code: number, temp: number, humidity: number, windSpeed: number) => {
+  // If humidity is very high (> 75%) or WMO indicates rain/drizzle
+  const isRainy = [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99].includes(code) || humidity > 75;
+  if (isRainy) {
+    return { condition: 'Pluie/Humide 🌧️', icon: '🌧️' };
+  }
+  // If temperature is cold (< 8°C) or WMO is snow
+  const isCold = [71, 73, 75, 77, 85, 86].includes(code) || temp < 8;
+  if (isCold) {
+    return { condition: 'Froid/Sec ❄️', icon: '❄️' };
+  }
+  // If wind speed is high (> 20 km/h)
+  const isWindy = windSpeed > 20;
+  if (isWindy) {
+    return { condition: 'Venteux/Sec 💨', icon: '💨' };
+  }
+  // Default to sunny
+  return { condition: 'Soleil/Chaud ☀️', icon: '☀️' };
 };
 
 const getWeatherAdvice = (texture: string, weatherIcon: string): string => {
@@ -124,7 +161,56 @@ export const DynamicHeader: React.FC<DynamicHeaderProps> = ({ onPriorityPress })
     r => r.profileId === activeProfile.id && r.date === todayStr && !r.completed
   );
 
-  const weather = getMockedWeather(todayStr);
+  const [weather, setWeather] = useState<{
+    condition: string;
+    icon: string;
+    humidity: number;
+    temp: number;
+  }>(() => getMockedWeather(todayStr));
+
+  useEffect(() => {
+    let active = true;
+    const fetchRealWeather = async () => {
+      try {
+        // Step 1: Geolocation by IP
+        const geoRes = await fetch('https://ipapi.co/json/');
+        if (!geoRes.ok) throw new Error('Geo API failed');
+        const geoData = await geoRes.json();
+        const { latitude, longitude, city } = geoData;
+        
+        if (!latitude || !longitude) throw new Error('Invalid coordinates');
+
+        // Step 2: Open-Meteo Weather
+        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m`;
+        const weatherRes = await fetch(weatherUrl);
+        if (!weatherRes.ok) throw new Error('Weather API failed');
+        const weatherData = await weatherRes.json();
+        
+        if (active && weatherData.current) {
+          const current = weatherData.current;
+          const temp = Math.round(current.temperature_2m);
+          const humidity = Math.round(current.relative_humidity_2m);
+          const code = current.weather_code;
+          const windSpeed = current.wind_speed_10m || 0;
+          
+          const mapped = mapWmoToWeather(code, temp, humidity, windSpeed);
+          
+          setWeather({
+            condition: city ? `${mapped.condition} à ${city}` : mapped.condition,
+            icon: mapped.icon,
+            humidity,
+            temp,
+          });
+        }
+      } catch (err) {
+        console.warn('Real weather fetch failed, using fallback:', err);
+      }
+    };
+    fetchRealWeather();
+    return () => {
+      active = false;
+    };
+  }, [todayStr]);
 
   return (
     <View style={styles.container}>
@@ -158,7 +244,7 @@ export const DynamicHeader: React.FC<DynamicHeaderProps> = ({ onPriorityPress })
           style={[styles.weatherWidget, { backgroundColor: isLight ? '#F5F7FA' : 'rgba(255, 255, 255, 0.05)', borderColor: customBorder }]}
         >
           <Text style={styles.weatherIcon}>{weather.icon}</Text>
-          <Text style={[styles.weatherText, { color: customText }]}>{weather.humidity}% HR</Text>
+          <Text style={[styles.weatherText, { color: customText }]}>{weather.humidity}% d'humidité</Text>
         </TouchableOpacity>
       </View>
 
