@@ -116,7 +116,7 @@ export const NotificationService = {
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#E5A982', // Couleur Terracotta
           showBadge: true,
-          sound: '2pshit.mp3',
+          sound: 'two_pshit.mp3',
         });
       }
 
@@ -154,7 +154,7 @@ export const NotificationService = {
             content: {
               title: "My Root'In 🌿 Rappel de Soin",
               body: getNotificationBody(profileName, item.category, tone),
-              sound: '2pshit.mp3',
+              sound: 'two_pshit.mp3',
               data: { routineId: item.id, category: item.category },
             },
             trigger: { 

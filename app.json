@@ -38,7 +38,7 @@
         "expo-notifications",
         {
           "sounds": [
-            "./assets/sounds/2pshit.mp3"
+            "./assets/sounds/two_pshit.mp3"
           ]
         }
       ]
