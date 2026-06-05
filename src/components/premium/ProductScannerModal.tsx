@@ -1135,7 +1135,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     Choisis l'une de nos 4 fonctions intelligentes : 🔬
                   </Text>
                   
-                  {/* Card 1: Diagnostic INCI */}
+                  {/* Card 1: Analyse INCI & Diagnostic IA */}
                   <TouchableOpacity
                     style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
                     activeOpacity={0.9}
@@ -1147,36 +1147,15 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     <Text style={styles.modeCardIcon}>🔬</Text>
                     <View style={styles.modeCardTextContainer}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Analyse Totale & Profil Capillaire</Text>
+                        <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Analyse INCI & Diagnostic IA</Text>
                       </View>
                       <Text style={[styles.modeCardSubtitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                        Analyse moléculaire complète de la formule INCI et diagnostic personnalisé de compatibilité avec tes cuticules.
+                        Analyse moléculaire de la formule INCI et diagnostic complet (Pour/Contre) adapté à tes cuticules.
                       </Text>
                     </View>
                   </TouchableOpacity>
 
-                  {/* Card 2: DIY Dupe */}
-                  <TouchableOpacity
-                    style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
-                    activeOpacity={0.9}
-                    onPress={() => {
-                      setActiveFeatureTab('diy');
-                      setScannerMode('photo');
-                    }}
-                  >
-                    <Text style={styles.modeCardIcon}>🌿</Text>
-                    <View style={styles.modeCardTextContainer}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Dupe Végétal DIY</Text>
-                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#A892B3', backgroundColor: 'rgba(168, 146, 179, 0.15)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3 }}>RECETTE NATURELLE</Text>
-                      </View>
-                      <Text style={[styles.modeCardSubtitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                        Conçois une alternative saine, 100% naturelle et économique sous forme de recette maison sur-mesure pour ton type de cheveu.
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  {/* Card 3: Ranger */}
+                  {/* Card 2: Ajouter à ma Salle de Bain */}
                   <TouchableOpacity
                     style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
                     activeOpacity={0.9}
@@ -1185,19 +1164,19 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                       setScannerMode('photo');
                     }}
                   >
-                    <Text style={styles.modeCardIcon}>➕</Text>
+                    <Text style={styles.modeCardIcon}>📅</Text>
                     <View style={styles.modeCardTextContainer}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                         <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Ajouter à ma Salle de Bain</Text>
                         <Text style={{ fontSize: 9, fontWeight: 'bold', color: colors.primary, backgroundColor: 'rgba(229, 169, 130, 0.15)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3 }}>PROACTIF</Text>
                       </View>
                       <Text style={[styles.modeCardSubtitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                        Enregistre ton produit dans ton placard virtuel pour que l'IA intelligente l'associe automatiquement à tes futurs soins du calendrier.
+                        Range tes flacons dans ta Salle de Bain virtuelle et laisse l'IA planifier automatiquement tes prochains soins dans ton calendrier.
                       </Text>
                     </View>
                   </TouchableOpacity>
 
-                  {/* Card 4: Comparateur */}
+                  {/* Card 3: Comparateur Anti-Gaspillage */}
                   <TouchableOpacity
                     style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
                     activeOpacity={0.9}
@@ -1209,11 +1188,32 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     <Text style={styles.modeCardIcon}>🧐</Text>
                     <View style={styles.modeCardTextContainer}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Est-ce que j'ai un équivalent chez moi ?</Text>
+                        <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Comparateur Anti-Gaspillage</Text>
                         <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#5C8AA7', backgroundColor: 'rgba(92, 138, 167, 0.15)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3 }}>ANTI-GASPI</Text>
                       </View>
                       <Text style={[styles.modeCardSubtitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                        Flashe un produit en magasin pour comparer sa formule et détecter instantanément si tu as déjà un doublon identique à la maison.
+                        Scan en rayon pour détecter instantanément si tu possèdes déjà un produit équivalent à la maison.
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Card 4: Alternative Naturelle DIY (Dupe Végétal) */}
+                  <TouchableOpacity
+                    style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
+                    activeOpacity={0.9}
+                    onPress={() => {
+                      setActiveFeatureTab('diy');
+                      setScannerMode('photo');
+                    }}
+                  >
+                    <Text style={styles.modeCardIcon}>🌿</Text>
+                    <View style={styles.modeCardTextContainer}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Alternative Naturelle DIY (Dupe Végétal)</Text>
+                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#A892B3', backgroundColor: 'rgba(168, 146, 179, 0.15)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3 }}>RECETTE NATURELLE</Text>
+                      </View>
+                      <Text style={[styles.modeCardSubtitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                        Conçois des recettes végétales saines (plantes, poudres, huiles) sur-mesure pour ton type de cheveu.
                       </Text>
                     </View>
                   </TouchableOpacity>
