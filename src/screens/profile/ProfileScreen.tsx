@@ -704,6 +704,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
                       <Text style={[styles.feedbackQuestionText, { color: customText }]}>
                         Q1 : Lors de votre inscription, avez-vous trouvé les étapes du diagnostic claires et faciles à remplir ?
                       </Text>
+                      <Text style={[styles.ratingLegend, { color: customTextSec }]}>
+                        (1 = Très difficile, 5 = Très facile)
+                      </Text>
                       <View style={styles.ratingRow}>
                         {[1, 2, 3, 4, 5].map(val => (
                           <TouchableOpacity
@@ -816,6 +819,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
                       <Text style={[styles.feedbackQuestionText, { color: customText }]}>
                         Q6 : Les explications du scanner sur les ingrédients (bons ou mauvais pour votre type de cheveu) étaient-elles faciles à comprendre ?
                       </Text>
+                      <Text style={[styles.ratingLegend, { color: customTextSec }]}>
+                        (1 = Très difficile à comprendre, 5 = Très facile à comprendre)
+                      </Text>
                       <View style={styles.ratingRow}>
                         {[1, 2, 3, 4, 5].map(val => (
                           <TouchableOpacity
@@ -846,6 +852,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
                     <View style={styles.feedbackQuestionBlock}>
                       <Text style={[styles.feedbackQuestionText, { color: customText }]}>
                         Q7 : Les rappels et notifications de l'application vous ont-ils aidée à être plus régulière dans vos soins ?
+                      </Text>
+                      <Text style={[styles.ratingLegend, { color: customTextSec }]}>
+                        (1 = Pas du tout d'accord, 5 = Tout à fait d'accord)
                       </Text>
                       <View style={styles.ratingRow}>
                         {[1, 2, 3, 4, 5].map(val => (
@@ -1667,5 +1676,11 @@ const styles = StyleSheet.create({
     height: 80,
     textAlignVertical: 'top',
     marginTop: 4,
+  },
+  ratingLegend: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    marginTop: -2,
+    marginBottom: 4,
   },
 });
