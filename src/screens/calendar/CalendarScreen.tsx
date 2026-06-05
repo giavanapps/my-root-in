@@ -738,6 +738,19 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
             )}
           </View>
 
+          {activeDateRoutines.length > 0 && activeDateRoutines.some(item => item.completed || item.date < todayStr) && (
+            <Text style={{
+              fontSize: 11.5,
+              color: colors.primary,
+              fontStyle: 'italic',
+              marginBottom: 12,
+              textAlign: 'center',
+              fontWeight: '600'
+            }}>
+              💡 Glisse un soin réalisé ou manqué vers la gauche pour l'effacer.
+            </Text>
+          )}
+
           {/* Tasks List */}
           {activeDateRoutines.length === 0 ? (
             <View style={styles.emptyTasksBox}>
@@ -1049,9 +1062,9 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
               borderRadius: 12,
               padding: 12,
             }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
                 <Text style={{ fontSize: 18, marginRight: 8 }}>🔔</Text>
-                <View style={{ flex: 1, marginRight: 8 }}>
+                <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 13, color: customText, fontWeight: '700' }}>
                     Activer la notification
                   </Text>

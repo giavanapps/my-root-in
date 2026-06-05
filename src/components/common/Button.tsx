@@ -42,6 +42,10 @@ export const Button: React.FC<ButtonProps> = ({
     switch (variant) {
       case 'outline':
         return [styles.text, styles.textOutline, textStyle];
+      case 'secondary':
+        return [styles.text, styles.textSecondary, textStyle];
+      case 'danger':
+        return [styles.text, styles.textDanger, textStyle];
       default:
         return [styles.text, styles.textSolid, textStyle];
     }
@@ -114,5 +118,11 @@ const styles = StyleSheet.create({
   },
   textOutline: {
     color: colors.primary,
+  },
+  textSecondary: {
+    color: colors.textPrimary,
+  },
+  textDanger: {
+    color: colors.textPrimary,
   },
 });

@@ -1133,7 +1133,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
               {upcomingCares.map(care => {
                 // Pick appropriate emoji based on category
                 let careEmoji = '🧴';
-                if (care.category.toLowerCase().includes('lavage')) careEmoji = '🚰';
+                if (care.category.toLowerCase().includes('lavage')) careEmoji = '🚿';
                 else if (care.category.toLowerCase().includes('clarif')) careEmoji = '🌺';
                 else if (care.category.toLowerCase().includes('bain')) careEmoji = '🌿';
                 else if (care.category.toLowerCase().includes('masque')) careEmoji = '🍯';
