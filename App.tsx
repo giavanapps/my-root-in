@@ -182,9 +182,14 @@ function MainApp() {
                   }
                 }}
               >
-                <Text style={[styles.tabIcon, { opacity: activeTab === 'bathroom' ? 1 : 0.6 }]}>
-                  🧴
-                </Text>
+                <View style={styles.badgeWrapper}>
+                  <Text style={[styles.tabIcon, { opacity: activeTab === 'bathroom' ? 1 : 0.6 }]}>
+                    🧴
+                  </Text>
+                  <View style={[styles.proBadge, { borderColor: barBackground }]}>
+                    <Text style={styles.proBadgeText}>PRO</Text>
+                  </View>
+                </View>
                 <Text style={[
                   styles.tabLabel, 
                   { color: activeTab === 'bathroom' ? activeTextColor : inactiveTextColor }
@@ -277,5 +282,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
+  },
+  badgeWrapper: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  proBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -16,
+    backgroundColor: colors.primary,
+    borderRadius: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderWidth: 1.5,
+  },
+  proBadgeText: {
+    color: '#0B0D17', // Match dark background for strong contrast
+    fontSize: 7.5,
+    fontWeight: '900',
+    letterSpacing: 0.2,
   },
 });
