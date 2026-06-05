@@ -750,6 +750,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
 
   // Ref to guard against onClose and onSave race conditions in the rescheduling flow
   const rescheduleSavingRef = useRef(false);
+  const [isSavingTransition, setIsSavingTransition] = useState(false);
 
   // Shopping list starts hidden by default for all users, including premium
 
@@ -757,8 +758,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
   useEffect(() => {
     if (!activeProfile || !routine) return;
 
-    // Guard: do not open the overdue modal if we are actively rescheduling or in the smart shift modal
-    if (showRescheduleDatePicker || showRescheduleTimePicker || showSmartShiftModal || pendingShift) {
+    // Guard: do not open the overdue modal if we are actively rescheduling, in the smart shift modal, or saving/shifting
+    if (showRescheduleDatePicker || showRescheduleTimePicker || showSmartShiftModal || pendingShift || isSavingTransition) {
       return;
     }
     
@@ -773,7 +774,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
       setOverdueCare(null);
       setShowOverdueModal(false);
     }
-  }, [routine, activeProfile?.id, todayStr, showRescheduleDatePicker, showRescheduleTimePicker, showSmartShiftModal, pendingShift]);
+  }, [routine, activeProfile?.id, todayStr, showRescheduleDatePicker, showRescheduleTimePicker, showSmartShiftModal, pendingShift, isSavingTransition]);
 
   if (!activeProfile) {
     return (
@@ -1359,7 +1360,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                 style={[styles.modalButton, styles.modalButtonPrimary]}
                 onPress={() => {
                   if (pendingShift) {
+                    setIsSavingTransition(true);
                     shiftRoutineDates(activeProfile.id, pendingShift.deltaDays, pendingShift.careId, pendingShift.newTime);
+                    setTimeout(() => {
+                      setIsSavingTransition(false);
+                    }, 500);
                   }
                   setPendingShift(null);
                   setShowSmartShiftModal(false);
@@ -1373,7 +1378,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                 style={[styles.modalButton, styles.modalButtonSecondary, { borderColor: customBorder }]}
                 onPress={() => {
                   if (pendingShift) {
+                    setIsSavingTransition(true);
                     updateRoutineItemDate(pendingShift.careId, pendingShift.newDate, pendingShift.newTime);
+                    setTimeout(() => {
+                      setIsSavingTransition(false);
+                    }, 500);
                   }
                   setPendingShift(null);
                   setShowSmartShiftModal(false);
@@ -1476,8 +1485,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
               (overdueCare.recurrence && (overdueCare.recurrence === 'Unique' || overdueCare.recurrence.includes('Unique')));
 
             if (isCustomCare) {
-              updateRoutineItemDate(overdueCare.id, rescheduledDate);
-              updateRoutineItemTime(overdueCare.id, selectedTime);
+              setIsSavingTransition(true);
+              updateRoutineItemDate(overdueCare.id, rescheduledDate, selectedTime);
+              setTimeout(() => {
+                setIsSavingTransition(false);
+              }, 500);
             } else {
               const deltaDays = getDaysBetween(overdueCare.date, rescheduledDate);
               setPendingShift({
