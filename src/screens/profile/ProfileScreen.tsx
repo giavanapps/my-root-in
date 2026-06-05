@@ -175,7 +175,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#E5A982', // Terracotta
           showBadge: true,
-          sound: 'vapo_soundmore.mp3',
+          sound: '2pshit.mp3',
         });
       }
 
@@ -183,7 +183,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
         content: {
           title: "My Root'In 🌿 Test Sonore",
           body: "Pshhht ! Le vaporisateur fonctionne. C'est l'heure de ton soin ! 💨",
-          sound: 'vapo_soundmore.mp3',
+          sound: '2pshit.mp3',
           data: { test: true },
         },
         trigger: { 
