@@ -612,9 +612,9 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
   const todayStr = getLocalDateString();
 
   // Get active routines list for the selected date
-  const activeDateRoutines = routine.filter(
-    r => r.profileId === activeProfile.id && r.date === selectedDateStr && !(r.completed && r.date < todayStr)
-  );
+  const activeDateRoutines = routine
+    .filter(r => r.profileId === activeProfile.id && r.date === selectedDateStr && !(r.completed && r.date < todayStr))
+    .sort((a, b) => b.id.localeCompare(a.id));
   const isPastDate = selectedDateStr < todayStr;
   const isFutureDate = selectedDateStr > todayStr;
 
