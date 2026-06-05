@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, Modal, TouchableOpacity, ScrollView, Animated, ActivityIndicator, Image, TextInput, Platform } from 'react-native';
+import { StyleSheet, View, Text, Modal, TouchableOpacity, ScrollView, Animated, ActivityIndicator, Image, TextInput, Platform, Alert } from 'react-native';
 import { colors, borderRadius, spacing } from '../../theme/colors';
 import { useAppState } from '../../store/AppStateContext';
 import * as ImagePicker from 'expo-image-picker';
@@ -396,6 +396,14 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   } = useAppState();
   const isDark = themeMode === 'dark';
 
+  const showAppAlert = (title: string, message: string) => {
+    if (Platform.OS === 'web') {
+      window.alert(`${title}\n\n${message}`);
+    } else {
+      Alert.alert(title, message, [{ text: "J'ai compris" }]);
+    }
+  };
+
   const [scanStep, setScanStep] = useState<'idle' | 'scanning' | 'result' | 'scan_error' | 'manual_express'>('idle');
   const [activeFeatureTab, setActiveFeatureTab] = useState<'inci' | 'add' | 'compare' | 'diy'>('inci');
   const [selectedProduct, setSelectedProduct] = useState<MockProduct | null>(null);
@@ -658,7 +666,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
         // 1. Demander les permissions d'appareil photo
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== 'granted') {
-          alert("Désolé, nous avons besoin des permissions d'appareil photo pour analyser votre produit.");
+          showAppAlert("Permissions requises", "Désolé, nous avons besoin des permissions d'appareil photo pour analyser ton produit.");
           return;
         }
 
@@ -702,7 +710,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
         }
       } catch (err: any) {
         console.error("Camera launch error on native:", err);
-        alert(err.message || "Une erreur est survenue lors de l'ouverture de l'appareil photo.");
+        showAppAlert("Erreur", err.message || "Une erreur est survenue lors de l'ouverture de l'appareil photo.");
       }
     }
   };
@@ -769,7 +777,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   const handleBarcodeSearch = async (barcodeToSearch?: string) => {
     const code = barcodeToSearch || barcodeInput.trim();
     if (!code) {
-      alert("Veuillez saisir un code-barres (EAN-13).");
+      showAppAlert("Saisie requise", "Veuillez saisir un code-barres (EAN-13).");
       return;
     }
 
@@ -895,7 +903,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
 
   const handleManualExpressSubmit = async () => {
     if (!manualBrand.trim() || !manualName.trim()) {
-      alert("Veuillez renseigner la marque et le nom du produit.");
+      showAppAlert("Saisie incomplète", "Veuillez renseigner la marque et le nom du produit.");
       return;
     }
 
@@ -945,7 +953,10 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
       const errMsg = err.message || 'Impossible de trouver ou d\'analyser ce produit.';
       setRealProductError(errMsg);
       setScanStep('scan_error');
-      alert(`Désolé, l'analyse manuelle a échoué : ${errMsg}`);
+      showAppAlert(
+        "Oups !",
+        "Ce produit n'a pas pu être analysé. Pour rappel, My Root'In prend soin de tes boucles et ne décrypte que les produits capillaires (shampoings, soins, huiles pour cheveux...)."
+      );
     } finally {
       setIsSubmittingManual(false);
     }

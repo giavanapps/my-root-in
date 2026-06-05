@@ -758,8 +758,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
   useEffect(() => {
     if (!activeProfile || !routine) return;
 
-    // Guard: do not open the overdue modal if we are actively rescheduling, in the smart shift modal, or saving/shifting
-    if (showRescheduleDatePicker || showRescheduleTimePicker || showSmartShiftModal || pendingShift || isSavingTransition) {
+    // Guard: do not open the overdue modal if we are actively rescheduling, in the smart shift modal, saving/shifting, or if datepicker/overdue modal is open
+    if (
+      showRescheduleDatePicker || 
+      showRescheduleTimePicker || 
+      showSmartShiftModal || 
+      pendingShift || 
+      isSavingTransition || 
+      showDatePicker || 
+      showOverdueModal
+    ) {
       return;
     }
     
@@ -774,7 +782,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
       setOverdueCare(null);
       setShowOverdueModal(false);
     }
-  }, [routine, activeProfile?.id, todayStr, showRescheduleDatePicker, showRescheduleTimePicker, showSmartShiftModal, pendingShift, isSavingTransition]);
+  }, [
+    routine, 
+    activeProfile?.id, 
+    todayStr, 
+    showRescheduleDatePicker, 
+    showRescheduleTimePicker, 
+    showSmartShiftModal, 
+    pendingShift, 
+    isSavingTransition, 
+    showDatePicker, 
+    showOverdueModal
+  ]);
 
   if (!activeProfile) {
     return (
