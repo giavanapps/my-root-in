@@ -16,9 +16,10 @@ const { width } = Dimensions.get('window');
 interface ProfileScreenProps {
   onRefireDiagnostic: () => void;
   onLogoutPress: () => void;
+  onGoBackToHome?: () => void;
 }
 
-export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic, onLogoutPress }) => {
+export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic, onLogoutPress, onGoBackToHome }) => {
   const {
     profiles,
     activeProfileId,
@@ -955,6 +956,24 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
           )}
         </View>
 
+        {/* Bottom Actions Container */}
+        <View style={styles.bottomActionsContainer}>
+          {onGoBackToHome && (
+            <Button
+              title="🏠 Retour à l'accueil"
+              onPress={onGoBackToHome}
+              variant="outline"
+              style={styles.bottomActionBtn}
+            />
+          )}
+          <Button
+            title="🚪 Se déconnecter du compte"
+            onPress={onLogoutPress}
+            variant="danger"
+            style={styles.bottomActionBtn}
+          />
+        </View>
+
       </ScrollView>
 
       {/* ⏰ TIME PICKER MODAL */}
@@ -1682,5 +1701,14 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: -2,
     marginBottom: 4,
+  },
+  bottomActionsContainer: {
+    marginTop: 24,
+    marginBottom: 16,
+    gap: 12,
+  },
+  bottomActionBtn: {
+    marginVertical: 0,
+    paddingVertical: 14,
   },
 });

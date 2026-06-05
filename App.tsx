@@ -120,6 +120,7 @@ function MainApp() {
                     setCurrentScreen('diagnostic');
                   }}
                   onLogoutPress={logout}
+                  onGoBackToHome={() => setActiveTab('dashboard')}
                 />
               )}
             </View>

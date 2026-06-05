@@ -17,21 +17,22 @@ export const QuickAction: React.FC<QuickActionProps> = ({ onPress }) => {
 
   const isLight = themeMode === 'light';
   const customCard = isLight ? '#FFFFFF' : colors.card;
-  const customBorder = isLight ? 'rgba(0, 0, 0, 0.08)' : colors.cardBorder;
   const customText = isLight ? '#1C1E26' : colors.textPrimary;
   const customTextSec = isLight ? '#6A6F82' : colors.textSecondary;
 
   const handlePress = () => {
-    // Spring scale feedback animation
+    // Micro-animation scale-down and scale-up spring
     Animated.sequence([
-      Animated.timing(scaleValue, { toValue: 0.95, duration: 100, useNativeDriver: true }),
-      Animated.spring(scaleValue, { toValue: 1.02, friction: 3, tension: 40, useNativeDriver: true }),
-      Animated.timing(scaleValue, { toValue: 1, duration: 150, useNativeDriver: true }),
-    ]).start(() => {
+      Animated.timing(scaleValue, { toValue: 0.94, duration: 80, useNativeDriver: true }),
+      Animated.spring(scaleValue, { toValue: 1, friction: 4, useNativeDriver: true }),
+    ]).start();
+
+    // Fast feedback: call navigation callback immediately after scale-down completes (80ms)
+    setTimeout(() => {
       if (onPress) {
         onPress();
       }
-    });
+    }, 80);
   };
 
   return (
@@ -42,9 +43,7 @@ export const QuickAction: React.FC<QuickActionProps> = ({ onPress }) => {
           style={[
             styles.actionButton,
             { 
-              backgroundColor: customCard, 
-              borderColor: customBorder,
-              shadowColor: isLight ? 'rgba(0, 0, 0, 0.1)' : 'rgba(0, 0, 0, 0.3)'
+              backgroundColor: customCard,
             }
           ]}
           onPress={handlePress}
@@ -63,6 +62,7 @@ const styles = StyleSheet.create({
   container: {
     marginVertical: 16,
     width: '100%',
+    paddingHorizontal: 24, // Aligns perfectly with marginHorizontal: 24 of other cards
   },
   animatedWrapper: {
     width: '100%',
@@ -70,15 +70,18 @@ const styles = StyleSheet.create({
   actionButton: {
     alignSelf: 'stretch',
     borderRadius: 16,
-    borderWidth: 1.5,
+    borderWidth: 1.2,
+    borderColor: colors.secondary, // Green border matching health score
     paddingVertical: 18,
     paddingHorizontal: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 3,
+    // Subtle green glow shadow effect
+    shadowColor: colors.secondary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.32,
+    shadowRadius: 8,
+    elevation: 4,
   },
   actionTitle: {
     fontSize: 16,
