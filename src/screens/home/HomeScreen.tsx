@@ -1141,6 +1141,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                 else if (care.category.toLowerCase().includes('co-wash')) careEmoji = '🌸';
                 else if (care.category.toLowerCase().includes('retwist')) careEmoji = '👑';
                 else if (care.category.toLowerCase().includes('massage')) careEmoji = '💆‍♀️';
+                else if (care.category.toLowerCase().includes('dusting') || care.category.toLowerCase().includes('coupe')) careEmoji = '✂️';
 
                 const relativeLabel = getRelativeDateLabel(care.date);
 
