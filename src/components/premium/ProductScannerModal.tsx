@@ -1206,7 +1206,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                       setScannerMode('photo');
                     }}
                   >
-                    <Text style={styles.modeCardIcon}>🧐</Text>
+                    <Text style={styles.modeCardIcon}>🗄️</Text>
                     <View style={styles.modeCardTextContainer}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                         <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Est-ce que j'ai un équivalent chez moi ?</Text>
@@ -1790,7 +1790,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     onPress={() => setActiveFeatureTab('compare')}
                   >
                     <Text style={[styles.tabBarButtonText, activeFeatureTab === 'compare' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
-                      🧐 Comparer
+                      🗄️ Comparer
                     </Text>
                   </TouchableOpacity>
                 </View>

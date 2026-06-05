@@ -1133,7 +1133,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
               {upcomingCares.map(care => {
                 // Pick appropriate emoji based on category
                 let careEmoji = '🧴';
-                if (care.category.toLowerCase().includes('clarif')) careEmoji = '🔬';
+                if (care.category.toLowerCase().includes('lavage')) careEmoji = '🚰';
+                else if (care.category.toLowerCase().includes('clarif')) careEmoji = '🌺';
                 else if (care.category.toLowerCase().includes('bain')) careEmoji = '🌿';
                 else if (care.category.toLowerCase().includes('masque')) careEmoji = '🍯';
                 else if (care.category.toLowerCase().includes('rinçage') || care.category.toLowerCase().includes('leave')) careEmoji = '💧';
@@ -1280,61 +1281,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
         </TouchableOpacity>
       </ScrollView>
 
-      {/* 💬 POP-UP Feedback Quiz Modal (Mini-Quiz Feedback) */}
-      <Modal
-        visible={showFeedbackQuiz}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={closeFeedbackQuiz}
-      >
-        <View style={[styles.modalOverlay, { backgroundColor: isLight ? 'rgba(0, 0, 0, 0.4)' : colors.overlay }]}>
-          <View style={[styles.feedbackCard, { backgroundColor: customCard, borderColor: customBorder }]}>
-            <Text style={styles.feedbackEmoji}>Feedback 📝</Text>
-            <Text style={[styles.feedbackTitle, { color: customText }]}>Comment se sentent vos cheveux après ce soin ?</Text>
-            <Text style={[styles.feedbackSubtitle, { color: customTextSec }]}>
-              Votre réponse permet d'ajuster en temps réel votre jauge de santé globale.
-            </Text>
 
-            <View style={styles.feedbackOptions}>
-              {/* Option Dry */}
-              <TouchableOpacity
-                style={[styles.feedbackOptionItem, { borderColor: colors.warning, backgroundColor: customInputBg }]}
-                onPress={() => submitFeedback('Secs')}
-              >
-                <Text style={styles.optionEmojiText}>🌵</Text>
-                <Text style={[styles.optionBtnLabel, { color: customText }]}>[ Secs ]</Text>
-                <Text style={[styles.optionDescText, { color: customTextSec }]}>Manque d'hydratation</Text>
-              </TouchableOpacity>
-
-              {/* Option Top */}
-              <TouchableOpacity
-                style={[styles.feedbackOptionItem, { borderColor: colors.secondary, backgroundColor: customInputBg }]}
-                onPress={() => submitFeedback('Top')}
-              >
-                <Text style={styles.optionEmojiText}>✨</Text>
-                <Text style={[styles.optionBtnLabel, { color: customText }]}>[ Top ]</Text>
-                <Text style={[styles.optionDescText, { color: customTextSec }]}>Doux, brillants, parfaits</Text>
-              </TouchableOpacity>
-
-              {/* Option Heavy */}
-              <TouchableOpacity
-                style={[styles.feedbackOptionItem, { borderColor: colors.primary, backgroundColor: customInputBg }]}
-                onPress={() => submitFeedback('Lourds')}
-              >
-                <Text style={styles.optionEmojiText}>🏋️</Text>
-                <Text style={[styles.optionBtnLabel, { color: customText }]}>[ Lourds ]</Text>
-                <Text style={[styles.optionDescText, { color: customTextSec }]}>Saturés, gras ou poisseux</Text>
-              </TouchableOpacity>
-            </View>
-
-            <Button
-              title="Passer"
-              onPress={closeFeedbackQuiz}
-              variant="outline"
-            />
-          </View>
-        </View>
-      </Modal>
 
       {/* 📅 Premium Routine Date Shifter Modal */}
       <DatePickerModal
@@ -1797,125 +1744,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
         </View>
       </Modal>
 
-      {/* 🏆 POST-FEEDBACK CARE SUMMARY MODAL */}
-      <Modal
-        visible={showCareSummary}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={closeCareSummary}
-      >
-        <View style={[styles.modalOverlay, { backgroundColor: isLight ? 'rgba(0, 0, 0, 0.4)' : colors.overlay }]}>
-          <View style={[styles.detailCard, { backgroundColor: customCard, borderColor: customBorder }]}>
-            <View style={styles.detailHeader}>
-              <Text style={[styles.detailTitle, { color: customText }]}>🏆 Soin Enregistré !</Text>
-              <TouchableOpacity 
-                style={[styles.closeDetailIcon, { backgroundColor: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.05)' }]} 
-                onPress={closeCareSummary}
-              >
-                <Text style={[styles.closeDetailIconText, { color: customTextSec }]}>✕</Text>
-              </TouchableOpacity>
-            </View>
 
-            <Text style={[styles.detailSubtitle, { color: customTextSec, marginBottom: 12 }]}>
-              Félicitations pour avoir complété votre routine capillaire.
-            </Text>
-
-            {/* Care details info card */}
-            <View style={[styles.feedbackOptionItem, { borderColor: customBorder, backgroundColor: customInputBg, marginVertical: 8, paddingVertical: 14 }]}>
-              <Text style={styles.optionEmojiText}>🧴</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.optionBtnLabel, { color: customText, width: '100%' }]}>
-                  {lastValidatedCare?.category || 'Soin Quotidien'}
-                </Text>
-                <Text style={{ fontSize: 11, color: customTextSec, marginTop: 2 }}>
-                  Validé le {lastValidatedCare?.date || todayStr}
-                </Text>
-              </View>
-            </View>
-
-            {/* Gauge Impact animated box */}
-            <View style={{ alignItems: 'center', marginVertical: 16 }}>
-              <Text style={{ fontSize: 12, color: customTextSec, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '700' }}>
-                Impact sur la Jauge :
-              </Text>
-              <Text style={{ 
-                fontSize: 34, 
-                fontWeight: '900', 
-                color: lastFeedbackDelta >= 0 ? '#5C8A6B' : colors.danger,
-                marginTop: 6 
-              }}>
-                {lastFeedbackDelta >= 0 ? `+${lastFeedbackDelta}` : lastFeedbackDelta} pts
-              </Text>
-              <Text style={{ fontSize: 11, color: customTextSec, marginTop: 4, fontWeight: '600' }}>
-                {lastFeedbackReason}
-              </Text>
-            </View>
-
-            {/* Dynamic Advice Message based on delta/reason */}
-            <View style={{
-              backgroundColor: lastFeedbackDelta >= 0 ? 'rgba(92, 138, 107, 0.06)' : 'rgba(217, 83, 79, 0.06)',
-              borderRadius: 14,
-              borderWidth: 0.5,
-              borderColor: lastFeedbackDelta >= 0 ? 'rgba(92, 138, 107, 0.2)' : 'rgba(217, 83, 79, 0.2)',
-              padding: 14,
-              marginBottom: 16
-            }}>
-              <Text style={{
-                color: lastFeedbackDelta >= 0 ? colors.secondary : colors.danger,
-                fontWeight: '700',
-                fontSize: 12,
-                marginBottom: 4,
-                textTransform: 'uppercase'
-              }}>
-                Conseil Immédiat :
-              </Text>
-              <Text style={{ fontSize: 12, color: customText, lineHeight: 18 }}>
-                {lastFeedbackReason.includes('Secs') && 
-                  "Tes cheveux manquent d'hydratation 💧 Pense à appliquer un soin sans rinçage après ton prochain lavage (ajouté à ton calendrier dans 2 jours !)"
-                }
-                {lastFeedbackReason.includes('Top') && 
-                  "Parfait ! Tes cheveux adorent cette routine 🌿 Ton score de régularité progresse ! (+5 pts de santé)."
-                }
-                {lastFeedbackReason.includes('Lourds') && 
-                  "Tes cheveux sont surchargés 😬 Réduis la quantité de produit. Une clarification légère peut aider (ajoutée à ton calendrier dans 5 jours !)"
-                }
-                {!lastFeedbackReason.includes('Secs') && !lastFeedbackReason.includes('Top') && !lastFeedbackReason.includes('Lourds') &&
-                  "Routine complétée avec succès ! Prenez soin de vous au quotidien."
-                }
-              </Text>
-            </View>
-
-            {/* Next scheduled care reminder */}
-            {(() => {
-              const nextCare = routine
-                .filter(r => r.profileId === activeProfile.id && !r.completed && r.date >= todayStr && r.date !== lastValidatedCare?.date)
-                .sort((a, b) => a.date.localeCompare(b.date))[0];
-              
-              if (!nextCare) return null;
-
-              return (
-                <View style={{
-                  backgroundColor: isLight ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.02)',
-                  borderRadius: 12,
-                  padding: 10,
-                  marginBottom: 16,
-                  alignItems: 'center'
-                }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: customTextSec }}>
-                    Prochain soin : <Text style={{ color: colors.primary }}>{nextCare.category}</Text> le {nextCare.date}
-                  </Text>
-                </View>
-              );
-            })()}
-
-            <Button
-              title="Retour à l'accueil"
-              onPress={closeCareSummary}
-              variant="primary"
-            />
-          </View>
-        </View>
-      </Modal>
 
       {/* 📖 DETAILED CARE GUIDE MODAL (Priorité du jour cliquable) */}
       <Modal

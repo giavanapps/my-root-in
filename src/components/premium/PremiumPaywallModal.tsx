@@ -42,7 +42,7 @@ export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visibl
       desc: 'Enregistre ton produit dans ton placard virtuel pour que l\'IA intelligente l\'associe automatiquement à tes futurs soins du calendrier.',
     },
     {
-      icon: '🧐',
+      icon: '🗄️',
       title: 'Est-ce que j\'ai un équivalent chez moi ?',
       desc: 'Flashe un produit en magasin pour comparer sa formule et détecter instantanément si tu as déjà un doublon identique à la maison.',
     },

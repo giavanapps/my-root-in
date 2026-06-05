@@ -11,6 +11,7 @@ import { ProfileScreen } from './src/screens/profile/ProfileScreen';
 import { CalendarScreen } from './src/screens/calendar/CalendarScreen';
 import { BathroomScreen } from './src/screens/bathroom/BathroomScreen';
 import { PremiumPaywallModal } from './src/components/premium/PremiumPaywallModal';
+import { FeedbackSystem } from './src/components/common/FeedbackSystem';
 
 type ActiveScreen = 'auth' | 'diagnostic' | 'home';
 type ActiveTab = 'dashboard' | 'calendar' | 'bathroom' | 'profile';
@@ -218,6 +219,9 @@ function MainApp() {
         visible={showPaywall}
         onClose={() => setShowPaywall(false)}
       />
+
+      {/* 💬 POP-UP Feedback Quiz & Care Summary Modal Overlay */}
+      <FeedbackSystem />
     </SafeAreaView>
   );
 }

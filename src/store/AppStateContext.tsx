@@ -694,48 +694,140 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return l;
     }));
 
-    // Add future care automatically based on feedback
+    // Add or adjust future cares intelligently based on feedback, hair texture and porosity
+    const porosity = activeProfile.diagnostic?.porosity || 'Moyenne';
+    const texture = activeProfile.diagnostic?.texture || 'Crépus';
+    
+    let feedbackExplanation = '';
+
     if (feedback === 'Secs') {
-      // 2 days in the future
       const in2Days = new Date(Date.now() + 2 * 86400000);
       const in2DaysStr = getLocalDateString(in2Days);
-      const newRoutineItem: RoutineItem = {
-        id: uuid(),
-        profileId: activeProfileId,
-        category: 'Soin sans rinçage',
-        product: 'Lait Capillaire Hydratant à l\'Hibiscus (Feedback Secs)',
-        recurrence: 'Ajustement (Feedback Secs)',
-        date: in2DaysStr,
-        completed: false,
-        enableNotificationReminder: true,
-      };
-      setRoutine(prev => [...prev, newRoutineItem]);
+      
+      let secProduct = "Lait Capillaire Hydratant à l'Hibiscus & Aloe Vera";
+      if (texture === 'Locksés') {
+        secProduct = "Vaporisateur Hydratant à l'Eau de Rose et Glycérine végétale";
+      } else if (porosity === 'Faible') {
+        secProduct = "Lait Capillaire Hydratant Léger appliqué sous Bonnet Chauffant";
+      } else if (porosity === 'Forte') {
+        secProduct = "Lait Capillaire Hydratant Riche scellé au Beurre de Karité";
+      } else if (texture === 'Crépus') {
+        secProduct = "Lait Capillaire Riche & Gelée d'Hibiscus hydratante";
+      }
+
+      // Check if there is an upcoming uncompleted hydration/mask care in the next 7 days to move closer
+      let careAdjusted = false;
+      const in7Days = new Date(Date.now() + 7 * 86400000);
+      const in7DaysStr = getLocalDateString(in7Days);
+
+      setRoutine(prev => {
+        // Let's find if there is an upcoming hydration care
+        const targetIndex = prev.findIndex(item => 
+          item.profileId === activeProfileId && 
+          !item.completed && 
+          item.date > todayStr && 
+          item.date <= in7DaysStr &&
+          (item.category === 'Masque hydratant' || item.category === 'Soin sans rinçage')
+        );
+
+        if (targetIndex !== -1) {
+          careAdjusted = true;
+          return prev.map((item, idx) => {
+            if (idx === targetIndex) {
+              return { 
+                ...item, 
+                date: in2DaysStr, 
+                product: `${secProduct} (Ajustement Secs)`,
+                recurrence: 'Ajustement (Feedback Secs)'
+              };
+            }
+            return item;
+          });
+        } else {
+          // If not found, insert a new hydration care
+          const newRoutineItem: RoutineItem = {
+            id: uuid(),
+            profileId: activeProfileId,
+            category: 'Soin sans rinçage',
+            product: `${secProduct} (Feedback Secs)`,
+            recurrence: 'Ajustement (Feedback Secs)',
+            date: in2DaysStr,
+            completed: false,
+            enableNotificationReminder: true,
+          };
+          return [...prev, newRoutineItem];
+        }
+      });
+
+      feedbackExplanation = careAdjusted 
+        ? `Soin hydratant avancé déplacé au ${in2DaysStr} pour hydrater tes cheveux ${texture.toLowerCase()} de porosité ${porosity.toLowerCase()}.`
+        : `Nouveau soin hydratant planifié le ${in2DaysStr} pour hydrater tes cheveux ${texture.toLowerCase()} de porosité ${porosity.toLowerCase()}.`;
+
     } else if (feedback === 'Lourds') {
-      // 5 days in the future
-      const in5Days = new Date(Date.now() + 5 * 86400000);
-      const in5DaysStr = getLocalDateString(in5Days);
+      const in2Days = new Date(Date.now() + 2 * 86400000);
+      const in2DaysStr = getLocalDateString(in2Days);
+      
+      let detoxProduct = "Shampoing Clarifiant Détox au Romarin & Argile Blanche";
+      if (texture === 'Locksés') {
+        detoxProduct = "Bain de Clarification détox au Bicarbonate & Vinaigre de Cidre";
+      } else if (porosity === 'Faible') {
+        detoxProduct = "Clarification Douce au Ghassoul (Légère & sans tension)";
+      } else if (porosity === 'Forte') {
+        detoxProduct = "Masque Purifiant Clarifiant à l'Argile Bentonite";
+      }
+
+      // 1. Insert/schedule a clarification card in 2 days
       const newRoutineItem: RoutineItem = {
         id: uuid(),
         profileId: activeProfileId,
         category: 'Clarification',
-        product: 'Shampoing clarifiant détox (Feedback Lourds)',
+        product: `${detoxProduct} (Feedback Lourds)`,
         recurrence: 'Ajustement (Feedback Lourds)',
-        date: in5DaysStr,
+        date: in2DaysStr,
         completed: false,
         enableNotificationReminder: true,
       };
-      setRoutine(prev => [...prev, newRoutineItem]);
+
+      // 2. Postpone any upcoming heavy cares (oil baths, protein masks) by 4 days to let the scalp and hair breathe
+      const in7Days = new Date(Date.now() + 7 * 86400000);
+      const in7DaysStr = getLocalDateString(in7Days);
+      
+      let richCaresDelayed = 0;
+
+      setRoutine(prev => {
+        const updated = prev.map(item => {
+          if (
+            item.profileId === activeProfileId &&
+            !item.completed &&
+            item.date > todayStr &&
+            item.date <= in7DaysStr &&
+            (item.category === 'Bain d\'huile' || item.category === 'Masque protéiné' || item.category.toLowerCase().includes('protéin') || item.category.toLowerCase().includes('beurre'))
+          ) {
+            richCaresDelayed++;
+            const currentDate = new Date(item.date);
+            currentDate.setDate(currentDate.getDate() + 4);
+            return {
+              ...item,
+              date: getLocalDateString(currentDate),
+              product: `${item.product} (Reporté - Cheveux saturés)`
+            };
+          }
+          return item;
+        });
+        return [...updated, newRoutineItem];
+      });
+
+      feedbackExplanation = richCaresDelayed > 0
+        ? `Clarification ajoutée le ${in2DaysStr} pour tes locks/cheveux ${texture.toLowerCase()} et reports de ${richCaresDelayed} soin(s) gras/lourd(s) pour laisser respirer tes fibres.`
+        : `Clarification ajoutée le ${in2DaysStr} pour libérer tes cheveux ${texture.toLowerCase()} de porosité ${porosity.toLowerCase()} de toute surcharge de produit.`;
+
+    } else {
+      feedbackExplanation = "Génial ! Tes cheveux se portent à merveille. On poursuit l'agenda des soins prévu sans aucune modification ! Continuons ainsi.";
     }
 
     // Set summary screen details
     setLastFeedbackDelta(delta);
-    setLastFeedbackReason(
-      feedback === 'Secs' 
-        ? 'Feedback Secs (Manque d\'hydratation)' 
-        : feedback === 'Top' 
-          ? 'Feedback Top (Doux, brillants, parfaits)' 
-          : 'Feedback Lourds (Saturés, gras)'
-    );
+    setLastFeedbackReason(feedbackExplanation);
     
     // Close feedback quiz and OPEN care summary!
     setShowFeedbackQuiz(false);
@@ -799,6 +891,13 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           completed: true,
         };
         setLogs(prev => [...prev, newLog]);
+
+        // Open feedback popup for any completed care item!
+        setLastLoggedCategory(targetCategory);
+        setLastValidatedCare({ category: targetCategory, date: targetDate });
+        setTimeout(() => {
+          setShowFeedbackQuiz(true);
+        }, 600);
       } else {
         setLogs(prev => prev.filter(l => !(l.profileId === targetProfileId && l.date === targetDate && l.category === targetCategory)));
       }
