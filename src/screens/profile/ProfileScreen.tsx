@@ -851,7 +851,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
 
                     <View style={styles.feedbackQuestionBlock}>
                       <Text style={[styles.feedbackQuestionText, { color: customText }]}>
-                        Q7 : Les rappels et notifications de l'application vous ont-ils aidée à être plus régulière dans vos soins ?
+                        Q7 : Les rappels et notifications de l'application vous ont-ils aidé(e) à être plus régulier(ère) dans vos soins ?
                       </Text>
                       <Text style={[styles.ratingLegend, { color: customTextSec }]}>
                         (1 = Pas du tout d'accord, 5 = Tout à fait d'accord)
@@ -905,11 +905,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
 
                     <View style={styles.feedbackQuestionBlock}>
                       <Text style={[styles.feedbackQuestionText, { color: customText }]}>
-                        Q10 : Quelle est la fonctionnalité que vous avez préférée dans My Root'In ?
+                        Q10 : Quelle est la fonctionnalité que vous avez préféré(e) dans My Root'In ?
                       </Text>
                       <TextInput
                         style={[styles.feedbackTextInputLarge, { color: customText, borderColor: customBorder, backgroundColor: customInputBg }]}
-                        placeholder="Le scanner ? Le calendrier ? Le Closet virtuel ?..."
+                        placeholder="Le scanner ? Le calendrier ? Ma salle de bain ?..."
                         placeholderTextColor={colors.textMuted}
                         value={q10}
                         onChangeText={setQ10}
