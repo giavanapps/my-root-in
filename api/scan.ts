@@ -18,9 +18,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Méthode non autorisée. Utilisez POST.' });
   }
 
-  const { frontImage, backImage, image, ingredientsText, manualBrand, manualName, manualType, texture, porosity } = req.body;
+  const { frontImage, backImage, image, ingredientsText, manualBrand, manualName, manualType, texture, porosity, barcodeImage } = req.body;
 
-  if (!frontImage && !backImage && !image && !ingredientsText && (!manualBrand || !manualName)) {
+  if (!frontImage && !backImage && !image && !ingredientsText && (!manualBrand || !manualName) && !barcodeImage) {
     return res.status(400).json({ error: 'Aucune image, liste d\'ingrédients, ni informations de saisie manuelle fournies.' });
   }
 
@@ -37,7 +37,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let promptText = '';
     const parts: any[] = [];
 
-    if (frontImage && backImage) {
+    if (barcodeImage) {
+      // Option 0 : Barcode image extraction (OCR)
+      const base64Data = barcodeImage.replace(/^data:image\/\w+;base64,/, '');
+      let mimeType = 'image/jpeg';
+      const mimeMatch = barcodeImage.match(/^data:(image\/\w+);base64,/);
+      if (mimeMatch) {
+        mimeType = mimeMatch[1];
+      }
+
+      promptText = `Tu es un assistant IA spécialisé dans la lecture optique et le décodage de codes-barres (OCR).
+Analyse l'image fournie pour identifier le code-barres (généralement EAN-13, 13 chiffres imprimés sous les barres verticales) du produit capillaire.
+Extrais les 13 chiffres du code-barres.
+Fournis ta réponse en français au format JSON STRICT avec cette structure exacte :
+{
+  "barcode": "les 13 chiffres extraits sans aucun espace (ex: 3596710406087)"
+}
+Si aucun code-barres ou numéro de code-barres valide n'est visible sur la photo, renvoie une explication d'erreur sous ce format :
+{
+  "error": "Aucun code-barres lisible trouvé sur cette photo. Essaie de bien centrer le code-barres et d'éviter les reflets."
+}`;
+
+      parts.push({ text: promptText });
+      parts.push({
+        inlineData: {
+          mimeType: mimeType,
+          data: base64Data
+        }
+      });
+    } else if (frontImage && backImage) {
       // Option 1 : Double-image scan (front + back)
       const base64Front = frontImage.replace(/^data:image\/\w+;base64,/, '');
       const base64Back = backImage.replace(/^data:image\/\w+;base64,/, '');
