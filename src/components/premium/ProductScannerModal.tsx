@@ -4,6 +4,7 @@ import { colors, borderRadius, spacing } from '../../theme/colors';
 import { useAppState } from '../../store/AppStateContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { CameraView, Camera } from 'expo-camera';
 
 interface ProductScannerModalProps {
   visible: boolean;
@@ -454,7 +455,8 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   const [scannerMode, setScannerMode] = useState<'photo' | 'barcode' | 'select_method' | 'diy_select' | null>(null);
   const [barcodeInput, setBarcodeInput] = useState('');
   const [isSearchingBarcode, setIsSearchingBarcode] = useState(false);
-  const [isDecodingBarcode, setIsDecodingBarcode] = useState(false);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [scanned, setScanned] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [showScanTip, setShowScanTip] = useState(false);
@@ -746,101 +748,15 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     }
   };
 
-  const captureBarcodePhoto = async () => {
-    if (Platform.OS === 'web') {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = async (e: any) => {
-        const file = e.target.files?.[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = async (event) => {
-            const rawBase64 = event.target?.result as string;
-            const base64Data = await compressImageWeb(rawBase64);
-            await decodeBarcodeFromImage(base64Data);
-          };
-          reader.readAsDataURL(file);
-        }
-      };
-      input.click();
-    } else {
-      try {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-          showAppAlert("Permissions requises", "Désolé, nous avons besoin des permissions d'appareil photo pour photographier le code-barres.");
-          return;
-        }
-
-        const result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: false,
-          quality: 0.5,
-          base64: true,
-        });
-
-        if (!result.canceled && result.assets && result.assets[0]) {
-          const asset = result.assets[0];
-          
-          const manipResult = await ImageManipulator.manipulateAsync(
-            asset.uri,
-            [{ resize: { width: 1024 } }],
-            { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-          );
-
-          const base64Str = manipResult.base64 || asset.base64;
-          if (!base64Str) {
-            throw new Error("Impossible de générer le rendu base64 de la photo.");
-          }
-
-          const base64Data = `data:image/jpeg;base64,${base64Str}`;
-          await decodeBarcodeFromImage(base64Data);
-        }
-      } catch (err: any) {
-        console.error("Barcode camera launch error:", err);
-        showAppAlert("Erreur", err.message || "Une erreur est survenue lors de l'ouverture de l'appareil photo.");
-      }
+  useEffect(() => {
+    if (visible && scannerMode === 'barcode' && Platform.OS !== 'web') {
+      (async () => {
+        const { status } = await Camera.requestCameraPermissionsAsync();
+        setHasCameraPermission(status === 'granted');
+        setScanned(false);
+      })();
     }
-  };
-
-  const decodeBarcodeFromImage = async (base64Data: string) => {
-    setIsSearchingBarcode(true);
-    setScanStep('scanning');
-    setIsDecodingBarcode(true);
-    
-    try {
-      const response = await fetch('https://my-root-in-nine.vercel.app/api/scan', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          barcodeImage: base64Data
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error("Impossible de lire le code-barres à partir de la photo.");
-      }
-
-      const data = await response.json();
-
-      if (data.error || !data.barcode) {
-        throw new Error(data.error || "Aucun code-barres lisible trouvé sur cette photo. Essaie de bien centrer le code-barres et d'éviter les reflets.");
-      }
-
-      const decodedBarcode = data.barcode;
-      setBarcodeInput(decodedBarcode);
-      await handleBarcodeSearch(decodedBarcode);
-    } catch (err: any) {
-      console.error("Error decoding barcode:", err);
-      showAppAlert("Échec du décodage", err.message || "Impossible de lire le code-barres sur l'image.");
-      setScanStep('idle');
-    } finally {
-      setIsSearchingBarcode(false);
-      setIsDecodingBarcode(false);
-    }
-  };
+  }, [visible, scannerMode]);
 
   const uploadAndAnalyzeDouble = async (front: string, back: string) => {
     try {
@@ -1117,6 +1033,8 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     setBackPhoto(null);
     setCaptureStep('front');
     frontPhotoRef.current = null;
+    setScanned(false);
+    setHasCameraPermission(null);
   };
 
   const handleLoadFromHistory = (item: any) => {
@@ -1704,24 +1622,64 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                         </View>
                       ) : (
                         // Native mobile camera scan options
-                        <View style={{ width: '100%', alignItems: 'center', marginTop: 12 }}>
-                          <View style={{ backgroundColor: 'rgba(229, 169, 130, 0.1)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginBottom: 16, width: '100%' }}>
-                            <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.primary, textAlign: 'center' }}>
-                              📷 Flasher le code-barres du produit
-                            </Text>
+                        <View style={{ width: '100%' }}>
+                          <Text style={[styles.scannerInstructions, isDark ? styles.textLight : styles.textDark]}>
+                            📷 Cadre le code-barres dans le viseur :
+                          </Text>
+                          
+                          {/* Live Native Camera Viewport */}
+                          <View style={styles.cameraViewfinderWrapper}>
+                            {hasCameraPermission === null ? (
+                              <View style={[styles.viewfinder, { justifyContent: 'center', alignItems: 'center' }]}>
+                                <ActivityIndicator size="large" color={colors.primary} />
+                              </View>
+                            ) : hasCameraPermission === false ? (
+                              <View style={[styles.viewfinder, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+                                <Text style={{ color: colors.danger, textAlign: 'center', fontSize: 13, fontWeight: 'bold' }}>
+                                  Accès à l'appareil photo refusé. Veuillez autoriser l'accès dans les paramètres de votre téléphone.
+                                </Text>
+                              </View>
+                            ) : (
+                              <CameraView
+                                style={StyleSheet.absoluteFillObject}
+                                barcodeScannerSettings={{
+                                  barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'code39'],
+                                }}
+                                onBarcodeScanned={scanned ? undefined : ({ data }) => {
+                                  setScanned(true);
+                                  setBarcodeInput(data);
+                                  handleBarcodeSearch(data);
+                                }}
+                              >
+                                <View style={styles.viewfinder}>
+                                  {/* Laser Bar */}
+                                  <Animated.View style={[
+                                    styles.laserLine,
+                                    { transform: [{ translateY: laserAnim }] }
+                                  ]} />
+
+                                  {/* Corners of Viewfinder */}
+                                  <Animated.View style={[
+                                    styles.viewfinderFrame,
+                                    { transform: [{ scale: pulseAnim }] }
+                                  ]}>
+                                    <View style={[styles.corner, styles.topLeft]} />
+                                    <View style={[styles.corner, styles.topRight]} />
+                                    <View style={[styles.corner, styles.bottomLeft]} />
+                                    <View style={[styles.corner, styles.bottomRight]} />
+                                  </Animated.View>
+                                </View>
+                              </CameraView>
+                            )}
                           </View>
 
-                          <TouchableOpacity
-                            style={[styles.realScanButton, { width: '100%', marginBottom: spacing.md }]}
-                            activeOpacity={0.8}
-                            onPress={captureBarcodePhoto}
-                          >
-                            <Text style={styles.realScanButtonIcon}>🏷️</Text>
-                            <View style={styles.realScanButtonTextContainer}>
-                              <Text style={styles.realScanButtonTitle}>Prendre le code-barres en photo</Text>
-                              <Text style={styles.realScanButtonSubtitle}>Notre IA va déchiffrer les chiffres automatiquement</Text>
+                          {showScanTip && (
+                            <View style={styles.scanTipCard}>
+                              <Text style={styles.scanTipText}>
+                                💡 Astuce : Éloigne un peu ton produit (environ 15-20 cm) pour faire la mise au point, et assure-toi que le code-barres est bien éclairé et sans reflet.
+                              </Text>
                             </View>
-                          </TouchableOpacity>
+                          )}
                         </View>
                       )}
 

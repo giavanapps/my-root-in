@@ -41,6 +41,13 @@
             "./assets/sounds/two_pshit.mp3"
           ]
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "L'application a besoin d'accéder à l'appareil photo pour scanner les codes-barres.",
+          "barcodeScannerEnabled": true
+        }
       ]
     ],
     "web": {
