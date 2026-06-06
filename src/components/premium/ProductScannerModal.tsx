@@ -404,6 +404,36 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     }
   };
 
+  const showAppConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    onCancel: () => void
+  ) => {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined') {
+        const result = window.confirm(`${title}\n\n${message}`);
+        if (result) {
+          onConfirm();
+        } else {
+          onCancel();
+        }
+      } else {
+        onCancel();
+      }
+    } else {
+      Alert.alert(
+        title,
+        message,
+        [
+          { text: "Annuler", style: "cancel", onPress: onCancel },
+          { text: "Prendre en photo", style: "default", onPress: onConfirm }
+        ],
+        { cancelable: true }
+      );
+    }
+  };
+
   const [scanStep, setScanStep] = useState<'idle' | 'scanning' | 'result' | 'scan_error' | 'manual_express'>('idle');
   const [activeFeatureTab, setActiveFeatureTab] = useState<'inci' | 'add' | 'compare' | 'diy'>('inci');
   const [selectedProduct, setSelectedProduct] = useState<MockProduct | null>(null);
@@ -885,108 +915,113 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     setScanStep('scanning');
 
     try {
+      let analysisResult: any = null;
+
       // 1. Interroger l'API publique Open Beauty Facts
-      const openBeautyFactsUrl = `https://world.openbeautyfacts.org/api/v0/product/${code}.json`;
-      const obfResponse = await fetch(openBeautyFactsUrl);
-      
-      if (!obfResponse.ok) {
-        throw new Error("Impossible de se connecter à la base de données internationale.");
-      }
+      try {
+        const openBeautyFactsUrl = `https://world.openbeautyfacts.org/api/v0/product/${code}.json`;
+        const obfResponse = await fetch(openBeautyFactsUrl);
+        if (obfResponse.ok) {
+          const obfData = await obfResponse.json();
+          if (obfData.status === 1 && obfData.product) {
+            const product = obfData.product;
+            const productName = product.product_name || "Produit Inconnu";
+            const productBrand = product.brands || "Marque Inconnue";
+            const ingredientsText = product.ingredients_text;
 
-      const obfData = await obfResponse.json();
+            if (ingredientsText && ingredientsText.trim().length >= 5) {
+              // Appeler l'API pour analyser la liste d'ingrédients trouvée
+              const scanResponse = await fetch('https://my-root-in-nine.vercel.app/api/scan', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  ingredientsText: ingredientsText,
+                  texture: activeProfile?.diagnostic?.texture || 'Crépus',
+                  porosity: activeProfile?.diagnostic?.porosity || 'Moyenne'
+                })
+              });
 
-      if (obfData.status !== 1 || !obfData.product) {
-        // Fallback: Product not found, prompt to take photo instead!
-        const confirmPhoto = window.confirm(
-          `Le code-barres "${code}" n'est pas encore répertorié dans la base internationale.\n\nPas de soucis ! Préfères-tu prendre directement en photo sa liste d'ingrédients au dos ?`
-        );
-        if (confirmPhoto) {
-          setScanStep('idle');
-          setScannerMode('photo');
-          setIsSearchingBarcode(false);
-          // Auto trigger camera capture
-          setFrontPhoto(null);
-          setBackPhoto(null);
-          setCaptureStep('front');
-          setTimeout(() => {
-            capturePhoto('front');
-          }, 200);
-        } else {
-          setScanStep('idle');
-          setIsSearchingBarcode(false);
+              if (scanResponse.ok) {
+                const result = await scanResponse.json();
+                if (result && !result.error) {
+                  if (productBrand && productBrand !== "Marque Inconnue") result.brand = productBrand;
+                  if (productName && productName !== "Produit Inconnu") result.name = productName;
+                  if (product.image_url) result.image = product.image_url;
+                  analysisResult = result;
+                }
+              }
+            }
+          }
         }
-        return;
+      } catch (obfErr) {
+        console.log("Open Beauty Facts API failed or timed out, trying Gemini direct lookup...", obfErr);
       }
 
-      const product = obfData.product;
-      const productName = product.product_name || "Produit Inconnu";
-      const productBrand = product.brands || "Marque Inconnue";
-      const ingredientsText = product.ingredients_text;
+      // 2. Fallback direct sur notre API scan (Gemini knowledge base) si pas trouvé
+      if (!analysisResult) {
+        console.log("Product not found or incomplete in Open Beauty Facts, attempting Gemini lookup for barcode:", code);
+        const scanResponse = await fetch('https://my-root-in-nine.vercel.app/api/scan', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            barcode: code,
+            texture: activeProfile?.diagnostic?.texture || 'Crépus',
+            porosity: activeProfile?.diagnostic?.porosity || 'Moyenne'
+          })
+        });
 
-      if (!ingredientsText || ingredientsText.trim().length < 5) {
-        // Fallback: Product found but ingredients list is empty
-        const confirmPhoto = window.confirm(
-          `Produit trouvé : "${productBrand} - ${productName}" !\n\nMalheureusement, sa liste d'ingrédients est incomplète dans la base.\n\nPréfères-tu prendre en photo la liste d'ingrédients réelle au dos du produit ?`
-        );
-        if (confirmPhoto) {
-          setScanStep('idle');
-          setScannerMode('photo');
-          setIsSearchingBarcode(false);
-          setFrontPhoto(null);
-          setBackPhoto(null);
-          setCaptureStep('front');
-          setTimeout(() => {
-            capturePhoto('front');
-          }, 200);
-        } else {
-          setScanStep('idle');
-          setIsSearchingBarcode(false);
+        if (scanResponse.ok) {
+          const result = await scanResponse.json();
+          if (result && !result.error) {
+            analysisResult = result;
+          }
         }
-        return;
       }
 
-      // 2. Envoyer les ingrédients textuels à notre API Route privée
-      // Toujours utiliser l'URL absolue de Vercel car les URLs relatives échouent sur l'APK natif !
-      const scanResponse = await fetch('https://my-root-in-nine.vercel.app/api/scan', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          ingredientsText: ingredientsText,
-          texture: activeProfile?.diagnostic?.texture || 'Crépus',
-          porosity: activeProfile?.diagnostic?.porosity || 'Moyenne'
-        })
-      });
+      // 3. Traiter le résultat ou proposer la photo
+      if (analysisResult) {
+        const displayImage = analysisResult.image || 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop';
+        analysisResult.image = displayImage;
 
-      if (!scanResponse.ok) {
-        const errData = await scanResponse.json();
-        throw new Error(errData.error || errData.details || 'Erreur lors de l\'analyse moléculaire');
+        setRealProductAnalysis(analysisResult);
+        addScanHistoryItem({
+          brand: analysisResult.brand || 'Marque Inconnue',
+          name: analysisResult.name || 'Produit Inconnu',
+          image: displayImage,
+          ingredients: analysisResult.ingredients || [],
+          score: analysisResult.score || 80,
+          title: analysisResult.title || 'Compatible 🌿',
+          description: analysisResult.description || '',
+          color: analysisResult.color,
+          inciReport: analysisResult.inciReport
+        });
+        setScanStep('result');
+      } else {
+        // Aucun résultat dans Open Beauty Facts ni Gemini, proposer la photo des ingrédients
+        showAppConfirm(
+          "Produit non trouvé",
+          `Le code-barres "${code}" n'est pas répertorié dans nos bases de données.\n\nPas de soucis ! Souhaites-tu prendre en photo la liste d'ingrédients au dos de ton produit ?`,
+          () => {
+            setScanStep('idle');
+            setScannerMode('photo');
+            setIsSearchingBarcode(false);
+            setFrontPhoto(null);
+            setBackPhoto(null);
+            setCaptureStep('front');
+            setTimeout(() => {
+              capturePhoto('front');
+            }, 200);
+          },
+          () => {
+            setScanStep('idle');
+            setIsSearchingBarcode(false);
+          }
+        );
       }
-
-      const result = await scanResponse.json();
-      
-      // Surcharge avec les infos précises d'Open Beauty Facts si besoin
-      if (productBrand && productBrand !== "Marque Inconnue") result.brand = productBrand;
-      if (productName && productName !== "Produit Inconnu") result.name = productName;
-      if (product.image_url) result.image = product.image_url;
-
-      const displayImage = result.image || 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop';
-      result.image = displayImage;
-
-      setRealProductAnalysis(result);
-      addScanHistoryItem({
-        brand: result.brand || 'Marque Inconnue',
-        name: result.name || 'Produit Inconnu',
-        image: displayImage,
-        ingredients: result.ingredients || [],
-        score: result.score || 80,
-        title: result.title || 'Compatible 🌿',
-        description: result.description || '',
-        color: result.color,
-        inciReport: result.inciReport
-      });
-      setScanStep('result');
 
     } catch (err: any) {
       console.error('Barcode scan failed:', err);
@@ -1258,7 +1293,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     activeOpacity={0.9}
                     onPress={() => {
                       setActiveFeatureTab('inci');
-                      setScannerMode('photo');
+                      setScannerMode('select_method');
                     }}
                   >
                     <Text style={styles.modeCardIcon}>🔬</Text>
@@ -1299,7 +1334,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     activeOpacity={0.9}
                     onPress={() => {
                       setActiveFeatureTab('add');
-                      setScannerMode('photo');
+                      setScannerMode('select_method');
                     }}
                   >
                     <Text style={styles.modeCardIcon}>➕</Text>
@@ -1320,7 +1355,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     activeOpacity={0.9}
                     onPress={() => {
                       setActiveFeatureTab('compare');
-                      setScannerMode('photo');
+                      setScannerMode('select_method');
                     }}
                   >
                     <Text style={styles.modeCardIcon}>🗄️</Text>

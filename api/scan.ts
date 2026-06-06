@@ -18,9 +18,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Méthode non autorisée. Utilisez POST.' });
   }
 
-  const { frontImage, backImage, image, ingredientsText, manualBrand, manualName, manualType, texture, porosity, barcodeImage } = req.body;
+  const { frontImage, backImage, image, ingredientsText, manualBrand, manualName, manualType, texture, porosity, barcodeImage, barcode } = req.body;
 
-  if (!frontImage && !backImage && !image && !ingredientsText && (!manualBrand || !manualName) && !barcodeImage) {
+  if (!frontImage && !backImage && !image && !ingredientsText && (!manualBrand || !manualName) && !barcodeImage && !barcode) {
     return res.status(400).json({ error: 'Aucune image, liste d\'ingrédients, ni informations de saisie manuelle fournies.' });
   }
 
@@ -37,7 +37,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let promptText = '';
     const parts: any[] = [];
 
-    if (barcodeImage) {
+    if (barcode) {
+      // Option -1 : Barcode text lookup using Gemini knowledge base
+      promptText = `Tu es un expert en cosmétologie capillaire et ingrédients INCI, spécialisé dans les cheveux afro et texturés (crépus, frisés, bouclés, ondulés, locksés).
+On te fournit un code-barres EAN-13 : ${barcode}.
+Si tu connais le produit capillaire exact correspondant à ce code-barres, reconstitue sa marque, son nom et sa liste d'ingrédients INCI officielle pour faire son analyse.
+
+RÈGLES STRICTES DE CATÉGORISATION ET D'INTERDICTION CAPILLAIRE :
+- Interdiction totale de conseiller d'utiliser un produit de type 'Gel', 'Gelée' ou 'Cire' pour un 'Bain d'huile' ou pour un 'Masque / Soin Profond', même si le produit contient des huiles dans ses ingrédients. Les gels sont formulés avec des agents fixants et gélifiants et ne sont techniquement pas adaptés aux soins profonds ou bains d'huiles.
+- Pour un soin 'Bain d'huile', conseille exclusivement des huiles végétales pures, des beurres ou des sérums huileux.
+- Pour un soin 'Masque / Soin Profond', conseille uniquement des masques capillaires spécifiques.
+- Pour un soin 'Shampoing / Clarification', conseille uniquement des shampoings (avec ou sans sulfates) ou des argiles détox.
+- Pour un soin 'Hydratation / Coiffage', conseille uniquement des leave-in, laits, crèmes, gels ou gelées.
+
+Prends en compte le profil capillaire de l'utilisateur :
+- Texture : ${texture || 'Crépus'}
+- Porosité : ${porosity || 'Moyenne'}
+
+Fournis ton analyse en français au format JSON STRICT avec cette structure exacte :
+{
+  "brand": "Marque détectée (ex: Cantu)",
+  "name": "Nom du produit détecté (ex: Shea Butter Leave-in)",
+  "score": 85, // Score de 0 à 100 indiquant la compatibilité exacte avec son profil (sois honnête et sévère s'il y a des ingrédients toxiques ou occlusifs inadaptés)
+  "title": "Titre court de compatibilité (ex: Excellent pour ton profil ! 🌿)",
+  "description": "Explication détaillée et personnalisée de ton avis en tant que coach capillaire IA, en expliquant spécifiquement pourquoi les ingrédients de ce produit conviennent ou non à sa porosité et sa texture. Adresse-toi directement à l'utilisateur de manière bienveillante. Mentionne au début que tu analyses ce produit via ta base de connaissances à partir de son code-barres.",
+  "inciReport": {
+    "good": ["Ingrédient 1 (Explication rapide de son effet bénéfique)", "Ingrédient 2 (Explication)"],
+    "neutral": ["Ingrédient 1 (Explication)", "Ingrédient 2 (Explication)"],
+    "avoid": ["Ingrédient 1 (Pourquoi l'éviter : ex: occlusif, cire minérale, sulfate décapant, alcool desséchant)", "Ingrédient 2 (Pourquoi l'éviter)"]
+  }
+}
+Si tu ne connais pas du tout ce code-barres ou que ce n'est pas un produit capillaire, renvoie exactement cet objet JSON d'erreur :
+{
+  "error": "Produit inconnu dans notre base de connaissances."
+}`;
+
+      parts.push({ text: promptText });
+    } else if (barcodeImage) {
       // Option 0 : Barcode image extraction (OCR)
       const base64Data = barcodeImage.replace(/^data:image\/\w+;base64,/, '');
       let mimeType = 'image/jpeg';
