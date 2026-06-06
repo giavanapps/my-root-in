@@ -474,11 +474,11 @@ const libraryArticles: LibraryArticle[] = [
   },
   {
     id: 'la11',
-    title: 'La routine de lavage spéciale Locks Matures 🦁',
+    title: 'La routine de lavage spéciale Locks Matures 🪮',
     category: 'Soins',
     readTime: '5 min',
     tags: ['Locksés', 'Locks matures', 'Épais'],
-    bgEmoji: '🦁',
+    bgEmoji: '🪮',
     snippet: 'Les locks matures ont besoin d\'un nettoyage en profondeur mais sans résidus. La méthode du bain de bicarbonate et vinaigre est magique.',
     content: 'Les locks matures capturent facilement la poussière, le calcaire et le sébum au cœur de leur structure serrée. Pour conserver des locks légères, propres et sans résidus, effectuez une détox bi-annuelle : plongez vos locks dans une bassine d\'eau chaude additionnée de 2 cuillères à soupe de bicarbonate de soude et d\'un demi-verre de vinaigre de cidre pendant 15 minutes. Pressez doucement pour faire sortir les impuretés accumulées. Rincez abondamment. Vos locks en ressortiront d\'une légèreté et d\'une fraîcheur incomparables !'
   },

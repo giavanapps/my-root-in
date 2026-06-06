@@ -10,11 +10,12 @@ import { HomeScreen } from './src/screens/home/HomeScreen';
 import { ProfileScreen } from './src/screens/profile/ProfileScreen';
 import { CalendarScreen } from './src/screens/calendar/CalendarScreen';
 import { BathroomScreen } from './src/screens/bathroom/BathroomScreen';
+import { ShopScreen } from './src/screens/shop/ShopScreen';
 import { PremiumPaywallModal } from './src/components/premium/PremiumPaywallModal';
 import { FeedbackSystem } from './src/components/common/FeedbackSystem';
 
 type ActiveScreen = 'auth' | 'diagnostic' | 'home';
-type ActiveTab = 'dashboard' | 'calendar' | 'bathroom' | 'profile';
+type ActiveTab = 'dashboard' | 'calendar' | 'bathroom' | 'shop' | 'profile';
 
 function MainApp() {
   const [currentScreen, setCurrentScreen] = useState<ActiveScreen>('auth');
@@ -116,6 +117,9 @@ function MainApp() {
               {activeTab === 'bathroom' && (
                 <BathroomScreen />
               )}
+              {activeTab === 'shop' && (
+                <ShopScreen />
+              )}
               {activeTab === 'profile' && (
                 <ProfileScreen 
                   onRefireDiagnostic={() => {
@@ -198,7 +202,24 @@ function MainApp() {
                 </Text>
               </TouchableOpacity>
 
-              {/* Tab 4: Mon Profil */}
+              {/* Tab 4: Shop */}
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                style={styles.tabItem} 
+                onPress={() => setActiveTab('shop')}
+              >
+                <Text style={[styles.tabIcon, { opacity: activeTab === 'shop' ? 1 : 0.6 }]}>
+                  🛒
+                </Text>
+                <Text style={[
+                  styles.tabLabel, 
+                  { color: activeTab === 'shop' ? activeTextColor : inactiveTextColor }
+                ]}>
+                  Shop
+                </Text>
+              </TouchableOpacity>
+
+              {/* Tab 5: Mon Profil */}
               <TouchableOpacity 
                 activeOpacity={0.8}
                 style={styles.tabItem} 

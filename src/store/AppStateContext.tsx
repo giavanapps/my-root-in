@@ -180,6 +180,28 @@ const uuid = () => {
   return `${Date.now().toString(36)}-${uuidCounter}-${Math.random().toString(36).substring(2, 9)}`;
 };
 
+export const getCareOrderWeight = (category: string): number => {
+  const cat = category.toLowerCase().trim();
+  if (cat.includes("bain d'huile") || cat.includes("bain d’huile") || cat.includes("pre-poo") || cat.includes("avant-lavage")) return 1;
+  if (cat.includes("clarification") || cat.includes("clarif") || cat.includes("détox") || cat.includes("detox")) return 2;
+  if (cat.includes("lavage") || cat.includes("shampoing") || cat.includes("shampoo")) return 3;
+  if (cat.includes("masque") || cat.includes("après-shampoing") || cat.includes("apres-shampoing") || cat.includes("rincer") || cat.includes("à rincer") || cat.includes("a rincer")) return 4;
+  if (cat.includes("sans rinçage") || cat.includes("sans rincage") || cat.includes("leave-in") || cat.includes("leave in") || cat.includes("spray") || cat.includes("lait") || cat.includes("crème") || cat.includes("creme") || cat.includes("retwist")) return 5;
+  return 6;
+};
+
+export const sortRoutineItems = (items: RoutineItem[]): RoutineItem[] => {
+  return [...items].sort((a, b) => {
+    if (a.date !== b.date) {
+      return a.date.localeCompare(b.date);
+    }
+    const wA = getCareOrderWeight(a.category);
+    const wB = getCareOrderWeight(b.category);
+    if (wA !== wB) return wA - wB;
+    return b.id.localeCompare(a.id);
+  });
+};
+
 const isAppRoutineCategory = (cat: string) => {
   const normalized = cat.toLowerCase().trim();
   return (
@@ -420,7 +442,7 @@ const generateRoutineCalendar = (profileId: string, diagnostic: HairDiagnostic, 
     });
   }
 
-  return items;
+  return sortRoutineItems(items);
 };
 
 export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -446,7 +468,14 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [showCareSummary, setShowCareSummary] = useState<boolean>(false);
 
   // Pre-configured Routine / Agenda
-  const [routine, setRoutine] = useState<RoutineItem[]>([]);
+  const [routine, setRoutineInternal] = useState<RoutineItem[]>([]);
+  const setRoutine = (value: RoutineItem[] | ((prev: RoutineItem[]) => RoutineItem[])) => {
+    if (typeof value === 'function') {
+      setRoutineInternal(prev => sortRoutineItems(value(prev)));
+    } else {
+      setRoutineInternal(sortRoutineItems(value));
+    }
+  };
 
   const [logs, setLogs] = useState<ActionLog[]>([]);
 

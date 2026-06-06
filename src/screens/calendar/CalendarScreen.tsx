@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Modal, TextInput, Platform, Switch, Animated, PanResponder } from 'react-native';
 import { colors, borderRadius } from '../../theme/colors';
-import { useAppState, RoutineItem } from '../../store/AppStateContext';
+import { useAppState, RoutineItem, getCareOrderWeight } from '../../store/AppStateContext';
 import { Button } from '../../components/common/Button';
 import { TimePickerModal } from '../../components/common/TimePickerModal';
 import { DatePickerModal } from '../../components/common/DatePickerModal';
@@ -614,7 +614,12 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
   // Get active routines list for the selected date
   const activeDateRoutines = routine
     .filter(r => r.profileId === activeProfile.id && r.date === selectedDateStr && !(r.completed && r.date < todayStr))
-    .sort((a, b) => b.id.localeCompare(a.id));
+    .sort((a, b) => {
+      const wA = getCareOrderWeight(a.category);
+      const wB = getCareOrderWeight(b.category);
+      if (wA !== wB) return wA - wB;
+      return b.id.localeCompare(a.id);
+    });
   const isPastDate = selectedDateStr < todayStr;
   const isFutureDate = selectedDateStr > todayStr;
 
