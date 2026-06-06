@@ -1474,7 +1474,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
 
                       <View style={{ backgroundColor: 'rgba(229, 169, 130, 0.1)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginBottom: 16, width: '100%' }}>
                         <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.primary, textAlign: 'center' }}>
-                          📸 Étape 2 : Prendre le dos du produit en photo (ingrédients)
+                          📸 Étape 2 : Prendre en photo la liste des ingrédients au dos du produit
                         </Text>
                       </View>
                       
@@ -1485,8 +1485,8 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                       >
                         <Text style={styles.realScanButtonIcon}>📷</Text>
                         <View style={styles.realScanButtonTextContainer}>
-                          <Text style={[styles.realScanButtonTitle, { color: '#FFFFFF' }]}>Prendre le dos en photo</Text>
-                          <Text style={[styles.realScanButtonSubtitle, { color: 'rgba(255,255,255,0.8)' }]}>Analyse INCI et moléculaire</Text>
+                          <Text style={[styles.realScanButtonTitle, { color: '#FFFFFF' }]}>Prendre la liste des ingrédients en photo</Text>
+                          <Text style={[styles.realScanButtonSubtitle, { color: 'rgba(255,255,255,0.8)' }]}>Veille à ce que la liste INCI soit bien nette</Text>
                         </View>
                       </TouchableOpacity>
 
