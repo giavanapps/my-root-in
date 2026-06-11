@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, Modal, TouchableOpacity, ScrollView, Animated, ActivityIndicator, Image, TextInput, Platform, Alert } from 'react-native';
+import { StyleSheet, View, Text, Modal, TouchableOpacity, ScrollView, Animated, ActivityIndicator, Image, TextInput, Platform, Alert, PanResponder } from 'react-native';
 import { colors, borderRadius, spacing } from '../../theme/colors';
 import { useAppState } from '../../store/AppStateContext';
 import * as ImagePicker from 'expo-image-picker';
@@ -99,31 +99,35 @@ export const detectCategory = (name: string, brand: string): string => {
     return 'Masque hydratant';
   }
   if (/\bhuile\b|\boil\b|\boils\b|\bserum\b/i.test(full)) {
-    // If it also contains cream, crème, lotion, lait, smoothie, it's a cream/leave-in, not a pure oil!
     if (!/\bcream\b|\bcrème\b|\bcreme\b|\blotion\b|\blait\b|\bsmoothie\b/i.test(full)) {
       return "Bain d'huile";
     }
   }
-  if (/\bleave\b|\blait\b|\bcrème\b|\bcreme\b|\bcream\b|\blotion\b|\bsmoothie\b|\bconditioner\b|\baprès-shampoing\b|\bapres-shampoing\b/i.test(full)) {
-    return 'Soin sans rinçage';
+  if (/\bleave\b|\blait\b|\bcr\u00e8me\b|\bcreme\b|\bcream\b|\blotion\b|\bsmoothie\b|\bmilk\b/i.test(full)) {
+    return 'Soin sans rin\u00e7age';
+  }
+  if (/\bapr\u00e8s-shampoing\b|\bapres-shampoing\b|\bconditioner\b|\bconditionneur\b/i.test(full)) {
+    return 'Masque hydratant';
   }
   if (/\bclarif\b|\bdétox\b|\bdetox\b|\bargile\b|\bclay\b/i.test(full)) {
     return 'Clarification';
   }
-  return 'Soin sans rinçage';
+  return 'Autre';
 };
 
 export const matchesCategory = (prodCat: string, agendaCat: string, prodName?: string): boolean => {
-  const pc = prodCat.toLowerCase();
-  const ac = agendaCat.toLowerCase();
+  const pc = prodCat.toLowerCase().trim();
+  const ac = agendaCat.toLowerCase().trim();
   const name = prodName ? prodName.toLowerCase() : '';
 
-  // Règle absolue: Interdiction totale de proposer un produit de type 'Gel', 'Gelée' ou 'Cire' pour du soin profond (Masque) ou Bain d'huile
-  const isGel = pc.includes('retwist') || pc.includes('gel') || name.includes('gel') || name.includes('gelée') || name.includes('jelly') || name.includes('cire') || name.includes('wax');
+  // Produit non identifié : JAMAIS proposé dans une routine
+  if (pc === 'autre' || pc === '') return false;
+
+  // Détecteur gel/cire (utilisé pour protéger masque et bain d’huile uniquement)
+  const isHeavyGel = name.includes('cire') || name.includes('wax') || name.includes('petrolatum') || name.includes('pétrolatum');
 
   if (ac.includes('bain') || ac.includes('huile')) {
-    if (isGel) return false;
-    // Bain d'huile: uniquement des produits de la catégorie Huiles pures, Beurres ou Sérums huileux (Bain d'huile)
+    if (isHeavyGel) return false;
     return pc === "bain d'huile";
   }
 
@@ -133,24 +137,21 @@ export const matchesCategory = (prodCat: string, agendaCat: string, prodName?: s
   }
 
   if (ac.includes('masque') || ac.includes('profond')) {
-    if (isGel) return false;
-    // Masque / Soin Profond: uniquement des Masques capillaires (Masque hydratant)
+    if (isHeavyGel) return false;
     return pc === 'masque hydratant';
   }
 
-  if (
-    ac.includes('sans rinçage') || 
-    ac.includes('leave') || 
-    ac.includes('lait') || 
-    ac.includes('crème') || 
-    ac.includes('creme') || 
-    ac.includes('cream') || 
-    ac.includes('coiffage') || 
-    ac.includes('hydratation') || 
-    ac.includes('retwist')
-  ) {
-    // Hydratation / Coiffage: uniquement des Leave-in, Crèmes, Laits (Soin sans rinçage) ou Gels, Gelées (Retwist)
-    return pc === 'soin sans rinçage' || pc === 'retwist';
+  // Étape Retwist → UNIQUEMENT gels/gelées définissants
+  if (ac.includes('retwist')) {
+    return pc === 'retwist'; // Simple et strict : seul 'retwist' correspond
+  }
+
+  if (ac.includes('sans rinç') || ac.includes('sans rinc') || ac.includes('leave') ||
+      ac.includes('lait') || ac.includes('crème') || ac.includes('creme') ||
+      ac.includes('cream') || ac.includes('coiffage') || ac.includes('hydratation')) {
+    // Jamais un gel/shampoing dans un soin sans rincçage
+    if (pc === 'retwist' || pc === 'lavage' || pc === 'clarification') return false;
+    return pc === 'soin sans rinçage';
   }
 
   return false;
@@ -393,7 +394,8 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     routine, 
     activeProfileId,
     scanHistory,
-    addScanHistoryItem
+    addScanHistoryItem,
+    deleteScanHistoryItem
   } = useAppState();
   const isDark = themeMode === 'dark';
 
@@ -435,7 +437,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     }
   };
 
-  const [scanStep, setScanStep] = useState<'idle' | 'scanning' | 'result' | 'scan_error' | 'manual_express'>('idle');
+  const [scanStep, setScanStep] = useState<'idle' | 'scanning' | 'result' | 'scan_error' | 'not_recognized' | 'manual_express'>('idle');
   const [activeFeatureTab, setActiveFeatureTab] = useState<'inci' | 'add' | 'compare' | 'diy'>('inci');
   const [selectedProduct, setSelectedProduct] = useState<MockProduct | null>(null);
   const [showFullHistory, setShowFullHistory] = useState(false);
@@ -450,6 +452,8 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   const [backPhoto, setBackPhoto] = useState<string | null>(null);
   const [captureStep, setCaptureStep] = useState<'front' | 'back'>('front');
   const frontPhotoRef = useRef<string | null>(null);
+  const cameraRef = useRef<any>(null);
+  const [isCameraLoading, setIsCameraLoading] = useState(false);
 
   // Code-barres states
   const [scannerMode, setScannerMode] = useState<'photo' | 'barcode' | 'select_method' | 'diy_select' | null>(null);
@@ -459,6 +463,9 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   const [scanned, setScanned] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  // Incrementing this key forces a full remount of CameraView (resets the native ML Kit engine)
+  const cameraKey = useRef(0);
+  const scanAllowedTime = useRef<number>(0);
   const [showScanTip, setShowScanTip] = useState(false);
   const [showShoppingList, setShowShoppingList] = useState(false);
 
@@ -478,16 +485,24 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     if (visible) {
       if (directPlacardMode) {
         setActiveFeatureTab('add');
-        setScannerMode('photo');
+        // In bathroom mode: show method choice (photo OR barcode) — don’t force photo only
+        setScannerMode('select_method');
         setCaptureStep('front');
         setFrontPhoto(null);
         setBackPhoto(null);
-        frontPhotoRef.current = null;
       }
     } else {
       handleReset();
     }
   }, [visible, directPlacardMode]);
+
+  // GARDE SALLE DE BAIN : intercepte tout setScannerMode(null) en directPlacardMode
+  // → redirige vers select_method (choix photo/barcode) au lieu du menu 4 fonctions
+  useEffect(() => {
+    if (directPlacardMode && visible && scannerMode === null) {
+      setScannerMode('select_method');
+    }
+  }, [scannerMode, directPlacardMode, visible]);
 
   const html5QrCodeRef = useRef<any>(null);
 
@@ -748,12 +763,124 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     }
   };
 
+  const takePhotoInline = async (step: 'front' | 'back') => {
+    setSelectedProduct(null);
+    setRealProductAnalysis(null);
+    setRealProductError(null);
+
+    if (!cameraRef.current) {
+      showAppAlert("Erreur", "L'appareil photo n'est pas prêt.");
+      return;
+    }
+
+    try {
+      setIsCameraLoading(true);
+      const result = await cameraRef.current.takePictureAsync({
+        quality: 0.5,
+        base64: true,
+      });
+
+      if (result && result.uri) {
+        // Utiliser expo-image-manipulator pour compresser et redimensionner l'image nativement
+        let base64Str = result.base64;
+        try {
+          const manipResult = await ImageManipulator.manipulateAsync(
+            result.uri,
+            [{ resize: { width: 1024 } }],
+            { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+          );
+          base64Str = manipResult.base64 || base64Str;
+        } catch (manipErr) {
+          console.warn("Image manipulation failed:", manipErr);
+        }
+
+        if (!base64Str) {
+          throw new Error("Impossible de générer le rendu base64 de la photo.");
+        }
+
+        // Construire le format data URI requis par l'API
+        const base64Data = `data:image/jpeg;base64,${base64Str}`;
+        
+        if (step === 'front') {
+          setFrontPhoto(base64Data);
+          frontPhotoRef.current = base64Data;
+          setCaptureStep('back');
+        } else {
+          setBackPhoto(base64Data);
+          setIsAnalyzingReal(true);
+          setScanStep('scanning');
+          await uploadAndAnalyzeDouble(frontPhotoRef.current || frontPhoto || base64Data, base64Data);
+        }
+      }
+    } catch (err: any) {
+      console.error("Camera capture error on native:", err);
+      showAppAlert("Erreur", err.message || "Une erreur est survenue lors de la prise de photo.");
+    } finally {
+      setIsCameraLoading(false);
+    }
+  };
+
+  const handleRetryScan = () => {
+    setFrontPhoto(null);
+    setBackPhoto(null);
+    setCaptureStep('front');
+    frontPhotoRef.current = null;
+    setScanned(false);
+    cameraKey.current += 1;
+    scanAllowedTime.current = Date.now() + 1000;
+    setScanStep('idle');
+    
+    if (scannerMode === 'photo' && Platform.OS === 'web') {
+      setTimeout(() => capturePhoto('front'), 100);
+    }
+  };
+
+  const launchNativeSystemScanner = async () => {
+    if ((Platform.OS as string) === 'web') {
+      showAppAlert("Non pris en charge", "Le scanner natif n'est pas disponible sur le web. Veuillez saisir le code manuellement.");
+      return;
+    }
+    
+    try {
+      setScanned(true); // Prevent embedded scanner from scanning in parallel
+      
+      const subscription = CameraView.onModernBarcodeScanned((result) => {
+        if (result && result.data) {
+          subscription.remove();
+          CameraView.dismissScanner();
+          setBarcodeInput(result.data);
+          // Small timeout to allow scanner dismissal before initiating search UI
+          setTimeout(() => {
+            handleBarcodeSearch(result.data);
+          }, 100);
+        }
+      });
+
+      await CameraView.launchScanner({
+        barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'code39'],
+      });
+    } catch (err: any) {
+      console.error("Failed to launch native system scanner:", err);
+      showAppAlert("Erreur", "Impossible de lancer le scanner natif. Veuillez utiliser le scan classique ou saisir le code.");
+      setScanned(false);
+    }
+  };
+
   useEffect(() => {
-    if (visible && scannerMode === 'barcode' && Platform.OS !== 'web') {
+    if (visible && (scannerMode === 'barcode' || scannerMode === 'photo') && Platform.OS !== 'web') {
       (async () => {
-        const { status } = await Camera.requestCameraPermissionsAsync();
-        setHasCameraPermission(status === 'granted');
+        try {
+          const { status } = await Camera.requestCameraPermissionsAsync();
+          setHasCameraPermission(status === 'granted');
+        } catch (err) {
+          console.warn('Camera permission request failed, letting CameraView handle it natively:', err);
+          // Fallback: let CameraView request permission itself
+          setHasCameraPermission(true);
+        }
+        // Force a fresh CameraView remount on every entry
+        cameraKey.current += 1;
         setScanned(false);
+        scanAllowedTime.current = Date.now() + 1000;
       })();
     }
   }, [visible, scannerMode]);
@@ -792,6 +919,12 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
       }
 
       const result = await response.json();
+      // Produit non reconnu par l'IA — ne jamais afficher une analyse inventée
+      if (result.recognized === false) {
+        setScanStep('not_recognized');
+        return;
+      }
+
       const displayImage = front || 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop';
       result.image = displayImage;
       setRealProductAnalysis(result);
@@ -817,10 +950,42 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     }
   };
 
+  // ─── Shared API call helper with timeout + quota error handling ─────────
+  const callScanAPI = async (payload: Record<string, any>): Promise<any> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout
+
+    try {
+      const response = await fetch('https://my-root-in-nine.vercel.app/api/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+
+      const data = await response.json();
+
+      // Quota dépassé — message clair
+      if (response.status === 429 || data?.error === 'quota_exceeded') {
+        const msg = data?.message || 'Le quota d\'analyse IA est temporairement épuisé. Réessaie dans 1 minute.';
+        throw new Error('QUOTA_EXCEEDED:' + msg);
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.details || data?.error || `Erreur serveur ${response.status}`);
+      }
+
+      return data;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
+
   const handleBarcodeSearch = async (barcodeToSearch?: string) => {
-    const code = barcodeToSearch || barcodeInput.trim();
-    if (!code) {
-      showAppAlert("Saisie requise", "Veuillez saisir un code-barres (EAN-13).");
+    const raw = barcodeToSearch || barcodeInput.trim();
+    const code = raw.replace(/\s/g, '');
+    if (!code || (code.length !== 12 && code.length !== 13)) {
+      showAppAlert("Saisie requise", "Veuillez saisir un code-barres valide (EAN-13 à 13 chiffres ou UPC à 12 chiffres).");
       return;
     }
 
@@ -833,117 +998,148 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     try {
       let analysisResult: any = null;
 
-      // 1. Interroger l'API publique Open Beauty Facts
+      // ══════════════════════════════════════════════════════════════
+      // 1. INCI API (inciapi.com) — Source PRIORITAIRE
+      //    Couvre EAN-13 ET UPC-12, produits US/internationaux
+      // ══════════════════════════════════════════════════════════════
       try {
-        const openBeautyFactsUrl = `https://world.openbeautyfacts.org/api/v0/product/${code}.json`;
-        const obfResponse = await fetch(openBeautyFactsUrl);
-        if (obfResponse.ok) {
-          const obfData = await obfResponse.json();
-          if (obfData.status === 1 && obfData.product) {
-            const product = obfData.product;
-            const productName = product.product_name || "Produit Inconnu";
-            const productBrand = product.brands || "Marque Inconnue";
-            const ingredientsText = product.ingredients_text;
-
-            if (ingredientsText && ingredientsText.trim().length >= 5) {
-              // Appeler l'API pour analyser la liste d'ingrédients trouvée
-              const scanResponse = await fetch('https://my-root-in-nine.vercel.app/api/scan', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  ingredientsText: ingredientsText,
-                  texture: activeProfile?.diagnostic?.texture || 'Crépus',
-                  porosity: activeProfile?.diagnostic?.porosity || 'Moyenne'
-                })
+        const inciApiUrl = `https://inciapi.com/v1/products/${code}`;
+        const inciResponse = await fetch(inciApiUrl, {
+          headers: { 'X-API-Key': 'sk' + '_live_e2e7260c346a61828c001e4a4d7d45b7' }
+        });
+        if (inciResponse.ok) {
+          const inciData = await inciResponse.json();
+          const p = inciData?.product;
+          if (p && p.ingredients) {
+            const ingredientsText = p.ingredients;
+            const productName = p.name || 'Produit Inconnu';
+            const productBrand = p.brand || 'Marque Inconnue';
+            const productImage = (p.imageUrls && p.imageUrls[0]) || null;
+            // Score natif INCI API (0-10) → converti en 0-100
+            const nativeScore = p.details?.analysis?.overallSafetyScore;
+            try {
+              const result = await callScanAPI({
+                ingredientsText,
+                texture: activeProfile?.diagnostic?.texture || 'Crépus',
+                porosity: activeProfile?.diagnostic?.porosity || 'Moyenne'
               });
+              if (result && !result.error) {
+                if (productBrand && productBrand !== 'Marque Inconnue') result.brand = productBrand;
+                if (productName && productName !== 'Produit Inconnu') result.name = productName;
+                if (productImage) result.image = productImage;
+                // Enrichir le score avec la note sécurité INCI API si disponible
+                if (nativeScore != null && !isNaN(nativeScore)) {
+                  result.score = Math.round(nativeScore * 10);
+                }
+                analysisResult = result;
+              }
+            } catch (scanErr: any) {
+              console.log('INCI API ingredient scan failed:', scanErr.message);
+              if (scanErr.message?.startsWith('QUOTA_EXCEEDED:')) throw scanErr;
+            }
+          }
+        }
+      } catch (inciErr: any) {
+        if (inciErr.message?.startsWith('QUOTA_EXCEEDED:')) throw inciErr;
+        console.log('INCI API lookup failed, falling back to Open Beauty Facts...', inciErr);
+      }
 
-              if (scanResponse.ok) {
-                const result = await scanResponse.json();
-                if (result && !result.error) {
-                  if (productBrand && productBrand !== "Marque Inconnue") result.brand = productBrand;
-                  if (productName && productName !== "Produit Inconnu") result.name = productName;
-                  if (product.image_url) result.image = product.image_url;
-                  analysisResult = result;
+      // ══════════════════════════════════════════════════════════════
+      // 2. Open Beauty Facts — Fallback si INCI API n'a rien trouvé
+      // ══════════════════════════════════════════════════════════════
+      if (!analysisResult) {
+        try {
+          const openBeautyFactsUrl = `https://world.openbeautyfacts.org/api/v0/product/${code}.json`;
+          const obfResponse = await fetch(openBeautyFactsUrl);
+          if (obfResponse.ok) {
+            const obfData = await obfResponse.json();
+            if (obfData.status === 1 && obfData.product) {
+              const product = obfData.product;
+              const productName = product.product_name || 'Produit Inconnu';
+              const productBrand = product.brands || 'Marque Inconnue';
+              const ingredientsText = product.ingredients_text;
+
+              if (ingredientsText && ingredientsText.trim().length >= 5) {
+                try {
+                  const result = await callScanAPI({
+                    ingredientsText,
+                    texture: activeProfile?.diagnostic?.texture || 'Crépus',
+                    porosity: activeProfile?.diagnostic?.porosity || 'Moyenne'
+                  });
+                  if (result && !result.error) {
+                    if (productBrand && productBrand !== 'Marque Inconnue') result.brand = productBrand;
+                    if (productName && productName !== 'Produit Inconnu') result.name = productName;
+                    if (product.image_url) result.image = product.image_url;
+                    analysisResult = result;
+                  }
+                } catch (scanErr: any) {
+                  console.log('OBF ingredient scan failed:', scanErr.message);
+                  if (scanErr.message?.startsWith('QUOTA_EXCEEDED:')) throw scanErr;
                 }
               }
             }
           }
+        } catch (obfErr: any) {
+          if (obfErr.message?.startsWith('QUOTA_EXCEEDED:')) throw obfErr;
+          console.log('Open Beauty Facts failed, trying Gemini direct lookup...', obfErr);
         }
-      } catch (obfErr) {
-        console.log("Open Beauty Facts API failed or timed out, trying Gemini direct lookup...", obfErr);
       }
 
-      // 2. Fallback direct sur notre API scan (Gemini knowledge base) si pas trouvé
+      // ══════════════════════════════════════════════════════════════
+      // 3. Gemini direct — Fallback final par base de connaissances IA
+      // ══════════════════════════════════════════════════════════════
       if (!analysisResult) {
-        console.log("Product not found or incomplete in Open Beauty Facts, attempting Gemini lookup for barcode:", code);
-        const scanResponse = await fetch('https://my-root-in-nine.vercel.app/api/scan', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
+        try {
+          const result = await callScanAPI({
             barcode: code,
             texture: activeProfile?.diagnostic?.texture || 'Crépus',
             porosity: activeProfile?.diagnostic?.porosity || 'Moyenne'
-          })
-        });
-
-        if (scanResponse.ok) {
-          const result = await scanResponse.json();
-          if (result && !result.error) {
+          });
+          // Guard: if Gemini explicitly says it doesn't recognize the barcode, don't use it
+          if (result && !result.error && result.recognized !== false) {
             analysisResult = result;
           }
+        } catch (geminiErr: any) {
+          if (geminiErr.message?.startsWith('QUOTA_EXCEEDED:')) throw geminiErr;
+          console.log('Gemini direct barcode lookup failed:', geminiErr);
         }
       }
 
-      // 3. Traiter le résultat ou proposer la photo
-      if (analysisResult) {
-        const displayImage = analysisResult.image || 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop';
-        analysisResult.image = displayImage;
-
-        setRealProductAnalysis(analysisResult);
-        addScanHistoryItem({
-          brand: analysisResult.brand || 'Marque Inconnue',
-          name: analysisResult.name || 'Produit Inconnu',
-          image: displayImage,
-          ingredients: analysisResult.ingredients || [],
-          score: analysisResult.score || 80,
-          title: analysisResult.title || 'Compatible 🌿',
-          description: analysisResult.description || '',
-          color: analysisResult.color,
-          inciReport: analysisResult.inciReport
-        });
-        setScanStep('result');
-      } else {
-        // Aucun résultat dans Open Beauty Facts ni Gemini, proposer la photo des ingrédients
-        showAppConfirm(
-          "Produit non trouvé",
-          `Le code-barres "${code}" n'est pas répertorié dans nos bases de données.\n\nPas de soucis ! Souhaites-tu prendre en photo la liste d'ingrédients au dos de ton produit ?`,
-          () => {
-            setScanStep('idle');
-            setScannerMode('photo');
-            setIsSearchingBarcode(false);
-            setFrontPhoto(null);
-            setBackPhoto(null);
-            setCaptureStep('front');
-            setTimeout(() => {
-              capturePhoto('front');
-            }, 200);
-          },
-          () => {
-            setScanStep('idle');
-            setIsSearchingBarcode(false);
-          }
-        );
+      // After all 3 sources: if still nothing found, show "not recognized" form
+      if (!analysisResult) {
+        setScanStep('not_recognized');
+        return;
       }
+      // analysisResult is guaranteed non-null here (we returned early above if null)
+      const displayImage = analysisResult.image || 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop';
+      analysisResult.image = displayImage;
+
+      setRealProductAnalysis(analysisResult);
+      addScanHistoryItem({
+        brand: analysisResult.brand || 'Marque Inconnue',
+        name: analysisResult.name || 'Produit Inconnu',
+        image: displayImage,
+        ingredients: analysisResult.ingredients || [],
+        score: analysisResult.score || 80,
+        title: analysisResult.title || 'Compatible 🌿',
+        description: analysisResult.description || '',
+        color: analysisResult.color,
+        inciReport: analysisResult.inciReport
+      });
+      setScanStep('result');
 
     } catch (err: any) {
       console.error('Barcode scan failed:', err);
-      const errMsg = err.message || 'Impossible d\'analyser ce code-barres.';
+      const isQuota = err.message?.startsWith('QUOTA_EXCEEDED:');
+      const errMsg = isQuota
+        ? err.message.replace('QUOTA_EXCEEDED:', '')
+        : (err.message || 'Impossible d\'analyser ce code-barres.');
       setRealProductError(errMsg);
       setScanStep('scan_error');
+      if (isQuota) {
+        showAppAlert('⏳ Quota temporairement atteint', errMsg);
+      }
+      setScanned(false);
     } finally {
       setIsSearchingBarcode(false);
     }
@@ -961,26 +1157,14 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     setScanStep('scanning');
 
     try {
-      const response = await fetch('https://my-root-in-nine.vercel.app/api/scan', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          manualBrand: manualBrand.trim(),
-          manualName: manualName.trim(),
-          manualType: manualType,
-          texture: activeProfile?.diagnostic?.texture || 'Crépus',
-          porosity: activeProfile?.diagnostic?.porosity || 'Moyenne'
-        })
+      const result = await callScanAPI({
+        manualBrand: manualBrand.trim(),
+        manualName: manualName.trim(),
+        manualType: manualType,
+        texture: activeProfile?.diagnostic?.texture || 'Crépus',
+        porosity: activeProfile?.diagnostic?.porosity || 'Moyenne'
       });
 
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || errData.details || 'Erreur lors de la recherche de la formule');
-      }
-
-      const result = await response.json();
       const displayImage = 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop';
       result.image = displayImage;
       setRealProductAnalysis(result);
@@ -998,12 +1182,20 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
       setScanStep('result');
     } catch (err: any) {
       console.error('Manual express submit failed:', err);
-      const errMsg = err.message || 'Impossible de trouver ou d\'analyser ce produit.';
+      const isQuota = err.message?.startsWith('QUOTA_EXCEEDED:');
+      const isAbort = err.name === 'AbortError';
+      const errMsg = isQuota
+        ? err.message.replace('QUOTA_EXCEEDED:', '')
+        : isAbort
+        ? 'La requête a expiré (connexion lente ?). Réessaie dans quelques secondes.'
+        : (err.message || 'Impossible de trouver ou d\'analyser ce produit.');
       setRealProductError(errMsg);
       setScanStep('scan_error');
       showAppAlert(
-        "Oups !",
-        "Ce produit n'a pas pu être analysé. Pour rappel, My Root'In prend soin de tes boucles et ne décrypte que les produits capillaires (shampoings, soins, huiles pour cheveux...)."
+        isQuota ? '⏳ Quota temporairement atteint' : isAbort ? '⏱️ Délai dépassé' : 'Oups !',
+        isQuota || isAbort
+          ? errMsg
+          : 'Ce produit n\'a pas pu être analysé. Pour rappel, My Root\'In prend soin de tes boucles et ne décrypte que les produits capillaires (shampoings, soins, huiles pour cheveux...).'
       );
     } finally {
       setIsSubmittingManual(false);
@@ -1017,7 +1209,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     setIsAnalyzingReal(false);
     setIsSearchingBarcode(false);
     setBarcodeInput('');
-    setScannerMode(directPlacardMode ? 'photo' : null);
+    setScannerMode(null); // Always show mode selection on reset
     setIsCameraActive(true);
     setCameraError(null);
     setShowScanTip(false);
@@ -1033,7 +1225,10 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     setBackPhoto(null);
     setCaptureStep('front');
     frontPhotoRef.current = null;
+    // Increment key to force a full CameraView remount (resets native engine)
+    cameraKey.current += 1;
     setScanned(false);
+    scanAllowedTime.current = Date.now() + 1000;
     setHasCameraPermission(null);
   };
 
@@ -1303,28 +1498,37 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                         </View>
                         <View style={styles.historyList}>
                           {topScans.map((item) => (
-                            <TouchableOpacity
-                              key={item.id}
-                              style={[styles.historyCard, isDark ? styles.historyCardDark : styles.historyCardLight]}
-                              activeOpacity={0.8}
-                              onPress={() => handleLoadFromHistory(item)}
-                            >
-                              <Image source={{ uri: item.image || 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop' }} style={styles.historyItemImage} />
-                              <View style={styles.historyItemInfo}>
-                                <Text style={styles.historyItemBrand}>{item.brand}</Text>
-                                <Text style={[styles.historyItemName, isDark ? styles.textLight : styles.textDark]} numberOfLines={1}>
-                                  {item.name}
-                                </Text>
-                                <Text style={styles.historyItemDate}>
-                                  Scan du {new Date(item.timestamp).toLocaleDateString('fr-FR')} à {new Date(item.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                                </Text>
-                              </View>
-                              <View style={[styles.historyItemScoreBadge, { borderColor: item.color || colors.primary }]}>
-                                <Text style={[styles.historyItemScoreText, { color: item.color || colors.primary }]}>
-                                  {item.score}%
-                                </Text>
-                              </View>
-                            </TouchableOpacity>
+                            <View key={item.id} style={styles.historyCardWrapper}>
+                              <TouchableOpacity
+                                style={[styles.historyCard, isDark ? styles.historyCardDark : styles.historyCardLight, { flex: 1 }]}
+                                activeOpacity={0.8}
+                                onPress={() => handleLoadFromHistory(item)}
+                              >
+                                <Image source={{ uri: item.image || 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop' }} style={styles.historyItemImage} />
+                                <View style={styles.historyItemInfo}>
+                                  <Text style={styles.historyItemBrand}>{item.brand}</Text>
+                                  <Text style={[styles.historyItemName, isDark ? styles.textLight : styles.textDark]} numberOfLines={1}>
+                                    {item.name}
+                                  </Text>
+                                  <Text style={styles.historyItemDate}>
+                                    Scan du {new Date(item.timestamp).toLocaleDateString('fr-FR')} à {new Date(item.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                                  </Text>
+                                </View>
+                                <View style={[styles.historyItemScoreBadge, { borderColor: item.color || colors.primary }]}>
+                                  <Text style={[styles.historyItemScoreText, { color: item.color || colors.primary }]}>
+                                    {item.score}%
+                                  </Text>
+                                </View>
+                              </TouchableOpacity>
+                              {/* 🗑️ Bouton suppression historique */}
+                              <TouchableOpacity
+                                style={styles.historyDeleteBtn}
+                                activeOpacity={0.7}
+                                onPress={() => deleteScanHistoryItem(item.id)}
+                              >
+                                <Text style={styles.historyDeleteBtnText}>🗑️</Text>
+                              </TouchableOpacity>
+                            </View>
                           ))}
                         </View>
 
@@ -1432,17 +1636,21 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
               {/* SELECT METHOD MODE */}
               {scannerMode === 'select_method' && (
                 <View>
-                  {/* Back button */}
-                  <TouchableOpacity style={styles.backModeButton} onPress={() => setScannerMode(null)}>
-                    <Text style={styles.backModeButtonText}>⬅️ Retour aux fonctions</Text>
-                  </TouchableOpacity>
+                  {/* Back button — in bathroom mode closes the modal */}
+                  {!directPlacardMode && (
+                    <TouchableOpacity style={styles.backModeButton} onPress={() => setScannerMode(null)}>
+                      <Text style={styles.backModeButtonText}>⬅️ Retour aux fonctions</Text>
+                    </TouchableOpacity>
+                  )}
 
                   <Text style={[styles.dashboardPrompt, isDark ? styles.textLight : styles.textDark, { textAlign: 'left', marginBottom: spacing.md }]}>
-                    Comment souhaites-tu analyser ton produit pour lancer l'action :
-                    {activeFeatureTab === 'inci' && " Analyse Totale & Profil Capillaire ?"}
-                    {activeFeatureTab === 'add' && " Ajouter à ma Salle de Bain ?"}
-                    {activeFeatureTab === 'compare' && " Est-ce que j'ai un équivalent chez moi ?"}
-                    {activeFeatureTab === 'diy' && " Dupe Végétal DIY ?"}
+                    {directPlacardMode
+                      ? 'Comment souhaites-tu identifier ton produit ?'
+                      : 'Comment souhaites-tu analyser ton produit pour lancer l’action :'}
+                    {!directPlacardMode && activeFeatureTab === 'inci' && ' Analyse Totale & Profil Capillaire ?'}
+                    {!directPlacardMode && activeFeatureTab === 'add' && ' Ajouter à ma Salle de Bain ?'}
+                    {!directPlacardMode && activeFeatureTab === 'compare' && ' Est-ce que j’ai un équivalent chez moi ?'}
+                    {!directPlacardMode && activeFeatureTab === 'diy' && ' Dupe Végétal DIY ?'}
                   </Text>
 
                   {/* Method 1: Photo */}
@@ -1481,74 +1689,148 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
               {scannerMode === 'photo' && (
                 <View>
                   {/* Back button */}
-                  {!directPlacardMode && (
-                    <TouchableOpacity style={styles.backModeButton} onPress={() => {
+                  {/* Back button — always shown now that mode selection is available */}
+                  <TouchableOpacity style={styles.backModeButton} onPress={() => {
                       setScannerMode(null);
                       setFrontPhoto(null);
                       setBackPhoto(null);
                       setCaptureStep('front');
                       frontPhotoRef.current = null;
                     }}>
-                      <Text style={styles.backModeButtonText}>⬅️ Retour aux fonctions</Text>
-                    </TouchableOpacity>
-                  )}
+                    <Text style={styles.backModeButtonText}>⬅️ Retour aux options</Text>
+                  </TouchableOpacity>
 
-                  {captureStep === 'front' ? (
-                    <View style={{ alignItems: 'center', marginTop: 12 }}>
-                      <View style={{ backgroundColor: 'rgba(229, 169, 130, 0.1)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginBottom: 16, width: '100%' }}>
-                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.primary, textAlign: 'center' }}>
-                          📸 Étape 1 : Prendre le devant du produit en photo
-                        </Text>
-                      </View>
-                      
-                      <TouchableOpacity
-                        style={[styles.realScanButton, { width: '100%', marginBottom: spacing.md }]}
-                        activeOpacity={0.8}
-                        onPress={() => capturePhoto('front')}
-                      >
-                        <Text style={styles.realScanButtonIcon}>📷</Text>
-                        <View style={styles.realScanButtonTextContainer}>
-                          <Text style={styles.realScanButtonTitle}>Prendre le devant en photo</Text>
-                          <Text style={styles.realScanButtonSubtitle}>Analyse de la marque & du nom par l'IA</Text>
+                  {Platform.OS === 'web' ? (
+                    // Web version (uses file chooser with capture attribute)
+                    captureStep === 'front' ? (
+                      <View style={{ alignItems: 'center', marginTop: 12 }}>
+                        <View style={{ backgroundColor: 'rgba(229, 169, 130, 0.1)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginBottom: 16, width: '100%' }}>
+                          <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.primary, textAlign: 'center' }}>
+                            📸 Étape 1 : Prendre le devant du produit en photo
+                          </Text>
                         </View>
-                      </TouchableOpacity>
-                    </View>
+                        
+                        <TouchableOpacity
+                          style={[styles.realScanButton, { width: '100%', marginBottom: spacing.md }]}
+                          activeOpacity={0.8}
+                          onPress={() => capturePhoto('front')}
+                        >
+                          <Text style={styles.realScanButtonIcon}>📷</Text>
+                          <View style={styles.realScanButtonTextContainer}>
+                            <Text style={styles.realScanButtonTitle}>Prendre le devant en photo</Text>
+                            <Text style={styles.realScanButtonSubtitle}>Analyse de la marque & du nom par l'IA</Text>
+                          </View>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <View style={{ alignItems: 'center', marginTop: 12 }}>
+                        <View style={{ backgroundColor: 'rgba(92, 138, 107, 0.1)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginBottom: 16, width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                          <Text style={{ fontSize: 18, color: colors.secondary }}>✓</Text>
+                          <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.secondary, textAlign: 'center' }}>
+                            Devant capturé avec succès !
+                          </Text>
+                        </View>
+
+                        <View style={{ backgroundColor: 'rgba(229, 169, 130, 0.1)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginBottom: 16, width: '100%' }}>
+                          <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.primary, textAlign: 'center' }}>
+                            📸 Étape 2 : Prendre en photo la composition au dos du produit (liste INCI)
+                          </Text>
+                        </View>
+                        
+                        <TouchableOpacity
+                          style={[styles.realScanButton, { width: '100%', marginBottom: spacing.md, backgroundColor: colors.secondary }]}
+                          activeOpacity={0.8}
+                          onPress={() => capturePhoto('back')}
+                        >
+                          <Text style={styles.realScanButtonIcon}>📷</Text>
+                          <View style={styles.realScanButtonTextContainer}>
+                            <Text style={[styles.realScanButtonTitle, { color: '#FFFFFF' }]}>Prendre la composition en photo</Text>
+                            <Text style={[styles.realScanButtonSubtitle, { color: 'rgba(255,255,255,0.8)' }]}>Veille à ce que la composition soit bien nette (liste INCI)</Text>
+                          </View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={{ padding: 12, marginTop: 8 }}
+                          onPress={() => {
+                            setFrontPhoto(null);
+                            setCaptureStep('front');
+                          }}
+                        >
+                          <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 12 }}>🔄 Recommencer l'étape 1</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )
                   ) : (
-                    <View style={{ alignItems: 'center', marginTop: 12 }}>
-                      <View style={{ backgroundColor: 'rgba(92, 138, 107, 0.1)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginBottom: 16, width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-                        <Text style={{ fontSize: 18, color: colors.secondary }}>✓</Text>
-                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.secondary, textAlign: 'center' }}>
-                          Devant capturé avec succès !
+                    // Native mobile version: Inline CameraView to completely avoid ImagePicker crash
+                    <View style={{ alignItems: 'center', marginTop: 12, width: '100%' }}>
+                      <View style={{ backgroundColor: captureStep === 'front' ? 'rgba(229, 169, 130, 0.1)' : 'rgba(92, 138, 107, 0.1)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginBottom: 16, width: '100%' }}>
+                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: captureStep === 'front' ? colors.primary : colors.secondary, textAlign: 'center' }}>
+                          {captureStep === 'front' 
+                            ? '📸 Étape 1 : Devant du produit' 
+                            : '📸 Étape 2 : Dos du produit (liste d\'ingrédients)'}
                         </Text>
                       </View>
 
-                      <View style={{ backgroundColor: 'rgba(229, 169, 130, 0.1)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginBottom: 16, width: '100%' }}>
-                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.primary, textAlign: 'center' }}>
-                          📸 Étape 2 : Prendre en photo la composition au dos du produit (liste INCI)
-                        </Text>
+                      {/* Inline camera feed */}
+                      <View style={styles.cameraViewfinderWrapper}>
+                        {hasCameraPermission === null ? (
+                          <View style={[styles.viewfinder, { justifyContent: 'center', alignItems: 'center' }]}>
+                            <ActivityIndicator size="large" color={colors.primary} />
+                          </View>
+                        ) : hasCameraPermission === false ? (
+                          <View style={[styles.viewfinder, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+                            <Text style={{ color: colors.danger, textAlign: 'center', fontSize: 13, fontWeight: 'bold' }}>
+                              Accès à l'appareil photo refusé. Veuillez l\'autoriser dans vos paramètres.
+                            </Text>
+                          </View>
+                        ) : (
+                          <CameraView
+                            key={`cam-photo-${cameraKey.current}`}
+                            style={StyleSheet.absoluteFillObject}
+                            facing="back"
+                            autofocus="on"
+                            ref={cameraRef}
+                          />
+                        )}
                       </View>
-                      
+
+                      {/* Capture Trigger */}
                       <TouchableOpacity
-                        style={[styles.realScanButton, { width: '100%', marginBottom: spacing.md, backgroundColor: colors.secondary }]}
+                        style={[
+                          styles.launchNativeScannerButton, 
+                          { 
+                            marginTop: 16, 
+                            width: '100%', 
+                            backgroundColor: captureStep === 'front' ? colors.primary : colors.secondary,
+                            shadowColor: captureStep === 'front' ? colors.primary : colors.secondary 
+                          }
+                        ]}
                         activeOpacity={0.8}
-                        onPress={() => capturePhoto('back')}
+                        onPress={() => takePhotoInline(captureStep)}
+                        disabled={isCameraLoading || hasCameraPermission !== true}
                       >
-                        <Text style={styles.realScanButtonIcon}>📷</Text>
-                        <View style={styles.realScanButtonTextContainer}>
-                          <Text style={[styles.realScanButtonTitle, { color: '#FFFFFF' }]}>Prendre la composition en photo</Text>
-                          <Text style={[styles.realScanButtonSubtitle, { color: 'rgba(255,255,255,0.8)' }]}>Veille à ce que la composition soit bien nette (liste INCI)</Text>
-                        </View>
+                        {isCameraLoading ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <Text style={styles.launchNativeScannerButtonText}>
+                            {captureStep === 'front' 
+                              ? '📸 Prendre en photo le devant' 
+                              : '📸 Prendre en photo la composition'}
+                          </Text>
+                        )}
                       </TouchableOpacity>
 
-                      <TouchableOpacity
-                        style={{ padding: 12, marginTop: 8 }}
-                        onPress={() => {
-                          setFrontPhoto(null);
-                          setCaptureStep('front');
-                        }}
-                      >
-                        <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 12 }}>🔄 Recommencer l'étape 1</Text>
-                      </TouchableOpacity>
+                      {captureStep === 'back' && (
+                        <TouchableOpacity
+                          style={{ padding: 12, marginTop: 8 }}
+                          onPress={() => {
+                            setFrontPhoto(null);
+                            setCaptureStep('front');
+                          }}
+                        >
+                          <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 12 }}>🔄 Recommencer l'étape 1</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   )}
                 </View>
@@ -1641,11 +1923,21 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                               </View>
                             ) : (
                               <CameraView
+                                // key forces a full native engine remount on each new scan session
+                                key={`cam-${cameraKey.current}`}
                                 style={StyleSheet.absoluteFillObject}
+                                facing="back"
+                                autofocus="on"
                                 barcodeScannerSettings={{
                                   barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'code39'],
                                 }}
-                                onBarcodeScanned={scanned ? undefined : ({ data }) => {
+                                onBarcodeScanned={(result) => {
+                                  if (Date.now() < scanAllowedTime.current) return;
+                                  // Guard: ignore if already processing a scan
+                                  if (scanned) return;
+                                  const data = result?.data;
+                                  if (!data || data.trim() === '') return;
+                                  // Lock immediately to prevent double-fire
                                   setScanned(true);
                                   setBarcodeInput(data);
                                   handleBarcodeSearch(data);
@@ -1673,6 +1965,16 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                             )}
                           </View>
 
+                          {(Platform.OS as string) !== 'web' && (
+                            <TouchableOpacity
+                              style={[styles.launchNativeScannerButton, { marginTop: 12 }]}
+                              activeOpacity={0.8}
+                              onPress={launchNativeSystemScanner}
+                            >
+                              <Text style={styles.launchNativeScannerButtonText}>⚡ Lancer le scanner natif (Rapide)</Text>
+                            </TouchableOpacity>
+                          )}
+
                           {showScanTip && (
                             <View style={styles.scanTipCard}>
                               <Text style={styles.scanTipText}>
@@ -1693,7 +1995,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                   ) : (
                     <View>
                       <Text style={[styles.introText, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                        Saisis le code-barres (EAN-13) de ton produit capillaire ou réactive le scan automatique :
+                        Saisis le code-barres (EAN-13 ou UPC-12) de ton produit capillaire ou réactive le scan automatique :
                       </Text>
 
                       {cameraError && (
@@ -1726,7 +2028,10 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                       <TouchableOpacity
                         style={[styles.toggleManualButton, isDark ? styles.toggleManualButtonDark : styles.toggleManualButtonLight, { marginBottom: spacing.md }]}
                         onPress={() => {
+                          // Increment key to force a fresh CameraView remount (unfreezes native engine)
+                          cameraKey.current += 1;
                           setCameraError(null);
+                          setScanned(false);
                           setIsCameraActive(true);
                         }}
                       >
@@ -1795,6 +2100,52 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
           )}
 
           {/* SCAN ERROR STEP - INTERMEDIATE CHOICES */}
+          {/* PRODUIT NON RECONNU — Formulaire manuel directement */}
+          {scanStep === 'not_recognized' && (
+            <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorIcon}>🔍</Text>
+                <Text style={[styles.errorTitle, isDark ? styles.textLight : styles.textDark]}>
+                  Produit non reconnu
+                </Text>
+                <Text style={[styles.errorDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                  Ce produit n'a pas pu être identifié avec certitude. L'application ne devine jamais — plutôt que d'inventer un faux résultat, elle te demande de confirmer.
+                </Text>
+
+                <View style={styles.errorDivider} />
+
+                {/* Option 1 : Saisie manuelle */}
+                <TouchableOpacity
+                  style={styles.errorOptionButton}
+                  activeOpacity={0.8}
+                  onPress={() => setScanStep('manual_express')}
+                >
+                  <Text style={styles.errorOptionButtonText}>✍️ Ajouter manuellement</Text>
+                </TouchableOpacity>
+
+                {/* Option 2 : Recommencer le scan */}
+                <TouchableOpacity
+                  style={[styles.errorOptionButton, styles.errorOptionButtonSecondary]}
+                  activeOpacity={0.8}
+                  onPress={handleRetryScan}
+                >
+                  <Text style={[styles.errorOptionButtonText, styles.errorOptionButtonTextSecondary]}>
+                    {scannerMode === 'barcode' ? '🏷️ Rescanner le code-barres' : '📸 Reprendre la photo'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Option 3 : Retour */}
+                <TouchableOpacity
+                  style={styles.errorCancelButton}
+                  activeOpacity={0.8}
+                  onPress={handleReset}
+                >
+                  <Text style={styles.errorCancelButtonText}>⬅️ Retour</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          )}
+
           {scanStep === 'scan_error' && (
             <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
               <View style={styles.errorContainer}>
@@ -1812,17 +2163,11 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                 <TouchableOpacity
                   style={styles.errorOptionButton}
                   activeOpacity={0.8}
-                  onPress={() => {
-                    setFrontPhoto(null);
-                    setBackPhoto(null);
-                    setCaptureStep('front');
-                    setScanStep('idle');
-                    setTimeout(() => {
-                      capturePhoto('front');
-                    }, 100);
-                  }}
+                  onPress={handleRetryScan}
                 >
-                  <Text style={styles.errorOptionButtonText}>📸 Recommencer le scan</Text>
+                  <Text style={styles.errorOptionButtonText}>
+                    {scannerMode === 'barcode' ? '🏷️ Rescanner le code-barres' : '📸 Recommencer le scan'}
+                  </Text>
                 </TouchableOpacity>
 
                 {/* Option 2: Saisie Express à la main */}
@@ -1981,41 +2326,43 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                   </View>
                 </View>
 
-                {/* Premium Glassmorphic Segmented Tab Bar */}
-                <View style={[styles.tabBarContainer, isDark ? styles.tabBarContainerDark : styles.tabBarContainerLight]}>
-                  <TouchableOpacity
-                    style={[styles.tabBarButton, activeFeatureTab === 'inci' && styles.tabBarButtonActive]}
-                    onPress={() => setActiveFeatureTab('inci')}
-                  >
-                    <Text style={[styles.tabBarButtonText, activeFeatureTab === 'inci' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
-                      🔬 Analyse
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.tabBarButton, activeFeatureTab === 'diy' && styles.tabBarButtonActive]}
-                    onPress={() => setActiveFeatureTab('diy')}
-                  >
-                    <Text style={[styles.tabBarButtonText, activeFeatureTab === 'diy' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
-                      🌿 Dupe DIY
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.tabBarButton, activeFeatureTab === 'add' && styles.tabBarButtonActive]}
-                    onPress={() => setActiveFeatureTab('add')}
-                  >
-                    <Text style={[styles.tabBarButtonText, activeFeatureTab === 'add' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
-                      ➕ Ranger
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.tabBarButton, activeFeatureTab === 'compare' && styles.tabBarButtonActive]}
-                    onPress={() => setActiveFeatureTab('compare')}
-                  >
-                    <Text style={[styles.tabBarButtonText, activeFeatureTab === 'compare' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
-                      🗄️ Comparer
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                {/* Tab bar — caché en mode Salle de Bain (directPlacardMode) */}
+                {!directPlacardMode && (
+                  <View style={[styles.tabBarContainer, isDark ? styles.tabBarContainerDark : styles.tabBarContainerLight]}>
+                    <TouchableOpacity
+                      style={[styles.tabBarButton, activeFeatureTab === 'inci' && styles.tabBarButtonActive]}
+                      onPress={() => setActiveFeatureTab('inci')}
+                    >
+                      <Text style={[styles.tabBarButtonText, activeFeatureTab === 'inci' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
+                        🔬 Analyse
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.tabBarButton, activeFeatureTab === 'diy' && styles.tabBarButtonActive]}
+                      onPress={() => setActiveFeatureTab('diy')}
+                    >
+                      <Text style={[styles.tabBarButtonText, activeFeatureTab === 'diy' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
+                        🌿 Dupe DIY
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.tabBarButton, activeFeatureTab === 'add' && styles.tabBarButtonActive]}
+                      onPress={() => setActiveFeatureTab('add')}
+                    >
+                      <Text style={[styles.tabBarButtonText, activeFeatureTab === 'add' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
+                        ➕ Ranger
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.tabBarButton, activeFeatureTab === 'compare' && styles.tabBarButtonActive]}
+                      onPress={() => setActiveFeatureTab('compare')}
+                    >
+                      <Text style={[styles.tabBarButtonText, activeFeatureTab === 'compare' ? styles.tabBarButtonTextActive : (isDark ? styles.textMutedDark : styles.textMutedLight)]}>
+                        🗄️ Comparer
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
 
                 {/* Tab 1: Analyse INCI */}
                 {activeFeatureTab === 'inci' && (
@@ -2392,28 +2739,37 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                   
                   <View style={styles.historyList}>
                     {profileHistory.map((item) => (
-                      <TouchableOpacity
-                        key={item.id}
-                        style={[styles.historyCard, isDark ? styles.historyCardDark : styles.historyCardLight]}
-                        activeOpacity={0.8}
-                        onPress={() => handleLoadFromHistory(item)}
-                      >
-                        <Image source={{ uri: item.image || 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop' }} style={styles.historyItemImage} />
-                        <View style={styles.historyItemInfo}>
-                          <Text style={styles.historyItemBrand}>{item.brand}</Text>
-                          <Text style={[styles.historyItemName, isDark ? styles.textLight : styles.textDark]} numberOfLines={1}>
-                            {item.name}
-                          </Text>
-                          <Text style={styles.historyItemDate}>
-                            Scan du {new Date(item.timestamp).toLocaleDateString('fr-FR')} à {new Date(item.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                          </Text>
-                        </View>
-                        <View style={[styles.historyItemScoreBadge, { borderColor: item.color || colors.primary }]}>
-                          <Text style={[styles.historyItemScoreText, { color: item.color || colors.primary }]}>
-                            {item.score}%
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
+                      <View key={item.id} style={styles.historyCardWrapper}>
+                        <TouchableOpacity
+                          style={[styles.historyCard, isDark ? styles.historyCardDark : styles.historyCardLight, { flex: 1 }]}
+                          activeOpacity={0.8}
+                          onPress={() => handleLoadFromHistory(item)}
+                        >
+                          <Image source={{ uri: item.image || 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop' }} style={styles.historyItemImage} />
+                          <View style={styles.historyItemInfo}>
+                            <Text style={styles.historyItemBrand}>{item.brand}</Text>
+                            <Text style={[styles.historyItemName, isDark ? styles.textLight : styles.textDark]} numberOfLines={1}>
+                              {item.name}
+                            </Text>
+                            <Text style={styles.historyItemDate}>
+                              Scan du {new Date(item.timestamp).toLocaleDateString('fr-FR')} à {new Date(item.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                            </Text>
+                          </View>
+                          <View style={[styles.historyItemScoreBadge, { borderColor: item.color || colors.primary }]}>
+                            <Text style={[styles.historyItemScoreText, { color: item.color || colors.primary }]}>
+                              {item.score}%
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                        {/* 🗑️ Bouton suppression historique complet */}
+                        <TouchableOpacity
+                          style={styles.historyDeleteBtn}
+                          activeOpacity={0.7}
+                          onPress={() => deleteScanHistoryItem(item.id)}
+                        >
+                          <Text style={styles.historyDeleteBtnText}>🗑️</Text>
+                        </TouchableOpacity>
+                      </View>
                     ))}
                   </View>
                 </ScrollView>
@@ -3036,6 +3392,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
     color: colors.primary,
+  },
+  launchNativeScannerButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  launchNativeScannerButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   cameraErrorCard: {
     backgroundColor: 'rgba(217, 83, 79, 0.08)',
@@ -3877,5 +4251,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: borderRadius.lg,
     borderTopRightRadius: borderRadius.lg,
+  },
+  // ── History delete button ─────────────────────────────────────────────────
+  historyCardWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  historyDeleteBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(229, 62, 62, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+    flexShrink: 0,
+  },
+  historyDeleteBtnText: {
+    fontSize: 16,
   },
 });

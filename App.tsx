@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Image, Platform } from 'react-native';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
+import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { colors } from './src/theme/colors';
 import { AppStateProvider, useAppState } from './src/store/AppStateContext';
 import { AuthScreen } from './src/screens/onboarding/AuthScreen';
-import { DiagnosticScreen } from './src/screens/onboarding/DiagnosticScreen';
+import { DiagnosticScreen, avatarImageMap } from './src/screens/onboarding/DiagnosticScreen';
 import { HomeScreen } from './src/screens/home/HomeScreen';
 import { ProfileScreen } from './src/screens/profile/ProfileScreen';
 import { CalendarScreen } from './src/screens/calendar/CalendarScreen';
@@ -25,7 +26,43 @@ function MainApp() {
   const [autoOpenCalendarModal, setAutoOpenCalendarModal] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
 
-  const { themeMode, activeProfile, profiles, isLoading, masterEmail, isPremium, logout: logoutSession } = useAppState();
+  const { themeMode, activeProfile, profiles, isLoading, masterEmail, isPremium, logout: logoutSession, startActiveSession } = useAppState();
+
+  // Listen to notification clicks (morning notification or step timer alert) to launch Active Session
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    const handleNotificationClick = (data: any) => {
+      if (data && (data.isMorningNotification || data.isNextStepNotification)) {
+        // Redirect user to Home Screen and Dashboard tab
+        setCurrentScreen('home');
+        setActiveTab('dashboard');
+        
+        // Start the active session (wrapped in timeout to ensure state settles)
+        setTimeout(() => {
+          startActiveSession();
+        }, 350);
+      }
+    };
+
+    // 1. Listen when app is running/backgrounded and clicked
+    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data;
+      handleNotificationClick(data);
+    });
+
+    // 2. Check if launched cold from a clicked notification on startup
+    Notifications.getLastNotificationResponseAsync().then(response => {
+      if (response) {
+        const data = response.notification.request.content.data;
+        handleNotificationClick(data);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [startActiveSession]);
 
   // Automatically handle routing after login / fetch completes
   useEffect(() => {
@@ -225,7 +262,7 @@ function MainApp() {
                 style={styles.tabItem} 
                 onPress={() => setActiveTab('profile')}
               >
-                <Text style={[styles.tabIcon, { opacity: activeTab === 'profile' ? 1 : 0.6 }]}>
+                <Text style={[styles.tabIcon, { opacity: activeTab === 'profile' ? 1 : 0.6, color: activeTab === 'profile' ? activeTextColor : inactiveTextColor }]}>
                   👤
                 </Text>
                 <Text style={[
@@ -290,6 +327,7 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   tabItem: {
+    flexDirection: 'column',
     justifyContent: 'center',
     alignItems: 'center',
     flex: 1,

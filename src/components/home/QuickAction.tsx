@@ -44,11 +44,12 @@ export const QuickAction: React.FC<QuickActionProps> = ({ onPress }) => {
             styles.actionButton,
             { 
               backgroundColor: customCard,
+              borderColor: isLight ? 'rgba(0, 0, 0, 0.08)' : colors.cardBorder,
             }
           ]}
           onPress={handlePress}
         >
-          <Text style={[styles.actionTitle, { color: customText }]}>MÉMO SOIN</Text>
+          <Text style={[styles.actionTitle, { color: customText }]}>Soin Express !</Text>
           <Text style={[styles.actionSubtitle, { color: customTextSec }]}>
             Planifier un soin libre 📆
           </Text>
@@ -60,7 +61,7 @@ export const QuickAction: React.FC<QuickActionProps> = ({ onPress }) => {
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 16,
+    marginVertical: 0,
     width: '100%',
     paddingHorizontal: 24, // Aligns perfectly with marginHorizontal: 24 of other cards
   },
@@ -71,17 +72,16 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     borderRadius: 16,
     borderWidth: 1.2,
-    borderColor: colors.secondary, // Green border matching health score
     paddingVertical: 18,
     paddingHorizontal: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    // Subtle green glow shadow effect
-    shadowColor: colors.secondary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.32,
-    shadowRadius: 8,
-    elevation: 4,
+    // Standard subtle card shadow
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 1,
   },
   actionTitle: {
     fontSize: 16,

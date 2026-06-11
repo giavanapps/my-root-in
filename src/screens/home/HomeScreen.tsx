@@ -12,6 +12,7 @@ import { Button } from '../../components/common/Button';
 import { TimePickerModal } from '../../components/common/TimePickerModal';
 import { PremiumPaywallModal } from '../../components/premium/PremiumPaywallModal';
 import { ProductScannerModal, matchesCategory } from '../../components/premium/ProductScannerModal';
+import { SettingsModal } from '../../components/settings/SettingsModal';
 import { DatePickerModal } from '../../components/common/DatePickerModal';
 import { RoutineItem } from '../../store/NotificationService';
 
@@ -665,9 +666,11 @@ interface HomeScreenProps {
   onAddProfilePress: () => void;
   onLogoutPress: () => void;
   onNavigateToCalendar?: () => void;
+  onSettingsPress?: () => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLogoutPress, onNavigateToCalendar }) => {
+  const [showSettings, setShowSettings] = useState(false);
   const {
     profiles,
     activeProfileId,
@@ -693,8 +696,55 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
     setPremiumStatus,
     regularityScore,
     shiftRoutineDates,
-    bathroomProducts
+    bathroomProducts,
+    masterEmail,
+
+    // Active Session exposed
+    isSessionActive,
+    activeSessionCares,
+    currentStepIndex,
+    activeSessionTimerEnd,
+    activeSessionTimerDuration,
+    activeSessionTimerRemaining,
+    isTimerRunning,
+    startActiveSession,
+    stopActiveSession,
+    startStepTimer,
+    pauseStepTimer,
+    completeCurrentStep,
+    isSessionSuspended,
+    setIsSessionSuspended
   } = useAppState();
+
+  const [secondsLeft, setSecondsLeft] = useState<number>(0);
+
+  // Auto-complete or update countdown timer
+  useEffect(() => {
+    if (!isTimerRunning || !activeSessionTimerEnd) {
+      setSecondsLeft(0);
+      return;
+    }
+
+    const updateTimer = () => {
+      const remaining = Math.max(0, Math.round((activeSessionTimerEnd - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+      
+      if (remaining === 0) {
+        completeCurrentStep();
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [isTimerRunning, activeSessionTimerEnd]);
+
+  // Handle background timer expiry on app focus
+  useEffect(() => {
+    if (isSessionActive && isTimerRunning && activeSessionTimerEnd && activeSessionTimerEnd < Date.now()) {
+      completeCurrentStep();
+    }
+  }, [isSessionActive, isTimerRunning, activeSessionTimerEnd]);
 
   const isLight = themeMode === 'light';
   const todayStr = getLocalDateString();
@@ -713,6 +763,221 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
 
+  const formatSeconds = (totalSeconds: number): string => {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const renderActiveSessionWizard = () => {
+    const activeCare = activeSessionCares[currentStepIndex];
+    if (!activeCare) return null;
+
+    const guide = careGuidesMap[activeCare.category] || {
+      title: activeCare.category,
+      duration: '10 min',
+      steps: ['Réaliser le soin selon vos habitudes.'],
+      mistakes: [],
+      products: activeCare.product
+    };
+
+    const getDurationInSeconds = (durationStr: string): number => {
+      const num = parseInt(durationStr.replace(/[^0-9]/g, ''));
+      return isNaN(num) ? 600 : num * 60;
+    };
+
+    const totalSeconds = activeSessionTimerDuration || getDurationInSeconds(guide.duration);
+
+    return (
+      <ScrollView contentContainerStyle={styles.wizardScrollContent} style={styles.wizardContainer}>
+        {/* Breadcrumb Steps Header */}
+        <View style={[styles.breadcrumbHeader, { borderColor: customBorder }]}>
+          <Text style={[styles.breadcrumbTitle, { color: customText }]}>🌿 Mon Rituel Capillaire</Text>
+          <TouchableOpacity 
+            style={[styles.closeDetailIcon, { backgroundColor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)' }]} 
+            onPress={stopActiveSession}
+          >
+            <Text style={[styles.closeDetailIconText, { color: customTextSec }]}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Steps visual indicators */}
+        <View style={styles.breadcrumbStepsRow}>
+          {activeSessionCares.map((care, idx) => {
+            const isCompleted = idx < currentStepIndex;
+            const isActive = idx === currentStepIndex;
+            const isFuture = idx > currentStepIndex;
+            
+            let careEmoji = '🧴';
+            if (care.category.toLowerCase().includes('lavage')) careEmoji = '🚿';
+            else if (care.category.toLowerCase().includes('clarif')) careEmoji = '🌺';
+            else if (care.category.toLowerCase().includes('bain')) careEmoji = '🌿';
+            else if (care.category.toLowerCase().includes('masque')) careEmoji = '🍯';
+            else if (care.category.toLowerCase().includes('rinçage') || care.category.toLowerCase().includes('rincage') || care.category.toLowerCase().includes('leave')) careEmoji = '🧴';
+            else if (care.category.toLowerCase().includes('retwist')) careEmoji = '👑';
+            else if (care.category.toLowerCase().includes('massage')) careEmoji = '💆‍♀️';
+
+            return (
+              <View key={care.id} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={[
+                  styles.stepIndicatorCircle,
+                  isActive && { borderColor: colors.primary, borderWidth: 2, backgroundColor: isLight ? '#FFF3E8' : 'rgba(229,169,130,0.1)' },
+                  isCompleted && { backgroundColor: colors.secondary, borderColor: colors.secondary },
+                  isFuture && { opacity: 0.4, borderColor: customBorder }
+                ]}>
+                  {isCompleted ? (
+                    <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' }}>✓</Text>
+                  ) : (
+                    <Text style={{ fontSize: 12 }}>{careEmoji}</Text>
+                  )}
+                </View>
+                {idx + 1 < activeSessionCares.length && (
+                  <View style={[
+                    styles.stepIndicatorLine,
+                    { backgroundColor: isCompleted ? colors.secondary : customBorder }
+                  ]} />
+                )}
+              </View>
+            );
+          })}
+        </View>
+
+        {/* Active Care Panel */}
+        <View style={[styles.activeCareWizardCard, { backgroundColor: customCard, borderColor: customBorder }]}>
+          <Text style={[styles.wizardActiveCategory, { color: colors.primary }]}>
+            Étape {currentStepIndex + 1} sur {activeSessionCares.length}
+          </Text>
+          <Text style={[styles.wizardActiveTitle, { color: customText }]}>
+            {guide.title}
+          </Text>
+          <Text style={[styles.wizardActiveProduct, { color: customTextSec }]}>
+            🧴 Produit : {activeCare.product}
+          </Text>
+
+          {/* TIMER SECTOR */}
+          <View style={styles.wizardTimerContainer}>
+            {isTimerRunning ? (
+              <View style={styles.timerCircleWrapper}>
+                <View style={[styles.timerCircleOuter, { borderColor: colors.primary }]}>
+                  <Text style={[styles.timerCountdownText, { color: customText }]}>
+                    {formatSeconds(secondsLeft)}
+                  </Text>
+                  <Text style={[styles.timerCountdownSub, { color: customTextSec }]}>
+                    restant
+                  </Text>
+                </View>
+                
+                <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+                  <TouchableOpacity
+                    style={[styles.timerButton, { backgroundColor: '#888D9F' }]}
+                    onPress={pauseStepTimer}
+                  >
+                    <Text style={styles.timerButtonText}>Pause ⏸️</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.timerButton, { backgroundColor: colors.secondary }]}
+                    onPress={completeCurrentStep}
+                  >
+                    <Text style={styles.timerButtonText}>Terminer ➔</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : activeSessionTimerRemaining !== null ? (
+              <View style={styles.timerCircleWrapper}>
+                <View style={[styles.timerCircleOuter, { borderColor: '#888D9F' }]}>
+                  <Text style={[styles.timerCountdownText, { color: customText }]}>
+                    {formatSeconds(activeSessionTimerRemaining)}
+                  </Text>
+                  <Text style={[styles.timerCountdownSub, { color: customTextSec }]}>
+                    en pause
+                  </Text>
+                </View>
+                
+                <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+                  <TouchableOpacity
+                    style={[styles.timerButton, { backgroundColor: colors.primary }]}
+                    onPress={() => startStepTimer(activeSessionTimerRemaining)}
+                  >
+                    <Text style={styles.timerButtonText}>Reprendre ▶️</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.timerButton, { backgroundColor: colors.secondary }]}
+                    onPress={completeCurrentStep}
+                  >
+                    <Text style={styles.timerButtonText}>Terminer ➔</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View style={{ alignItems: 'center', marginVertical: 14 }}>
+                <Text style={{ color: customTextSec, fontSize: 13, fontWeight: '600', marginBottom: 12 }}>
+                  ⏱️ Durée recommandée : {guide.duration}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <TouchableOpacity
+                    style={[styles.timerButton, { backgroundColor: colors.primary }]}
+                    onPress={() => startStepTimer(getDurationInSeconds(guide.duration))}
+                  >
+                    <Text style={styles.timerButtonText}>Lancer le chrono ⏰</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.timerButton, { backgroundColor: colors.secondary }]}
+                    onPress={completeCurrentStep}
+                  >
+                    <Text style={styles.timerButtonText}>Valider l'étape ✓</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* Guide Steps list */}
+          <View style={styles.wizardStepsList}>
+            <Text style={[styles.wizardSubtitle, { color: customText }]}>👣 Comment faire :</Text>
+            {guide.steps.map((step, idx) => (
+              <View key={idx} style={styles.wizardStepRow}>
+                <View style={styles.wizardStepBadge}>
+                  <Text style={styles.wizardStepBadgeText}>{idx + 1}</Text>
+                </View>
+                <Text style={[styles.wizardStepText, { color: customTextSec }]}>{step}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Mistakes Box */}
+          {guide.mistakes.length > 0 && (
+            <View style={[styles.wizardMistakesBox, { backgroundColor: 'rgba(217, 83, 79, 0.04)', borderColor: 'rgba(217, 83, 79, 0.15)' }]}>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: colors.danger, marginBottom: 4 }}>
+                ⚠️ À éviter :
+              </Text>
+              {guide.mistakes.map((m, idx) => (
+                <Text key={idx} style={{ fontSize: 11, color: customTextSec, lineHeight: 16 }}>
+                  • {m}
+                </Text>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Wizard Controls */}
+        <View style={{ flexDirection: 'row', gap: 12, marginHorizontal: 24, marginTop: 14, marginBottom: 30 }}>
+          <TouchableOpacity
+            style={[styles.wizardActionButton, { backgroundColor: '#888D9F', flex: 1 }]}
+            onPress={() => setIsSessionSuspended(true)}
+          >
+            <Text style={styles.wizardActionButtonText}>Réduire</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.wizardActionButton, { backgroundColor: 'transparent', borderWidth: 1.2, borderColor: colors.danger, flex: 1 }]}
+            onPress={stopActiveSession}
+          >
+            <Text style={[styles.wizardActionButtonText, { color: colors.danger }]}>Quitter ✕</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    );
+  };
+
   const [showHealthDetail, setShowHealthDetail] = useState(false);
   const [showPorosityModal, setShowPorosityModal] = useState(false);
   const [showCareGuide, setShowCareGuide] = useState(false);
@@ -724,6 +989,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
   const [selectedCareId, setSelectedCareId] = useState<string>('');
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showUpcomingAgenda, setShowUpcomingAgenda] = useState(false);
   
   // Premium and Scanner Modals active states
   const [showPaywall, setShowPaywall] = useState(false);
@@ -741,6 +1007,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
   const [showSmartShiftModal, setShowSmartShiftModal] = useState(false);
   const [showOverdueModal, setShowOverdueModal] = useState(false);
   const [overdueCare, setOverdueCare] = useState<RoutineItem | null>(null);
+
+  // Confirmation modal for deleting upcoming care
+  const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<{ id: string; category: string; date: string } | null>(null);
   const [showRescheduleDatePicker, setShowRescheduleDatePicker] = useState(false);
   const [showRescheduleTimePicker, setShowRescheduleTimePicker] = useState(false);
   const [rescheduledDate, setRescheduledDate] = useState<string>('');
@@ -879,7 +1148,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
   };
 
   // Filter future uncompleted cares (upcoming scheduled) sorted by absolute proximity in time
-  const defaultTime = activeProfile.notifications?.time || "08:30";
+  const defaultTime = activeProfile.notifications?.time || "09:00";
   const nowMs = Date.now();
   const getCareDateTime = (careDate: string, careTime?: string) => {
     const [year, month, day] = careDate.split('-').map(Number);
@@ -907,6 +1176,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
 
   const tomorrowStr = getLocalDateString(new Date(Date.now() + 86400000));
   const firstCareDate = shiftableUpcomingCares[0]?.date || tomorrowStr;
+  const hasCompletedCares = routine.some(r => r.profileId === activeProfile.id && r.completed);
 
   const handleShiftRoutine = (selectedDate: string) => {
     if (!shiftableUpcomingCares || shiftableUpcomingCares.length === 0) return;
@@ -957,7 +1227,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                     <Image
                       source={avatarImageMap[p.avatar]}
                       style={[
-                        styles.profileAvatarEmoji,
+                        styles.profileAvatarEmoji as any,
                         { backgroundColor: customCard },
                         isActive && { borderColor: colors.primary }
                       ]}
@@ -997,292 +1267,546 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
             </TouchableOpacity>
           </ScrollView>
 
-          {/* Right-aligned Logo Asset */}
+          {/* Right side: Logo + Gear */}
           <View style={styles.selectorLogoWrapper}>
-            <Image 
+            <Image
               source={isLight ? require('../../../assets/logo_jour.png') : require('../../../assets/logo_nuit.png')}
-              style={styles.selectorLogoImage}
+              style={styles.selectorLogoImage as any}
               resizeMode="contain"
             />
+            <TouchableOpacity
+              onPress={() => setShowSettings(true)}
+              activeOpacity={0.7}
+              style={styles.gearButton}
+            >
+              <Text style={styles.gearIcon}>⚙️</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Orange Banner for Skipped Porosity */}
-        {activeProfile.diagnostic.porosity === null && (
-          <TouchableOpacity
-            style={styles.orangeBanner}
-            activeOpacity={0.9}
-            onPress={() => setShowPorosityModal(true)}
-          >
-            <Text style={styles.orangeBannerEmoji}>🔬</Text>
-            <View style={styles.orangeBannerTextWrapper}>
-              <Text style={styles.orangeBannerTitle}>Porosité non renseignée ⚠️</Text>
-              <Text style={styles.orangeBannerDesc}>
-                Complétez le test pour débloquer vos conseils personnalisés ! Cliquez ici.
-              </Text>
-            </View>
-            <Text style={styles.orangeBannerArrow}>➔</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Dynamic header (Bandeau Dynamique) */}
-        <DynamicHeader onPriorityPress={() => {
-          setSelectedCareId(todayAction?.id || '');
-          setSelectedGuideCategory(activeCategory);
-          setShowCareGuide(true);
-        }} />
-
-        {/* Circular Health Gauge component */}
-        <View style={styles.gaugeSection}>
-          <CircularGauge
-            percentage={activeProfile.healthScore}
-            onPress={() => setShowHealthDetail(true)}
-          />
-          <Text style={[styles.gaugeHelpText, { color: isLight ? '#888D9F' : colors.textMuted }]}>
-            👉 Appuie sur la jauge pour voir le bilan détaillé
-          </Text>
-        </View>
-
-        {/* Central interactive Quick Action button */}
-        <QuickAction onPress={onNavigateToCalendar} />
-
-        {/* 🔍 Premium Product Scanner Widget Card */}
-        <TouchableOpacity
-          style={[styles.scannerWidgetCard, { backgroundColor: customCard, borderColor: customBorder }]}
-          activeOpacity={0.8}
-          onPress={() => {
-            if (isPremium) {
-              setShowScanner(true);
-            } else {
-              setShowPaywall(true);
-            }
-          }}
-        >
-          <View style={styles.scannerWidgetLeft}>
-            <Text style={styles.scannerWidgetEmoji}>🔍</Text>
-          </View>
-          <View style={styles.scannerWidgetCenter}>
-            <View style={styles.scannerWidgetTitleRow}>
-              <Text style={[styles.scannerWidgetTitle, { color: customText }]}>Scanner Capillaire IA</Text>
-              {isPremium ? (
-                <View style={styles.proBadgeActive}>
-                  <Text style={styles.proBadgeActiveText}>PREMIUM</Text>
-                </View>
-              ) : (
-                <View style={styles.proBadgeLocked}>
-                  <Text style={styles.proBadgeLockedText}>PRO</Text>
-                </View>
-              )}
-            </View>
-            <Text style={[styles.scannerWidgetDesc, { color: customTextSec }]} numberOfLines={2}>
-              Scanne tes produits et analyse la compatibilité INCI pour tes cheveux !
-            </Text>
-          </View>
-          <View style={styles.scannerWidgetRight}>
-            <Text style={[styles.scannerWidgetArrow, { color: colors.primary }]}>➔</Text>
-          </View>
-        </TouchableOpacity>
-
-        {/* Curated recommendation card */}
-        <FeaturedAdvice 
-          onSeeAllPress={() => setShowAllAdvice(true)} 
-          onArticlePress={(art) => {
-            setSelectedArticleContent(art);
-            setShowAllAdvice(true);
-          }}
-        />
-
-        {/* 📅 AGENDA EXPRESS: UPCOMING PLANED CARES FEED */}
-        <View style={styles.upcomingSection}>
-          <Text style={[styles.upcomingSectionTitle, { color: customText }]}>🗓️ Mon Agenda à Venir</Text>
-
-          {/* Premium Routine Date Shifter Button */}
-          {allUpcomingCares.length > 0 && (
+      {isSessionActive && !isSessionSuspended ? (
+        renderActiveSessionWizard()
+      ) : (
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {/* Orange Banner for Skipped Porosity */}
+          {activeProfile.diagnostic.porosity === null && (
             <TouchableOpacity
-              style={[
-                styles.shifterButton,
-                { 
-                  backgroundColor: isLight ? 'rgba(229, 169, 130, 0.08)' : 'rgba(229, 169, 130, 0.12)',
-                  borderColor: 'rgba(229, 169, 130, 0.25)'
-                }
-              ]}
-              activeOpacity={0.8}
-              onPress={() => setShowDatePicker(true)}
+              style={styles.orangeBanner}
+              activeOpacity={0.9}
+              onPress={() => setShowPorosityModal(true)}
             >
-              <Text style={[styles.shifterButtonText, { color: customText }]}>
-                📅 Démarrer ma routine le {formatFrenchDate(firstCareDate)}
-              </Text>
-              <View style={styles.shifterBadge}>
-                <Text style={styles.shifterBadgeText}>DÉCALER ➔</Text>
+              <Text style={styles.orangeBannerEmoji}>🔬</Text>
+              <View style={styles.orangeBannerTextWrapper}>
+                <Text style={styles.orangeBannerTitle}>Porosité non renseignée ⚠️</Text>
+                <Text style={styles.orangeBannerDesc}>
+                  Complétez le test pour débloquer vos conseils personnalisés ! Cliquez ici.
+                </Text>
               </View>
+              <Text style={styles.orangeBannerArrow}>➔</Text>
             </TouchableOpacity>
           )}
-          
-          {upcomingCares.length === 0 ? (
-            <View style={[styles.upcomingEmptyCard, { backgroundColor: customCard, borderColor: customBorder }]}>
-              <Text style={[styles.upcomingEmptyEmoji]}>🌿</Text>
-              <Text style={[styles.upcomingEmptyTitle, { color: customText }]}>Aucun soin planifié</Text>
-              <Text style={[styles.upcomingEmptyDesc, { color: customTextSec }]}>
-                Utilisez le bouton "Mémo Soin" ci-dessus pour planifier vos soins libres personnalisés !
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.upcomingListWrapper}>
-              {upcomingCares.map(care => {
-                // Pick appropriate emoji based on category
-                let careEmoji = '🧴';
-                if (care.category.toLowerCase().includes('lavage')) careEmoji = '🚿';
-                else if (care.category.toLowerCase().includes('clarif')) careEmoji = '🌺';
-                else if (care.category.toLowerCase().includes('bain')) careEmoji = '🌿';
-                else if (care.category.toLowerCase().includes('masque')) careEmoji = '🍯';
-                else if (care.category.toLowerCase().includes('rinçage') || care.category.toLowerCase().includes('rincage') || care.category.toLowerCase().includes('leave')) careEmoji = '🧴';
-                else if (care.category.toLowerCase().includes('co-wash')) careEmoji = '🌸';
-                else if (care.category.toLowerCase().includes('retwist')) careEmoji = '👑';
-                else if (care.category.toLowerCase().includes('massage')) careEmoji = '💆‍♀️';
-                else if (care.category.toLowerCase().includes('dusting') || care.category.toLowerCase().includes('coupe')) careEmoji = '✂️';
 
-                const relativeLabel = getRelativeDateLabel(care.date);
+          {/* 1. Header / Météo */}
+          <DynamicHeader />
 
-                const handleDeleteCare = () => {
-                  const confirmDelete = Platform.OS === 'web' 
-                    ? window.confirm(`Voulez-vous supprimer le soin "${care.category}" planifié pour le ${care.date} ?`)
-                    : true; // Standard confirm on mobile or simple delete
+          {/* 2. Le Bloc Principal (en Mode Action ou Mode Info) */}
+          {(() => {
+            const todayCares = routine.filter(r => r.profileId === activeProfile.id && r.date === todayStr && !r.completed);
+            
+            // Helper to determine day of the week
+            const getDayOfWeekName = (dateStr: string) => {
+              const parts = dateStr.split('-');
+              if (parts.length !== 3) return '';
+              const year = parseInt(parts[0], 10);
+              const month = parseInt(parts[1], 10) - 1;
+              const day = parseInt(parts[2], 10);
+              const dateObj = new Date(year, month, day);
+              const days = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+              return days[dateObj.getDay()];
+            };
 
-                  if (confirmDelete) {
-                    deleteRoutineItem(care.id);
-                  }
-                };
+            if (todayCares.length > 0 || isSessionActive) {
+              // MODE ACTION
+              let cardTitle = "💆‍♀️ Routine Capillaire";
+              let cardDesc = "";
+              let cardEmoji = "💆‍♀️";
+              let buttonText = "DÉMARRER";
+              let handlePress = () => startActiveSession();
 
-                return (
-                  <TouchableOpacity 
-                    key={care.id} 
-                    activeOpacity={0.8}
-                    onPress={() => {
-                      setSelectedCareId(care.id);
-                      setSelectedGuideCategory(care.category);
-                      setShowCareGuide(true);
-                    }}
-                    style={[
-                      styles.upcomingCareCard, 
-                      { backgroundColor: customCard, borderColor: customBorder }
-                    ]}
-                  >
-                    <View style={[styles.upcomingCareEmojiBadge, { backgroundColor: isLight ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.03)' }]}>
-                      <Text style={styles.upcomingCareEmojiText}>{careEmoji}</Text>
+              const caresList = isSessionActive ? activeSessionCares : todayCares;
+              const categories = caresList.map(c => c.category.toLowerCase().trim());
+
+              if (categories.some(c => c.includes("bain d'huile") || c.includes("bain d’huile") || c.includes("masque"))) {
+                cardTitle = "🌿 Routine Cocooning";
+                cardDesc = "Aujourd'hui, on répare et on nourrit tes longueurs en profondeur. Prête ?";
+                cardEmoji = "🌿";
+              } else if (categories.some(c => c.includes("clarification") || c.includes("lavage") || c.includes("shampoing") || c.includes("shampoo"))) {
+                cardTitle = "🫧 Grand Nettoyage";
+                cardDesc = "Détox capillaire : on libère tes boucles/locks de tous les résidus !";
+                cardEmoji = "🫧";
+              } else if (categories.some(c => c.includes("retwist") || c.includes("coiffage"))) {
+                cardTitle = "👑 Alerte Fraîcheur";
+                cardDesc = "On s'occupe de tes racines et de ta définition. On lance le chrono ?";
+                cardEmoji = "👑";
+              } else if (categories.some(c => c.includes("vapo") || c.includes("hydratation") || c.includes("sans rinçage") || c.includes("sans rincage") || c.includes("leave"))) {
+                cardTitle = "🌊 Hydratation Express";
+                cardDesc = "Un petit coup de boost ? 2 minutes pour hydrater tes longueurs et c'est plié !";
+                cardEmoji = "🌊";
+              } else {
+                cardDesc = `Tu as ${caresList.length} soin${caresList.length > 1 ? 's' : ''} prévus. C'est parti !`;
+              }
+
+              if (isSessionActive) {
+                cardDesc = `Rituel en cours • Étape ${currentStepIndex + 1} / ${activeSessionCares.length} : ${activeSessionCares[currentStepIndex]?.category || ''}`;
+                buttonText = "REPRENDRE";
+                handlePress = () => setIsSessionSuspended(false);
+              }
+
+              return (
+                <TouchableOpacity
+                  style={[
+                    styles.startSessionCard,
+                    { 
+                      backgroundColor: isLight ? '#FFEFE0' : '#FDBA74',
+                      borderColor: isLight ? '#FDBA74' : '#E5A982',
+                      borderWidth: 2.0,
+                      marginTop: 16,
+                      // Glowing shadow
+                      shadowColor: '#FDBA74',
+                      shadowOffset: { width: 0, height: 6 },
+                      shadowOpacity: isLight ? 0.15 : 0.3,
+                      shadowRadius: 12,
+                      elevation: 4,
+                    }
+                  ]}
+                  activeOpacity={0.8}
+                  onPress={handlePress}
+                >
+                  <View style={[
+                    styles.startSessionLeft,
+                    { 
+                      backgroundColor: isLight ? '#FFF0E0' : '#4E2A12'
+                    }
+                  ]}>
+                    <Text style={styles.startSessionEmoji}>{cardEmoji}</Text>
+                  </View>
+                  <View style={styles.startSessionCenter}>
+                    <Text style={[styles.startSessionTitle, { color: isLight ? '#5F2D0F' : '#2E1305' }]}>{cardTitle}</Text>
+                    <Text style={[styles.startSessionDesc, { color: isLight ? '#7C3F12' : '#4A2007' }]}>
+                      {cardDesc}
+                    </Text>
+                  </View>
+                  <View style={styles.startSessionRight}>
+                    <View style={[
+                      styles.startSessionBtn,
+                      { 
+                        backgroundColor: isLight ? '#5C351F' : '#2E1305'
+                      }
+                    ]}>
+                      <Text style={[
+                        styles.startSessionBtnText,
+                        { 
+                          color: '#FFFFFF'
+                        }
+                      ]}>{buttonText}</Text>
                     </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            } else {
+              // MODE INFO (Aucun soin aujourd'hui)
+              const upcomingCaresAll = routine.filter(r => r.profileId === activeProfile.id && r.date > todayStr && !r.completed);
+              // Sort chronologically by date
+              const sortedUpcoming = [...upcomingCaresAll].sort((a, b) => a.date.localeCompare(b.date));
+              const nextCare = sortedUpcoming[0];
 
-                    <View style={styles.upcomingCareInfoWrapper}>
-                      <View style={styles.upcomingCareHeaderRow}>
-                        <Text style={[styles.upcomingCareTitleText, { color: customText }]} numberOfLines={1}>
-                          {care.category}
-                        </Text>
-                        <Text style={{
-                          fontSize: 10,
-                          fontWeight: '800',
-                          color: colors.primary,
-                          textTransform: 'uppercase',
-                        }}>
-                          {relativeLabel}
+              let infoDesc = "Aucun soin planifié. Planifiez votre moment bien-être dans le calendrier !";
+              if (nextCare) {
+                const dayName = getDayOfWeekName(nextCare.date);
+                infoDesc = `Prochain rendez-vous bien-être : ${nextCare.category} le ${dayName}`;
+              }
+
+              return (
+                <View
+                  style={[
+                    styles.startSessionCard,
+                    { 
+                      backgroundColor: isLight ? '#FFEFE0' : '#FDBA74',
+                      borderColor: isLight ? 'rgba(253, 186, 116, 0.5)' : 'rgba(229, 169, 130, 0.45)',
+                      borderWidth: 2.0,
+                      marginTop: 16,
+                      // Glowing shadow
+                      shadowColor: '#FDBA74',
+                      shadowOffset: { width: 0, height: 6 },
+                      shadowOpacity: isLight ? 0.1 : 0.2,
+                      shadowRadius: 12,
+                      elevation: 4,
+                    }
+                  ]}
+                >
+                  <View style={[
+                    styles.startSessionLeft,
+                    { 
+                      backgroundColor: isLight ? '#FFF0E0' : '#4E2A12'
+                    }
+                  ]}>
+                    <Text style={styles.startSessionEmoji}>🌺</Text>
+                  </View>
+                  <View style={[styles.startSessionCenter, { flex: 1 }]}>
+                    <Text style={[styles.startSessionTitle, { color: isLight ? '#5F2D0F' : '#2E1305' }]}>🥥 Routine Capillaire</Text>
+                    <Text style={[styles.startSessionDesc, { color: isLight ? '#7C3F12' : '#4A2007' }]}>
+                      {infoDesc}
+                    </Text>
+                  </View>
+                </View>
+              );
+            }
+          })()}
+
+          {/* 3. Le bloc déroulant "Mon Agenda à Venir" (Fermé par défaut) */}
+          <View style={[styles.accordionItem, { backgroundColor: customCard, borderColor: customBorder, marginTop: 16, marginBottom: 0 }]}>
+            <TouchableOpacity
+              style={styles.accordionHeader}
+              onPress={() => setShowUpcomingAgenda(!showUpcomingAgenda)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.accordionTitle, { color: customText, fontSize: 16 }]}>📅 Mon Agenda à Venir</Text>
+              <Text style={[styles.accordionArrow, { color: customTextSec }]}>{showUpcomingAgenda ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+
+            {showUpcomingAgenda && (
+              <View style={[styles.panelContent, { borderTopColor: customBorder, borderTopWidth: 0.5 }]}>
+                {/* Premium Routine Date Shifter Config Block */}
+                {allUpcomingCares.length > 0 && (
+                  <View style={[
+                    styles.dateConfigCard,
+                    {
+                      backgroundColor: isLight ? 'rgba(229, 169, 130, 0.04)' : 'rgba(229, 169, 130, 0.03)',
+                      borderColor: isLight ? 'rgba(229, 169, 130, 0.15)' : 'rgba(229, 169, 130, 0.1)',
+                      borderWidth: 1,
+                      borderRadius: 14,
+                      padding: 14,
+                      marginBottom: 16,
+                    }
+                  ]}>
+                    <Text style={[styles.dateConfigTitle, { color: customText }]}>
+                      {hasCompletedCares ? '🗓️ Date de mon prochain soin' : '🗓️ Date de lancement de mon programme'}
+                    </Text>
+                    <Text style={[styles.dateConfigSubtext, { color: customTextSec }]}>
+                      {hasCompletedCares 
+                        ? `Ton prochain soin de routine est programmé pour le : `
+                        : `Le temps de recevoir tes produits, ton premier soin est calé pour le : `}
+                      <Text style={{ fontWeight: '700', color: colors.primary }}>{formatFrenchDate(firstCareDate)}</Text>
+                    </Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.dateConfigButton,
+                        {
+                          backgroundColor: colors.primary,
+                        }
+                      ]}
+                      activeOpacity={0.8}
+                      onPress={() => setShowDatePicker(true)}
+                    >
+                      <Text style={styles.dateConfigButtonText}>
+                        {hasCompletedCares 
+                          ? '[ Ajuster la date du prochain soin ]' 
+                          : '[ Ajuster la date du premier soin ]'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                
+                {(() => {
+                  const futureUpcomingCares = allUpcomingCares;
+                  const displayCares = showAllUpcoming ? futureUpcomingCares : futureUpcomingCares.slice(0, 4);
+
+                  if (displayCares.length === 0) {
+                    return (
+                      <View style={[styles.upcomingEmptyCard, { backgroundColor: customCard, borderColor: customBorder }]}>
+                        <Text style={[styles.upcomingEmptyEmoji]}>🌿</Text>
+                        <Text style={[styles.upcomingEmptyTitle, { color: customText }]}>Aucun soin planifié</Text>
+                        <Text style={[styles.upcomingEmptyDesc, { color: customTextSec }]}>
+                          Utilisez le bouton "Mémo Soin" ci-dessus pour planifier vos soins libres personnalisés !
                         </Text>
                       </View>
-                      
-                      {(() => {
-                        const matchingBathroomProduct = bathroomProducts.find(bp => matchesCategory(bp.category, care.category, bp.name));
-                        if (matchingBathroomProduct) {
-                          const isOcclusive = matchingBathroomProduct.ingredients.some(i => 
-                            i.toLowerCase().includes('mineral oil') || 
-                            i.toLowerCase().includes('petrolatum') || 
-                            i.toLowerCase().includes('cire') || 
-                            i.toLowerCase().includes('wax')
-                          );
-                          const isLowPoro = activeProfile.diagnostic.porosity === 'Faible';
-                          const hasWarning = matchingBathroomProduct.compatibility === 'Attention' || (isOcclusive && isLowPoro);
+                    );
+                  }
 
-                          if (hasWarning) {
-                            return (
-                              <View style={[
-                                styles.bathroomBadgeContainer,
-                                { 
-                                  backgroundColor: isLight ? 'rgba(217, 83, 79, 0.08)' : 'rgba(217, 83, 79, 0.15)',
-                                  borderColor: 'rgba(217, 83, 79, 0.3)'
-                                }
-                              ]}>
-                                <Text style={[styles.bathroomBadgeText, { color: isLight ? '#D9534F' : '#FF7875' }]} numberOfLines={1}>
-                                  🧼⚠️ {matchingBathroomProduct.brand} • {matchingBathroomProduct.name} (Attention)
+                  return (
+                    <View style={styles.upcomingListWrapper}>
+                      {displayCares.map(care => {
+                        // Pick appropriate emoji based on category
+                        let careEmoji = '🧴';
+                        if (care.category.toLowerCase().includes('lavage')) careEmoji = '🚿';
+                        else if (care.category.toLowerCase().includes('clarif')) careEmoji = '🌺';
+                        else if (care.category.toLowerCase().includes('bain')) careEmoji = '🌿';
+                        else if (care.category.toLowerCase().includes('masque')) careEmoji = '🍯';
+                        else if (care.category.toLowerCase().includes('rinçage') || care.category.toLowerCase().includes('rincage') || care.category.toLowerCase().includes('leave')) careEmoji = '🧴';
+                        else if (care.category.toLowerCase().includes('co-wash')) careEmoji = '🌸';
+                        else if (care.category.toLowerCase().includes('retwist')) careEmoji = '👑';
+                        else if (care.category.toLowerCase().includes('massage')) careEmoji = '💆‍♀️';
+                        else if (care.category.toLowerCase().includes('dusting') || care.category.toLowerCase().includes('coupe')) careEmoji = '✂️';
+
+                        const relativeLabel = getRelativeDateLabel(care.date);
+
+                        const handleDeleteCare = () => {
+                          if (Platform.OS === 'web') {
+                            const confirmDelete = window.confirm(`Voulez-vous supprimer le soin "${care.category}" planifié pour le ${care.date} ?`);
+                            if (confirmDelete) {
+                              deleteRoutineItem(care.id);
+                            }
+                          } else {
+                            setConfirmDeleteTarget({ id: care.id, category: care.category, date: care.date });
+                          }
+                        };
+
+                        return (
+                          <TouchableOpacity 
+                            key={care.id} 
+                            activeOpacity={0.8}
+                            onPress={() => {
+                              setSelectedCareId(care.id);
+                              setSelectedGuideCategory(care.category);
+                              setShowCareGuide(true);
+                            }}
+                            style={[
+                              styles.upcomingCareCard, 
+                              { backgroundColor: customCard, borderColor: customBorder }
+                            ]}
+                          >
+                            <View style={[styles.upcomingCareEmojiBadge, { backgroundColor: isLight ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.03)' }]}>
+                              <Text style={styles.upcomingCareEmojiText}>{careEmoji}</Text>
+                            </View>
+
+                            <View style={styles.upcomingCareInfoWrapper}>
+                              <View style={styles.upcomingCareHeaderRow}>
+                                <Text style={[styles.upcomingCareTitleText, { color: isLight ? '#1C1E26' : '#FFFFFF' }]} numberOfLines={1}>
+                                  {care.category}
+                                </Text>
+                                <Text style={{
+                                  fontSize: 10,
+                                  fontWeight: '800',
+                                  color: colors.primary,
+                                  textTransform: 'uppercase',
+                                }}>
+                                  {relativeLabel}
                                 </Text>
                               </View>
-                            );
-                          }
+                              
+                              {(() => {
+                                const matchingBathroomProduct = bathroomProducts.find(bp => matchesCategory(bp.category, care.category, bp.name));
+                                if (matchingBathroomProduct) {
+                                  const isOcclusive = matchingBathroomProduct.ingredients.some(i => 
+                                    i.toLowerCase().includes('mineral oil') || 
+                                    i.toLowerCase().includes('petrolatum') || 
+                                    i.toLowerCase().includes('cire') || 
+                                    i.toLowerCase().includes('wax')
+                                  );
+                                  const isLowPoro = activeProfile.diagnostic.porosity === 'Faible';
+                                  const hasWarning = matchingBathroomProduct.compatibility === 'Attention' || (isOcclusive && isLowPoro);
 
-                          return (
-                            <View style={[
-                              styles.bathroomBadgeContainer,
-                              { 
-                                backgroundColor: isLight ? 'rgba(118, 160, 138, 0.08)' : 'rgba(118, 160, 138, 0.15)',
-                                borderColor: 'rgba(118, 160, 138, 0.3)'
-                              }
-                            ]}>
-                              <Text style={[styles.bathroomBadgeText, { color: isLight ? '#4D735F' : '#9CCCAE' }]} numberOfLines={1}>
-                                🧼 {matchingBathroomProduct.brand} • {matchingBathroomProduct.name}
-                              </Text>
+                                  if (hasWarning) {
+                                    return (
+                                      <View style={[
+                                        styles.bathroomBadgeContainer,
+                                        { 
+                                          backgroundColor: isLight ? 'rgba(217, 83, 79, 0.08)' : 'rgba(217, 83, 79, 0.15)',
+                                          borderColor: 'rgba(217, 83, 79, 0.3)'
+                                        }
+                                      ]}>
+                                        <Text style={[styles.bathroomBadgeText, { color: isLight ? '#D9534F' : '#FF7875' }]} numberOfLines={1}>
+                                          🧼⚠️ {matchingBathroomProduct.brand} • {matchingBathroomProduct.name} (Attention)
+                                        </Text>
+                                      </View>
+                                    );
+                                  }
+
+                                  return (
+                                    <View style={[
+                                      styles.bathroomBadgeContainer,
+                                      { 
+                                        backgroundColor: isLight ? 'rgba(118, 160, 138, 0.08)' : 'rgba(118, 160, 138, 0.15)',
+                                        borderColor: 'rgba(118, 160, 138, 0.3)'
+                                      }
+                                    ]}>
+                                      <Text style={[styles.bathroomBadgeText, { color: isLight ? '#4D735F' : '#9CCCAE' }]} numberOfLines={1}>
+                                        🧼 {matchingBathroomProduct.brand} • {matchingBathroomProduct.name}
+                                      </Text>
+                                    </View>
+                                  );
+                                }
+                                return (
+                                  <Text style={[styles.upcomingCareProductText, { color: isLight ? '#6A6F82' : '#D1D4E0' }]} numberOfLines={1}>
+                                    {care.product}
+                                  </Text>
+                                );
+                              })()}
+                              
+                              <View style={styles.upcomingCareFooterRow}>
+                                <Text style={{ fontSize: 9, color: colors.secondary, fontWeight: '700' }}>
+                                  📅 {care.date}
+                                </Text>
+                                {care.enableNotificationReminder && (
+                                  <Text style={{ fontSize: 9, color: colors.accent, fontWeight: '700', marginLeft: 8 }}>
+                                    🔔 Rappel actif
+                                  </Text>
+                                )}
+                              </View>
                             </View>
-                          );
-                        }
-                        return (
-                          <Text style={[styles.upcomingCareProductText, { color: customTextSec }]} numberOfLines={1}>
-                            {care.product}
-                          </Text>
+
+                            {/* Delete button (cancel care) */}
+                            <TouchableOpacity 
+                              style={[styles.upcomingCareDeleteButton, { backgroundColor: isLight ? 'rgba(217, 83, 79, 0.05)' : 'rgba(217, 83, 79, 0.08)' }]} 
+                              onPress={handleDeleteCare}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={styles.upcomingCareDeleteButtonText}>🗑️</Text>
+                            </TouchableOpacity>
+                          </TouchableOpacity>
                         );
-                      })()}
+                      })}
                       
-                      <View style={styles.upcomingCareFooterRow}>
-                        <Text style={{ fontSize: 9, color: colors.secondary, fontWeight: '700' }}>
-                          📅 {care.date}
-                        </Text>
-                        {care.enableNotificationReminder && (
-                          <Text style={{ fontSize: 9, color: colors.accent, fontWeight: '700', marginLeft: 8 }}>
-                            🔔 Rappel actif
+                      {futureUpcomingCares.length > 4 && (
+                        <TouchableOpacity 
+                          style={styles.seeMoreUpcomingButton} 
+                          onPress={() => setShowAllUpcoming(!showAllUpcoming)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.seeMoreUpcomingText}>
+                            {showAllUpcoming ? 'Voir moins ➔' : `Voir plus (${futureUpcomingCares.length - 4} de plus) ➔`}
                           </Text>
-                        )}
-                      </View>
+                        </TouchableOpacity>
+                      )}
                     </View>
+                  );
+                })()}
+              </View>
+            )}
+          </View>
 
-                    {/* Delete button (cancel care) */}
-                    <TouchableOpacity 
-                      style={[styles.upcomingCareDeleteButton, { backgroundColor: isLight ? 'rgba(217, 83, 79, 0.05)' : 'rgba(217, 83, 79, 0.08)' }]} 
-                      onPress={handleDeleteCare}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.upcomingCareDeleteButtonText}>🗑️</Text>
-                    </TouchableOpacity>
-                  </TouchableOpacity>
-                );
-              })}
-              
-              {allUpcomingCares.length > 4 && (
-                <TouchableOpacity 
-                  style={styles.seeMoreUpcomingButton} 
-                  onPress={() => setShowAllUpcoming(!showAllUpcoming)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.seeMoreUpcomingText}>
-                    {showAllUpcoming ? 'Voir moins ➔' : `Voir plus (${allUpcomingCares.length - 4} de plus) ➔`}
-                  </Text>
-                </TouchableOpacity>
-              )}
+          {/* 4. Zone Actions Rapides : Le bouton Mémo Soin (ajout libre) et le bouton Scanner Capillaire IA */}
+          <View style={{ gap: 16, marginTop: 16, marginBottom: 0 }}>
+            <QuickAction onPress={onNavigateToCalendar} />
+
+            <TouchableOpacity
+              style={[styles.scannerWidgetCard, { backgroundColor: customCard }]}
+              activeOpacity={0.8}
+              onPress={() => {
+                if (isPremium) {
+                  setShowScanner(true);
+                } else {
+                  setShowPaywall(true);
+                }
+              }}
+            >
+              <View style={styles.scannerWidgetLeft}>
+                <Text style={styles.scannerWidgetEmoji}>🔍</Text>
+              </View>
+              <View style={styles.scannerWidgetCenter}>
+                <View style={styles.scannerWidgetTitleRow}>
+                  <Text style={[styles.scannerWidgetTitle, { color: customText }]}>Scanner Capillaire IA</Text>
+                  {isPremium ? (
+                    <View style={styles.proBadgeActive}>
+                      <Text style={styles.proBadgeActiveText}>PREMIUM</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.proBadgeLocked}>
+                      <Text style={styles.proBadgeLockedText}>PRO</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.scannerWidgetDesc, { color: customTextSec }]} numberOfLines={2}>
+                  Scanne tes produits et analyse la compatibilité INCI pour tes cheveux !
+                </Text>
+              </View>
+              <View style={styles.scannerWidgetRight}>
+                <Text style={[styles.scannerWidgetArrow, { color: colors.primary }]}>➔</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* 5. Conseil Vedette pour toi (Les articles/tutos) */}
+          <FeaturedAdvice 
+            onSeeAllPress={() => setShowAllAdvice(true)} 
+            onArticlePress={(art) => {
+              setSelectedArticleContent(art);
+              setShowAllAdvice(true);
+            }}
+          />
+
+          {/* 6. Jauge de Santé globale (Tout en bas de l'écran) */}
+          <View style={[styles.gaugeSection, { marginTop: 16, marginBottom: 20 }]}>
+            <CircularGauge
+              percentage={activeProfile.healthScore}
+              onPress={() => setShowHealthDetail(true)}
+            />
+            <Text style={[styles.gaugeHelpText, { color: isLight ? '#888D9F' : colors.textMuted }]}>
+              👉 Appuie sur la jauge pour voir le bilan détaillé
+            </Text>
+          </View>
+        </ScrollView>
+      )}
+
+
+
+      {/* 🗑️ Custom Confirm Delete Modal */}
+      <Modal
+        visible={confirmDeleteTarget !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setConfirmDeleteTarget(null)}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: isLight ? 'rgba(0,0,0,0.45)' : colors.overlay }]}>
+          <View style={[styles.feedbackCard, { backgroundColor: customCard, borderColor: customBorder }]}>
+            {/* Icône */}
+            <View style={styles.confirmDeleteIconWrapper}>
+              <Text style={styles.confirmDeleteIcon}>🗑️</Text>
             </View>
-          )}
+
+            <Text style={[styles.feedbackTitle, { color: customText, marginBottom: 8 }]}>
+              Supprimer ce soin ?
+            </Text>
+
+            <Text style={[styles.confirmDeleteMessage, { color: customTextSec }]}>
+              {confirmDeleteTarget && (
+                <>Vous êtes sur le point de supprimer{' '}
+                  <Text style={{ color: customText, fontWeight: '700' }}>{confirmDeleteTarget.category}</Text>
+                  {' '}prévu le{' '}
+                  <Text style={{ color: customText, fontWeight: '700' }}>{formatFrenchDate(confirmDeleteTarget.date)}</Text>.
+                  {' '}Cette action est irréversible.
+                </>
+              )}
+            </Text>
+
+            <View style={styles.confirmDeleteButtons}>
+              {/* Bouton Annuler */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[styles.confirmBtn, styles.confirmBtnCancel, { borderColor: customBorder, backgroundColor: customInputBg }]}
+                onPress={() => setConfirmDeleteTarget(null)}
+              >
+                <Text style={[styles.confirmBtnCancelText, { color: customText }]}>Annuler</Text>
+              </TouchableOpacity>
+
+              {/* Bouton Supprimer */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[styles.confirmBtn, styles.confirmBtnDelete]}
+                onPress={() => {
+                  if (confirmDeleteTarget) {
+                    deleteRoutineItem(confirmDeleteTarget.id);
+                    setConfirmDeleteTarget(null);
+                  }
+                }}
+              >
+                <Text style={styles.confirmBtnDeleteText}>Supprimer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
-
-        {/* Logout Bypass */}
-        <TouchableOpacity style={styles.logoutBtn} onPress={onLogoutPress}>
-          <Text style={[styles.logoutText, { color: isLight ? '#888D9F' : colors.textMuted }]}>🔒 Déconnexion Compte Maître</Text>
-        </TouchableOpacity>
-      </ScrollView>
-
-
+      </Modal>
 
       {/* 📅 Premium Routine Date Shifter Modal */}
       <DatePickerModal
@@ -1290,7 +1814,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
         initialDate={firstCareDate}
         onClose={() => setShowDatePicker(false)}
         onSave={handleShiftRoutine}
-        title="Démarrer ma routine le... 📅"
+        title={hasCompletedCares ? "Ajuster la date du prochain soin 📅" : "Ajuster la date du premier soin 📅"}
         useNativeModal={false}
       />
 
@@ -1861,7 +2385,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                   <Text style={styles.guideSectionHeader}>⏰ Heure de rappel pour ce soin :</Text>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
                     <Text style={[styles.guideSectionText, { color: customText, fontWeight: '700', fontSize: 13 }]}>
-                      ⏰ {activeCareItem.reminderTime || activeProfile.notifications.time || '08:30'}
+                      ⏰ {activeCareItem.reminderTime || activeProfile.notifications.time || '09:00'}
                     </Text>
                     <TouchableOpacity 
                       onPress={() => setShowTimePicker(true)}
@@ -2251,6 +2775,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
         onClose={() => setShowScanner(false)}
       />
 
+      {/* ⚙️ Settings Modal */}
+      <SettingsModal
+        visible={showSettings}
+        onClose={() => setShowSettings(false)}
+        onLogout={onLogoutPress}
+        themeMode={themeMode}
+        masterEmail={masterEmail}
+      />
+
       {/* 📊 Premium Health Report Modal */}
       <Modal
         visible={showPremiumHealthModal}
@@ -2331,12 +2864,257 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
         </View>
       </Modal>
 
+      {/* ⏳ Sticky Minimized Active Session Bar */}
+      {isSessionActive && isSessionSuspended && activeSessionCares.length > 0 && (
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => setIsSessionSuspended(false)}
+          style={[
+            styles.suspendedSessionBar,
+            { backgroundColor: colors.primary }
+          ]}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Text style={{ fontSize: 20 }}>⏳</Text>
+              <View>
+                <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
+                  Rituel en cours : Étape {currentStepIndex + 1}/{activeSessionCares.length}
+                </Text>
+                <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '600' }}>
+                  {activeSessionCares[currentStepIndex]?.category} {isTimerRunning && secondsLeft > 0 ? `(${formatSeconds(secondsLeft)} restant)` : (activeSessionTimerRemaining !== null ? `(${formatSeconds(activeSessionTimerRemaining)} en pause)` : '')}
+                </Text>
+              </View>
+            </View>
+            <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}>
+              <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 11 }}>Ouvrir ➔</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      )}
 
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  // ── Active Session / Wizard styles ──────────────────────────────
+  suspendedSessionBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 99,
+  },
+  startSessionCard: {
+    borderRadius: 20,
+    borderWidth: 1.5,
+    padding: 16,
+    marginHorizontal: 24,
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  startSessionLeft: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(229, 169, 130, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  startSessionEmoji: {
+    fontSize: 22,
+  },
+  startSessionCenter: {
+    flex: 1,
+  },
+  startSessionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  startSessionDesc: {
+    fontSize: 11,
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  startSessionRight: {
+    justifyContent: 'center',
+  },
+  startSessionBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  startSessionBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 11,
+  },
+  wizardContainer: {
+    flex: 1,
+  },
+  wizardScrollContent: {
+    paddingBottom: 40,
+  },
+  breadcrumbHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+  },
+  breadcrumbTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  breadcrumbStepsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    backgroundColor: 'rgba(0,0,0,0.02)',
+  },
+  stepIndicatorCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  stepIndicatorLine: {
+    width: 40,
+    height: 3,
+  },
+  activeCareWizardCard: {
+    marginHorizontal: 24,
+    marginTop: 16,
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  wizardActiveCategory: {
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  wizardActiveTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  wizardActiveProduct: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  wizardTimerContainer: {
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+    marginVertical: 14,
+  },
+  timerCircleWrapper: {
+    alignItems: 'center',
+  },
+  timerCircleOuter: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.02)',
+  },
+  timerCountdownText: {
+    fontSize: 32,
+    fontWeight: '800',
+  },
+  timerCountdownSub: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  timerButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    minWidth: 110,
+    alignItems: 'center',
+  },
+  timerButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 12,
+  },
+  wizardSubtitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  wizardStepsList: {
+    marginBottom: 14,
+  },
+  wizardStepRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginVertical: 4,
+  },
+  wizardStepBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    marginTop: 1,
+  },
+  wizardStepBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  wizardStepText: {
+    fontSize: 12,
+    lineHeight: 18,
+    flex: 1,
+  },
+  wizardMistakesBox: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 10,
+  },
+  wizardActionButton: {
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wizardActionButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 13,
+  },
   modalButton: {
     width: '100%',
     paddingVertical: 12,
@@ -2359,6 +3137,53 @@ const styles = StyleSheet.create({
   modalButtonSecondaryText: {
     fontWeight: '800',
     fontSize: 14,
+  },
+  // ── Confirm Delete Modal styles ─────────────────────────────────
+  confirmDeleteIconWrapper: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(229, 62, 62, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  confirmDeleteIcon: {
+    fontSize: 26,
+  },
+  confirmDeleteMessage: {
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 24,
+    marginTop: 4,
+  },
+  confirmDeleteButtons: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  confirmBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmBtnCancel: {
+    borderWidth: 1.2,
+  },
+  confirmBtnCancelText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  confirmBtnDelete: {
+    backgroundColor: '#E53E3E',
+  },
+  confirmBtnDeleteText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
   container: {
     flex: 1,
@@ -3023,33 +3848,39 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   selectorLogoWrapper: {
-    paddingLeft: 12,
+    paddingLeft: 10,
     borderLeftWidth: 1.5,
     borderLeftColor: 'rgba(229, 169, 130, 0.15)',
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
     height: 48,
-    width: 90,
+    gap: 6,
   },
   selectorLogoImage: {
-    width: '100%',
-    height: '100%',
-    transform: [{ scale: 1.5 }],
+    width: 90,
+    height: 54,
+  },
+  gearButton: {
+    padding: 4,
+  },
+  gearIcon: {
+    fontSize: 24,
   },
   // Scanner widget styles
   scannerWidgetCard: {
     marginHorizontal: 24,
-    marginTop: 16,
+    marginTop: 0,
     borderRadius: 20,
-    borderWidth: 1,
+    borderWidth: 1.2,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 3,
+    borderColor: colors.secondary,
+    shadowColor: colors.secondary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.32,
+    shadowRadius: 8,
+    elevation: 4,
   },
   scannerWidgetLeft: {
     marginRight: 14,
@@ -3226,5 +4057,60 @@ const styles = StyleSheet.create({
   bathroomBadgeText: {
     fontSize: 9.5,
     fontWeight: 'bold',
+  },
+  accordionItem: {
+    borderRadius: 16,
+    borderWidth: 1,
+    marginVertical: 6,
+    marginHorizontal: 24,
+    overflow: 'hidden',
+  },
+  dateConfigCard: {
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  dateConfigTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  dateConfigSubtext: {
+    fontSize: 11,
+    lineHeight: 16,
+    marginBottom: 10,
+  },
+  dateConfigButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+  },
+  dateConfigButtonText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  accordionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 18,
+  },
+  accordionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  accordionArrow: {
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
+  panelContent: {
+    paddingHorizontal: 18,
+    paddingBottom: 20,
+    borderTopWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    paddingTop: 16,
   },
 });

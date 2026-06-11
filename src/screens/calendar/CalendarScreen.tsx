@@ -175,48 +175,74 @@ const SwipeableCareItem: React.FC<SwipeableCareItemProps> = ({ children, onDelet
     isSwipeableRef.current = isSwipeable;
   }, [isSwipeable]);
 
+const isOpenRef = React.useRef(false);
+
   const panResponder = React.useRef(
     PanResponder.create({
+      // Never capture on initial press – only on deliberate horizontal move
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
+      onStartShouldSetPanResponderCapture: () => false,
+
+      // Tolerant horizontal detection: accept if |dx| > 5px AND dx is 2× larger than dy
+      // This allows up to ~27° off-axis diagonal without cancelling the swipe.
+      onMoveShouldSetPanResponder: (_, gs) => {
         if (!isSwipeableRef.current) return false;
-        return Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        return Math.abs(gs.dx) > 5 && Math.abs(gs.dx) > Math.abs(gs.dy) * 2;
       },
-      onPanResponderMove: (_, gestureState) => {
-        let newX = gestureState.dx;
+      onMoveShouldSetPanResponderCapture: (_, gs) => {
+        if (!isSwipeableRef.current) return false;
+        return Math.abs(gs.dx) > 10 && Math.abs(gs.dx) > Math.abs(gs.dy) * 2.5;
+      },
+
+      // Prevent parent ScrollView from stealing the gesture once we own it
+      onPanResponderTerminationRequest: () => false,
+
+      onPanResponderMove: (_, gs) => {
+        let newX = isOpenRef.current ? gs.dx - buttonWidth : gs.dx;
         if (newX > 0) newX = 0;
-        if (newX < -buttonWidth * 1.5) {
-          newX = -buttonWidth * 1.5 + (newX + buttonWidth * 1.5) * 0.3;
+        if (newX < -buttonWidth * 1.4) {
+          newX = -buttonWidth * 1.4 + (newX + buttonWidth * 1.4) * 0.25;
         }
         translateX.setValue(newX);
       },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx < -buttonWidth / 2) {
+
+      onPanResponderRelease: (_, gs) => {
+        const totalDx = isOpenRef.current ? gs.dx - buttonWidth : gs.dx;
+        if (totalDx < -(buttonWidth * 0.3)) {
           Animated.spring(translateX, {
             toValue: -buttonWidth,
             useNativeDriver: true,
-            bounciness: 4,
+            tension: 80,
+            friction: 12,
           }).start();
+          isOpenRef.current = true;
         } else {
           Animated.spring(translateX, {
             toValue: 0,
             useNativeDriver: true,
-            bounciness: 4,
+            tension: 80,
+            friction: 12,
           }).start();
+          isOpenRef.current = false;
         }
       },
+
       onPanResponderTerminate: () => {
         Animated.spring(translateX, {
           toValue: 0,
           useNativeDriver: true,
+          tension: 80,
+          friction: 12,
         }).start();
-      }
+        isOpenRef.current = false;
+      },
     })
   ).current;
 
   React.useEffect(() => {
     if (!isSwipeable) {
       translateX.setValue(0);
+      isOpenRef.current = false;
     }
   }, [isSwipeable]);
 

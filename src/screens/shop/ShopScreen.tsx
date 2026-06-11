@@ -11,10 +11,10 @@ interface Product {
   id: string;
   name: string;
   brand: string;
-  price: string;
   category: 
     | 'Cheveux Crépus (4C)' 
-    | 'Cheveux Bouclés (3A-4A)' 
+    | 'Cheveux Frisés (3C-4A)' 
+    | 'Cheveux Bouclés (3A-3B)' 
     | 'Cheveux Locksés' 
     | 'Cheveux Ondulés (2A-2C)' 
     | 'Cheveux Raides (Type 1)' 
@@ -33,7 +33,6 @@ const mockShopProducts: Product[] = [
     id: 'c1',
     name: 'Raw Shea Butter Moisture Retention Shampoo',
     brand: 'SheaMoisture',
-    price: '14.99 €',
     category: 'Cheveux Crépus (4C)',
     compatibility: 'Type 4C - Nutrition Intense 🧴',
     rating: 4.8,
@@ -46,7 +45,6 @@ const mockShopProducts: Product[] = [
     id: 'c2',
     name: 'Jamaican Black Castor Oil Strengthen & Restore Masque',
     brand: 'SheaMoisture',
-    price: '19.99 €',
     category: 'Cheveux Crépus (4C)',
     compatibility: 'Soin à Rincer - Force & Croissance 🍯',
     rating: 4.9,
@@ -59,7 +57,6 @@ const mockShopProducts: Product[] = [
     id: 'c3',
     name: 'Smoothie Ananas (Lait Nourrissant)',
     brand: 'Les Secrets de Loly',
-    price: '19.50 €',
     category: 'Cheveux Crépus (4C)',
     compatibility: 'Hydratation Quotidienne 🍍',
     rating: 4.7,
@@ -72,7 +69,6 @@ const mockShopProducts: Product[] = [
     id: 'c4',
     name: 'Shea Butter Leave-In Conditioning Repair Cream',
     brand: 'Cantu',
-    price: '8.50 €',
     category: 'Cheveux Crépus (4C)',
     compatibility: 'Leave-In réparateur intense 🧈',
     rating: 4.6,
@@ -82,13 +78,12 @@ const mockShopProducts: Product[] = [
     link: 'https://www.amazon.fr/Cantu-beurre-karit%C3%A9-Conditioning-Repair/dp/B00449W12S/',
   },
 
-  // 2. Cheveux Bouclés & Frisés (Types 3A à 4A)
+  // 2. Cheveux Bouclés (Types 3A à 3B)
   {
     id: 'b1',
     name: 'Perfect Clean (Shampoing Hydratant)',
     brand: 'Les Secrets de Loly',
-    price: '15.50 €',
-    category: 'Cheveux Bouclés (3A-4A)',
+    category: 'Cheveux Bouclés (3A-3B)',
     compatibility: 'Lavage doux sans alourdir 🧼',
     rating: 4.8,
     description: 'Shampoing doux hydratant parfait pour redéfinir les boucles et les nettoyer sans dessécher.',
@@ -98,23 +93,9 @@ const mockShopProducts: Product[] = [
   },
   {
     id: 'b2',
-    name: 'Baume Fondant à l\'Hibiscus (Masque Léger)',
-    brand: 'Kalia Nature',
-    price: '18.90 €',
-    category: 'Cheveux Bouclés (3A-4A)',
-    compatibility: 'Nutrition & Brillance Légère 🌺',
-    rating: 4.8,
-    description: 'Masque à texture fondante enrichi à l\'hibiscus pour apporter souplesse, brillance et hydratation sans lourdeur.',
-    emoji: '🌺',
-    image: 'https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?q=80&w=200&auto=format&fit=crop',
-    link: 'https://www.amazon.fr/Baume-Fondant-à-lHibiscus-100/dp/B085LDPVQB/',
-  },
-  {
-    id: 'b3',
     name: 'Kurl Nectar (Base Coiffante Leave-In)',
     brand: 'Les Secrets de Loly',
-    price: '20.00 €',
-    category: 'Cheveux Bouclés (3A-4A)',
+    category: 'Cheveux Bouclés (3A-3B)',
     compatibility: 'Soin Revitalisant Complet 💧',
     rating: 4.9,
     description: 'Soin sans rinçage restructurant aux 10 actifs capillaires. Démêle, nourrit et redessine les boucles.',
@@ -123,11 +104,10 @@ const mockShopProducts: Product[] = [
     link: 'https://www.amazon.fr/Secrets-Loly-Leave-Anti-frisottis-Hydratant/dp/B08Z2XMHTW/',
   },
   {
-    id: 'b4',
+    id: 'b3',
     name: 'Boost Curl (Gelée Définition)',
     brand: 'Les Secrets de Loly',
-    price: '19.90 €',
-    category: 'Cheveux Bouclés (3A-4A)',
+    category: 'Cheveux Bouclés (3A-3B)',
     compatibility: 'Fixation Douce sans carton 👑',
     rating: 4.8,
     description: 'Gelée capillaire hydratante pour fixer les boucles, limiter les frisottis et sceller l\'eau sans résidus.',
@@ -135,12 +115,37 @@ const mockShopProducts: Product[] = [
     image: 'https://images.unsplash.com/photo-1601049676099-e7ed07d825b0?q=80&w=200&auto=format&fit=crop',
     link: 'https://www.amazon.fr/Secrets-Loly-Capillaire-Hydratation-Définition/dp/B017KGU646/',
   },
+
+  // 3. Cheveux Frisés (Types 3C à 4A)
   {
-    id: 'b5',
+    id: 'f1',
+    name: 'Coconut & Hibiscus Curl & Shine Shampoo',
+    brand: 'SheaMoisture',
+    category: 'Cheveux Frisés (3C-4A)',
+    compatibility: 'Lavage Nourrissant Boucles & Frisures 🧴',
+    rating: 4.8,
+    description: 'Shampoing crème sans sulfates à l\'huile de coco et hibiscus. Nettoie en douceur et redéfinit les frisures.',
+    emoji: '🧴',
+    image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?q=80&w=200&auto=format&fit=crop',
+    link: 'https://www.amazon.fr/Shea-Moisture-Shampoing-Noix-Coco/dp/B0038TYTSS/',
+  },
+  {
+    id: 'f2',
+    name: 'Baume Fondant à l\'Hibiscus (Masque Léger)',
+    brand: 'Kalia Nature',
+    category: 'Cheveux Frisés (3C-4A)',
+    compatibility: 'Nutrition & Brillance Légère 🌺',
+    rating: 4.8,
+    description: 'Masque à texture fondante enrichi à l\'hibiscus pour apporter souplesse, brillance et hydratation sans lourdeur.',
+    emoji: '🌺',
+    image: 'https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?q=80&w=200&auto=format&fit=crop',
+    link: 'https://www.amazon.fr/Baume-Fondant-à-lHibiscus-100/dp/B085LDPVQB/',
+  },
+  {
+    id: 'f3',
     name: 'Huile de Jojoba Vierge Pressée à Froid',
     brand: 'Naissance',
-    price: '11.99 €',
-    category: 'Cheveux Bouclés (3A-4A)',
+    category: 'Cheveux Frisés (3C-4A)',
     compatibility: 'Huile Protectrice Légère 🌿',
     rating: 4.7,
     description: 'Huile végétale ultra-pure, régulatrice et scellante. Parfaite pour protéger les pointes sèches.',
@@ -149,12 +154,11 @@ const mockShopProducts: Product[] = [
     link: 'https://www.amazon.fr/Naissance-Huile-V%C3%A9g%C3%A9tale-Jojoba-naturelle/dp/B004RGMN1C/',
   },
 
-  // 3. Cheveux Locksés (Locks)
+  // 4. Cheveux Locksés (Locks)
   {
     id: 'l1',
     name: 'Dry & Itchy Scalp Care Shampoo',
     brand: 'As I Am',
-    price: '13.50 €',
     category: 'Cheveux Locksés',
     compatibility: 'Purifiant & Antipelliculaire 🧴',
     rating: 4.7,
@@ -167,7 +171,6 @@ const mockShopProducts: Product[] = [
     id: 'l2',
     name: 'Poudre d\'Argile Bentonite Naturelle',
     brand: 'Radhe Shyam',
-    price: '12.90 €',
     category: 'Cheveux Locksés',
     compatibility: 'Soin Détox Profond Anti-Résidus 🔬',
     rating: 4.8,
@@ -180,7 +183,6 @@ const mockShopProducts: Product[] = [
     id: 'l3',
     name: 'Spray Hydratant Leave-In Conditioner',
     brand: 'As I Am',
-    price: '15.99 €',
     category: 'Cheveux Locksés',
     compatibility: 'Vapo Quotidien sans résidus 💧',
     rating: 4.8,
@@ -193,7 +195,6 @@ const mockShopProducts: Product[] = [
     id: 'l4',
     name: 'Define & Shine Custard (Gelée Roots)',
     brand: 'Cantu',
-    price: '9.99 €',
     category: 'Cheveux Locksés',
     compatibility: 'Gelée de Tournissage Soluble 👑',
     rating: 4.6,
@@ -206,7 +207,6 @@ const mockShopProducts: Product[] = [
     id: 'l5',
     name: 'Huile de Pépins de Raisin Vierge',
     brand: 'Naissance',
-    price: '13.99 €',
     category: 'Cheveux Locksés',
     compatibility: 'Huile Fine et Pénétrante 🌿',
     rating: 4.7,
@@ -216,12 +216,11 @@ const mockShopProducts: Product[] = [
     link: 'https://www.amazon.fr/Naissance-V%C3%A9g%C3%A9tale-P%C3%A9pins-Raisin-naturelle/dp/B004RG75SS/',
   },
 
-  // 4. Cheveux Ondulés (Types 2A à 2C)
+  // 5. Cheveux Ondulés (Types 2A à 2C)
   {
     id: 'w1',
     name: 'Coconut Water & Dragon Fruit Shampoo',
     brand: 'Faith in Nature',
-    price: '8.90 €',
     category: 'Cheveux Ondulés (2A-2C)',
     compatibility: 'Volume et Légèreté Naturelle 🥥',
     rating: 4.5,
@@ -234,7 +233,6 @@ const mockShopProducts: Product[] = [
     id: 'w2',
     name: 'Après-Shampoing Pink Paradise',
     brand: 'Les Secrets de Loly',
-    price: '16.50 €',
     category: 'Cheveux Ondulés (2A-2C)',
     compatibility: 'Démêlant Léger Soyeux 🌸',
     rating: 4.8,
@@ -247,7 +245,6 @@ const mockShopProducts: Product[] = [
     id: 'w3',
     name: 'Leave-In Conditioner (Après-Shampoing Hydratant)',
     brand: 'As I Am',
-    price: '11.90 €',
     category: 'Cheveux Ondulés (2A-2C)',
     compatibility: 'Hydratant Fluide anti-frisottis 💧',
     rating: 4.7,
@@ -260,7 +257,6 @@ const mockShopProducts: Product[] = [
     id: 'w4',
     name: 'Comeback Curl Next Day Curl Reviver',
     brand: 'Cantu',
-    price: '9.50 €',
     category: 'Cheveux Ondulés (2A-2C)',
     compatibility: 'Définition Ondulation & Ressort 💨',
     rating: 4.5,
@@ -273,7 +269,6 @@ const mockShopProducts: Product[] = [
     id: 'w5',
     name: 'Huile de Pépins de Framboise Pure',
     brand: 'Naissance',
-    price: '14.99 €',
     category: 'Cheveux Ondulés (2A-2C)',
     compatibility: 'Finition Légère Anti-Frisottis 🍓',
     rating: 4.6,
@@ -283,12 +278,11 @@ const mockShopProducts: Product[] = [
     link: 'https://www.amazon.fr/Naissance-Huile-P%C3%A9pins-Framboise-251/dp/B00NU1JZH0/',
   },
 
-  // 5. Cheveux Raides (Type 1)
+  // 6. Cheveux Raides (Type 1)
   {
     id: 's1',
     name: 'African Black Soap Bamboo Charcoal Shampoo',
     brand: 'SheaMoisture',
-    price: '13.99 €',
     category: 'Cheveux Raides (Type 1)',
     compatibility: 'Cuir Chevelu Sain Sans Excès de Sébum 🧼',
     rating: 4.6,
@@ -301,7 +295,6 @@ const mockShopProducts: Product[] = [
     id: 's2',
     name: 'Aloe Vera Spray Conditioner',
     brand: 'Urtekram',
-    price: '9.50 €',
     category: 'Cheveux Raides (Type 1)',
     compatibility: 'Démêlant Aérien & Hydratant 💧',
     rating: 4.5,
@@ -314,7 +307,6 @@ const mockShopProducts: Product[] = [
     id: 's3',
     name: 'Argile Verte Prête à l\'Emploi (Pré-shampoing)',
     brand: 'Cattier',
-    price: '7.90 €',
     category: 'Cheveux Raides (Type 1)',
     compatibility: 'Masque Détoxifiant Cuir Chevelu 🔬',
     rating: 4.7,
@@ -327,7 +319,6 @@ const mockShopProducts: Product[] = [
     id: 's4',
     name: 'Protéines de Coiffage Sublimateur',
     brand: 'Demeliss',
-    price: '15.90 €',
     category: 'Cheveux Raides (Type 1)',
     compatibility: 'Soin Anti-fourches & Pointes ✨',
     rating: 4.6,
@@ -340,7 +331,6 @@ const mockShopProducts: Product[] = [
     id: 's5',
     name: 'Huile de Jojoba Vierge USDA',
     brand: 'Cliganic',
-    price: '12.50 €',
     category: 'Cheveux Raides (Type 1)',
     compatibility: 'Bain d\'Huile Occasionnel Léger 🌿',
     rating: 4.8,
@@ -353,9 +343,8 @@ const mockShopProducts: Product[] = [
   // 6. Accessoires & Nuit
   {
     id: 'a1',
-    name: 'Peigne Afro Carbone Dents Larges',
+    name: 'Peigne Carbone Dents Larges',
     brand: 'Coiffure Pro',
-    price: '7.99 €',
     category: 'Accessoires & Nuit',
     compatibility: 'Démêlage de base anti-casse 🪮',
     rating: 4.7,
@@ -368,7 +357,6 @@ const mockShopProducts: Product[] = [
     id: 'a2',
     name: 'Bonnet de Nuit Double Face Satin Réversible',
     brand: 'Dairui',
-    price: '12.99 €',
     category: 'Accessoires & Nuit',
     compatibility: 'Anti-Friction Nocturne Toutes Textures 😴',
     rating: 4.8,
@@ -394,7 +382,8 @@ export const ShopScreen: React.FC = () => {
   const categories = [
     'Tous', 
     'Cheveux Crépus (4C)', 
-    'Cheveux Bouclés (3A-4A)', 
+    'Cheveux Frisés (3C-4A)',
+    'Cheveux Bouclés (3A-3B)', 
     'Cheveux Locksés', 
     'Cheveux Ondulés (2A-2C)', 
     'Cheveux Raides (Type 1)', 
@@ -524,9 +513,8 @@ export const ShopScreen: React.FC = () => {
                   </View>
                 </View>
 
-                {/* Price & Buy Button */}
+                {/* Buy Button Only (No raw price text) */}
                 <View style={styles.priceRow}>
-                  <Text style={[styles.productPrice, { color: customText }]}>{product.price}</Text>
                   <TouchableOpacity
                     style={styles.buyBtn}
                     activeOpacity={0.8}
@@ -562,7 +550,6 @@ export const ShopScreen: React.FC = () => {
                 <View style={styles.modalProductTexts}>
                   <Text style={[styles.modalProductBrand, { color: colors.primary }]}>{redirectModalProduct.brand}</Text>
                   <Text style={[styles.modalProductName, { color: isLight ? '#1C1E26' : '#FFFFFF' }]}>{redirectModalProduct.name}</Text>
-                  <Text style={[styles.modalProductPrice, { color: isLight ? '#1C1E26' : '#FFFFFF' }]}>{redirectModalProduct.price}</Text>
                 </View>
               </View>
             )}
@@ -659,7 +646,7 @@ const styles = StyleSheet.create({
     marginHorizontal: -6,
   },
   productCard: {
-    width: (width - 40 - 12) / 2, // Perfect 2-column grid spacing
+    width: (width - 40 - 12) / 2,
     borderRadius: 20,
     borderWidth: 1,
     padding: 12,
@@ -741,21 +728,16 @@ const styles = StyleSheet.create({
   },
   priceRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    justifyContent: 'flex-end', // Aligne le bouton à droite proprement
     borderTopWidth: 0.5,
     borderTopColor: 'rgba(255,255,255,0.06)',
     paddingTop: 8,
     marginTop: 4,
   },
-  productPrice: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
   buyBtn: {
     backgroundColor: colors.primary,
     borderRadius: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 6,
   },
   buyBtnText: {
@@ -823,10 +805,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     marginVertical: 1,
-  },
-  modalProductPrice: {
-    fontSize: 11,
-    fontWeight: '800',
   },
   modalNote: {
     fontSize: 10,

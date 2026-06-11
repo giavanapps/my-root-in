@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ImageBackground } from 'react-native';
+import React, { useMemo } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { colors, borderRadius } from '../../theme/colors';
 import { useAppState } from '../../store/AppStateContext';
 
@@ -262,6 +262,23 @@ interface FeaturedAdviceProps {
   onArticlePress?: (article: any) => void;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// getDailyIndex: returns a number that increments once per day after 8:00 AM.
+// This makes the "featured" article rotate daily at 8h, deterministically.
+// ─────────────────────────────────────────────────────────────────────────────
+function getDailyIndex(): number {
+  const now = new Date();
+  // Shift the day boundary to 8:00: if current hour < 8, treat as "yesterday's slot"
+  const shifted = new Date(now);
+  if (now.getHours() < 8) {
+    shifted.setDate(shifted.getDate() - 1);
+  }
+  // Days since epoch — a pure integer, unique per calendar day
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.floor(shifted.setHours(8, 0, 0, 0) / msPerDay);
+}
+
+
 export const FeaturedAdvice: React.FC<FeaturedAdviceProps> = ({ onSeeAllPress, onArticlePress }) => {
   const { activeProfile, themeMode } = useAppState();
 
@@ -273,111 +290,107 @@ export const FeaturedAdvice: React.FC<FeaturedAdviceProps> = ({ onSeeAllPress, o
   const customTextSec = isLight ? '#6A6F82' : colors.textSecondary;
   const customBorder = isLight ? 'rgba(0, 0, 0, 0.08)' : colors.cardBorder;
 
-  // Find a matching article based on active profile texture, porosity or sensitivity tags
   const diag = activeProfile.diagnostic;
   const isPorosityNull = diag.porosity === null;
 
-  // Filter mock articles:
-  // We strictly require that the article contains the user's hair texture tag to be shown
+  // ── Step 1: strict filter by texture + porosity ───────────────────────────
   const baseFiltered = mockArticles.filter(art => {
-    // 1. Strict texture match
-    if (!art.tags.includes(diag.texture)) {
-      return false;
-    }
-    
-    // 2. Strict porosity match
+    if (!art.tags.includes(diag.texture)) return false;
     const articlePorosityTags = art.tags.filter(t => t === 'Faible' || t === 'Moyenne' || t === 'Forte');
     if (articlePorosityTags.length > 0) {
-      if (diag.porosity === null || !articlePorosityTags.includes(diag.porosity)) {
-        return false;
-      }
+      if (diag.porosity === null || !articlePorosityTags.includes(diag.porosity)) return false;
     } else if (isPorosityNull) {
-      // If user skipped porosity, filter out porosity-specific articles
-      if (art.tags.includes('Faible') || art.tags.includes('Moyenne') || art.tags.includes('Forte')) {
-        return false;
-      }
+      if (art.tags.includes('Faible') || art.tags.includes('Moyenne') || art.tags.includes('Forte')) return false;
     }
     return true;
   });
 
-  const availableArticles = [
-    ...baseFiltered,
-    ...(isPorosityNull ? [{
-      id: 'a-generic-warning',
-      title: '🚨 Routine de sécurité : Sans sulfates ni silicones',
-      category: 'Ingrédients' as const,
-      readTime: '3 min read',
-      tags: [diag.texture, 'Ingrédients', 'Sans Sulfate', 'Soin Sain'],
-      snippet: 'Porosité non définie. Par sécurité, nous filtrons uniquement les sulfates asséchants et les silicones insolubles pour préserver votre fibre capillaire.',
-      bgEmoji: '🛡️',
-      content: 'Votre porosité n\'étant pas définie, notre algorithme applique un principe de précaution strict : exclusion des sulfates de lavage agressifs (qui assèchent dramatiquement le cortex) et rejet des silicones insolubles (qui étouffent le cheveu). Nous vous recommandons vivement de faire le test de porosité via le bandeau orange en haut de l\'écran pour affiner votre profil !',
-    }] : [])
-  ];
+  const genericWarning = isPorosityNull ? [{
+    id: 'a-generic-warning',
+    title: '🚨 Routine de sécurité : Sans sulfates ni silicones',
+    category: 'Ingrédients' as const,
+    readTime: '3 min read',
+    tags: [diag.texture, 'Ingrédients', 'Sans Sulfate', 'Soin Sain'],
+    snippet: 'Porosité non définie. Par sécurité, nous filtrons uniquement les sulfates asséchants et les silicones insolubles pour préserver votre fibre capillaire.',
+    bgEmoji: '🛡️',
+    content: 'Votre porosité n\'étant pas définie, notre algorithme applique un principe de précaution strict : exclusion des sulfates de lavage agressifs (qui assèchent dramatiquement le cortex) et rejet des silicones insolubles (qui étouffent le cheveu). Nous vous recommandons vivement de faire le test de porosité via le bandeau orange en haut de l\'écran pour affiner votre profil !',
+  }] : [];
 
-  const activeTags = [diag.texture, diag.porosity, diag.activeStyle, ...diag.sensitivity];
-  
-  // Safe articles fallback: If strict filtering leaves us with nothing, use mockArticles excluding locks for non-locks users (and vice versa)
-  let finalArticles = availableArticles;
+  let finalArticles = [...baseFiltered, ...genericWarning];
+
+  // ── Step 2: fallback if strict filter yields nothing ──────────────────────
   if (finalArticles.length === 0) {
     finalArticles = mockArticles.filter(art => {
-      // Filter out wrong locks
-      if (diag.texture !== 'Locksés' && art.tags.includes('Locksés')) {
-        return false;
-      }
-      if (diag.texture === 'Locksés' && !art.tags.includes('Locksés')) {
-        return false;
-      }
-      
-      // Filter out wrong porosity
+      if (diag.texture !== 'Locksés' && art.tags.includes('Locksés')) return false;
+      if (diag.texture === 'Locksés' && !art.tags.includes('Locksés')) return false;
       const articlePorosityTags = art.tags.filter(t => t === 'Faible' || t === 'Moyenne' || t === 'Forte');
       if (articlePorosityTags.length > 0) {
-        if (diag.porosity === null || !articlePorosityTags.includes(diag.porosity)) {
-          return false;
-        }
+        if (diag.porosity === null || !articlePorosityTags.includes(diag.porosity)) return false;
       } else if (isPorosityNull) {
-        if (art.tags.includes('Faible') || art.tags.includes('Moyenne') || art.tags.includes('Forte')) {
-          return false;
-        }
+        if (art.tags.includes('Faible') || art.tags.includes('Moyenne') || art.tags.includes('Forte')) return false;
       }
       return true;
     });
   }
 
-  // Find article with the highest tag match count, fallback to first
-  const matchedArticle = finalArticles.reduce((best, current) => {
-    const currentMatches = current.tags.filter(tag => activeTags.includes(tag as any)).length;
-    const bestMatches = best.tags.filter(tag => activeTags.includes(tag as any)).length;
-    return currentMatches > bestMatches ? current : best;
-  }, finalArticles[0]);
+  // ── Step 3: sort by tag-match score so best articles surface more often ────
+  const activeTags = [diag.texture, diag.porosity, diag.activeStyle, ...diag.sensitivity].filter(Boolean);
+  const scored = [...finalArticles].sort((a, b) => {
+    const scoreA = a.tags.filter(t => activeTags.includes(t as any)).length;
+    const scoreB = b.tags.filter(t => activeTags.includes(t as any)).length;
+    return scoreB - scoreA; // highest match first
+  });
+
+  // ── Step 4: daily rotation — pick a different article each day at 8h ──────
+  const dailyIdx = getDailyIndex();
+  const featuredArticle = scored.length > 0 ? scored[dailyIdx % scored.length] : scored[0];
+
+  // ── Next refresh label ─────────────────────────────────────────────────────
+  const now = new Date();
+  const nextRefresh = new Date(now);
+  if (now.getHours() >= 8) {
+    nextRefresh.setDate(nextRefresh.getDate() + 1);
+  }
+  nextRefresh.setHours(8, 0, 0, 0);
+  const hoursUntil = Math.ceil((nextRefresh.getTime() - now.getTime()) / (1000 * 60 * 60));
+  const nextRefreshLabel = hoursUntil <= 1
+    ? 'Nouveau conseil dans moins d\'1h ✨'
+    : `Prochain conseil dans ${hoursUntil}h ✨`;
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.sectionTitle, { color: customText }]}>Conseil Vedette pour toi ✨</Text>
+      {/* Header row */}
+      <View style={styles.headerRow}>
+        <Text style={[styles.sectionTitle, { color: customText }]}>Conseil Vedette pour toi ✨</Text>
+        <View style={styles.dailyBadge}>
+          <Text style={styles.dailyBadgeText}>📅 Quotidien</Text>
+        </View>
+      </View>
       
       <TouchableOpacity 
         activeOpacity={0.9} 
         style={[styles.card, { backgroundColor: customCard, borderColor: customBorder }]}
-        onPress={() => onArticlePress && onArticlePress(matchedArticle)}
+        onPress={() => onArticlePress && onArticlePress(featuredArticle)}
       >
         <View style={[styles.emojiBackground, { backgroundColor: isLight ? 'rgba(229, 169, 130, 0.06)' : 'rgba(229, 169, 130, 0.08)', borderColor: customBorder }]}>
-          <Text style={styles.bgEmoji}>{matchedArticle.bgEmoji}</Text>
+          <Text style={styles.bgEmoji}>{featuredArticle.bgEmoji}</Text>
         </View>
 
         <View style={styles.cardContent}>
           <View style={styles.tagRow}>
             <View style={[styles.categoryBadge, { backgroundColor: isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.05)' }]}>
-              <Text style={[styles.categoryText, { color: customTextSec }]}>{matchedArticle.category}</Text>
+              <Text style={[styles.categoryText, { color: customTextSec }]}>{featuredArticle.category}</Text>
             </View>
-            <Text style={[styles.readTimeText, { color: isLight ? '#888D9F' : colors.textMuted }]}>{matchedArticle.readTime}</Text>
+            <Text style={[styles.readTimeText, { color: isLight ? '#888D9F' : colors.textMuted }]}>{featuredArticle.readTime}</Text>
           </View>
 
-          <Text style={[styles.titleText, { color: customText }]}>{matchedArticle.title}</Text>
+          <Text style={[styles.titleText, { color: customText }]}>{featuredArticle.title}</Text>
           <Text style={[styles.snippetText, { color: customTextSec }]} numberOfLines={2}>
-            {matchedArticle.snippet}
+            {featuredArticle.snippet}
           </Text>
 
           <View style={styles.tagPillRow}>
-            {matchedArticle.tags.map(t => (
+            {featuredArticle.tags.slice(0, 3).map(t => (
               <View key={t} style={[styles.tagPill, { backgroundColor: isLight ? 'rgba(118, 160, 138, 0.06)' : 'rgba(118, 160, 138, 0.08)', borderColor: isLight ? 'rgba(118, 160, 138, 0.15)' : 'rgba(118, 160, 138, 0.2)' }]}>
                 <Text style={styles.tagPillText}>#{t}</Text>
               </View>
@@ -386,11 +399,17 @@ export const FeaturedAdvice: React.FC<FeaturedAdviceProps> = ({ onSeeAllPress, o
         </View>
       </TouchableOpacity>
 
-      {onSeeAllPress && (
-        <TouchableOpacity style={styles.seeAllButton} onPress={onSeeAllPress} activeOpacity={0.7}>
-          <Text style={styles.seeAllText}>Voir tous mes conseils ➔</Text>
-        </TouchableOpacity>
-      )}
+      {/* Footer: next refresh hint + see all */}
+      <View style={styles.footerRow}>
+        <Text style={[styles.nextRefreshText, { color: isLight ? '#AAAAAA' : colors.textMuted }]}>
+          🔄 {nextRefreshLabel}
+        </Text>
+        {onSeeAllPress && (
+          <TouchableOpacity onPress={onSeeAllPress} activeOpacity={0.7}>
+            <Text style={styles.seeAllText}>Voir tout ➔</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 };
@@ -398,15 +417,37 @@ export const FeaturedAdvice: React.FC<FeaturedAdviceProps> = ({ onSeeAllPress, o
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 24,
-    marginVertical: 16,
+    marginTop: 16,
+    marginBottom: 0,
+  },
+  // ── Header ─────────────────────────────────────────────────────────────────
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '800',
     color: colors.textPrimary,
-    marginBottom: 12,
     letterSpacing: 0.5,
+    flex: 1,
   },
+  dailyBadge: {
+    backgroundColor: 'rgba(229, 169, 130, 0.15)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 0.8,
+    borderColor: 'rgba(229, 169, 130, 0.35)',
+  },
+  dailyBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  // ── Card ───────────────────────────────────────────────────────────────────
   card: {
     backgroundColor: colors.card,
     borderRadius: borderRadius.lg,
@@ -490,11 +531,19 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '700',
   },
-  seeAllButton: {
-    alignSelf: 'flex-end',
+  // ── Footer ─────────────────────────────────────────────────────────────────
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginTop: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: 2,
+  },
+  nextRefreshText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.textMuted,
+    flex: 1,
   },
   seeAllText: {
     color: colors.primary,
@@ -502,3 +551,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+

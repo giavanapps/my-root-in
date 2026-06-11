@@ -33,16 +33,28 @@ export interface RoutineItem {
   isCustom?: boolean;
 }
 
-const getNotificationBody = (name: string, category: string, tone: 'Doux' | 'Motivant' | 'Direct'): string => {
-  const cleanName = name.split(' ')[0]; // only use first name
-  if (tone === 'Doux') {
-    return `Bonjour ${cleanName} ! C'est le moment de chouchouter tes cheveux : ton soin ${category} t'attend. Prends ce doux moment pour toi 🌿`;
+const getMorningNotificationBody = (categories: string[]): string => {
+  const cats = categories.map(c => c.toLowerCase().trim());
+  
+  if (cats.some(c => c.includes("bain d'huile") || c.includes("bain d’huile") || c.includes("masque"))) {
+    return "🌿 Le rituel du jour : Aujourd'hui, on répare et on nourrit en profondeur. Prête pour ta session soin ?";
   }
-  if (tone === 'Motivant') {
-    return `Aujourd'hui on ne lâche rien, ${cleanName} ! Ton soin ${category} est prévu. Tes boucles vont adorer, let's go ! 💪`;
+  if (cats.some(c => c.includes("clarification") || c.includes("lavage") || c.includes("shampoing") || c.includes("shampoo") || c.includes("detox") || c.includes("détox"))) {
+    return "🫧 Détox capillaire : On libère tes cheveux de tous les résidus aujourd'hui. C'est parti !";
   }
-  // Default to 'Direct'
-  return `Rappel : Soin ${category} à réaliser aujourd'hui. Ouvre ton guide d'étapes sur l'application.`;
+  if (cats.some(c => c.includes("retwist") || c.includes("coiffage") || c.includes("coupe") || c.includes("dusting"))) {
+    return "👑 Alerte fraîcheur : On s'occupe de tes racines et de ta définition aujourd'hui. On lance le chrono ?";
+  }
+  if (cats.some(c => c.includes("sans rinçage") || c.includes("sans rincage") || c.includes("leave") || c.includes("vapo") || c.includes("hydratation") || c.includes("lait") || c.includes("crème") || c.includes("creme"))) {
+    return "🌊 Un petit coup de boost pour tes cheveux ? 2 minutes pour hydrater et c'est plié !";
+  }
+  if (cats.some(c => c.includes("massage"))) {
+    return "💆‍♀️ Détente absolue : C'est l'heure de ton massage crânien pour stimuler la pousse. Prête à te relaxer ?";
+  }
+  if (cats.some(c => c.includes("porosité") || c.includes("porosite") || c.includes("test"))) {
+    return "🔬 Test de porosité : Découvre la porosité de tes cheveux aujourd'hui pour adapter tes soins. C'est simple et rapide !";
+  }
+  return "💆‍♀️ My Root'In : C'est ton moment bien-être capillaire aujourd'hui !";
 };
 
 export const NotificationService = {
@@ -98,6 +110,7 @@ export const NotificationService = {
 
   /**
    * Schedules push notifications for upcoming cares in the routine calendar
+   * Groups cares by date to send a single dynamic morning alert per scheduled day.
    */
   async scheduleDailyCareReminders(
     timeStr: string,
@@ -130,17 +143,35 @@ export const NotificationService = {
         item => !item.completed && item.date >= todayStr
       );
 
-      // 4. Register native notifications up to a safe limit (Android/iOS supports ~64 scheduled tasks max)
-      const maxReminders = Math.min(upcomingCares.length, 30);
+      // Group cares by date
+      const caresByDate: { [date: string]: RoutineItem[] } = {};
+      for (const item of upcomingCares) {
+        if (!caresByDate[item.date]) {
+          caresByDate[item.date] = [];
+        }
+        caresByDate[item.date].push(item);
+      }
 
-      for (let i = 0; i < maxReminders; i++) {
-        const item = upcomingCares[i];
+      const sortedDates = Object.keys(caresByDate).sort();
+
+      // 4. Register native notifications up to a safe limit (Android/iOS supports ~64 scheduled tasks max)
+      const maxDays = Math.min(sortedDates.length, 30);
+
+      for (let i = 0; i < maxDays; i++) {
+        const dateStr = sortedDates[i];
+        const dayCares = caresByDate[dateStr];
         
         // Parse scheduled calendar date e.g. "YYYY-MM-DD"
-        const [year, month, day] = item.date.split('-').map(Number);
+        const [year, month, day] = dateStr.split('-').map(Number);
         
-        // Use custom reminderTime if defined, otherwise fall back to global default
-        const itemTime = item.reminderTime || timeStr;
+        // Use custom reminderTime of the first item with override if defined, otherwise fall back to global default
+        let itemTime = timeStr;
+        for (const care of dayCares) {
+          if (care.reminderTime) {
+            itemTime = care.reminderTime;
+            break;
+          }
+        }
         const [itemHour, itemMinute] = itemTime.split(':').map(Number);
 
         if (isNaN(itemHour) || isNaN(itemMinute)) continue;
@@ -150,12 +181,19 @@ export const NotificationService = {
         const triggerDate = new Date(year, month - 1, day, itemHour, itemMinute, 0);
 
         if (triggerDate.getTime() > Date.now()) {
+          const categories = dayCares.map(c => c.category);
+          const bodyText = getMorningNotificationBody(categories);
+
           await Notifications.scheduleNotificationAsync({
             content: {
-              title: "My Root'In 🌿 Rappel de Soin",
-              body: getNotificationBody(profileName, item.category, tone),
+              title: "My Root'In 🌿",
+              body: bodyText,
               sound: 'two_pshit.mp3',
-              data: { routineId: item.id, category: item.category },
+              data: {
+                isMorningNotification: true,
+                date: dateStr,
+                routineIds: dayCares.map(c => c.id)
+              },
             },
             trigger: { 
               type: Notifications.SchedulableTriggerInputTypes.DATE, 
@@ -166,7 +204,7 @@ export const NotificationService = {
         }
       }
       
-      console.log(`Successfully scheduled ${maxReminders} native reminders with individual time overrides`);
+      console.log(`Successfully scheduled ${maxDays} morning reminders`);
     } catch (e) {
       console.warn('Error scheduling reminders:', e);
     }

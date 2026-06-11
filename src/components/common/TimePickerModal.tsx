@@ -166,7 +166,7 @@ export const TimePickerModal: React.FC<TimePickerModalProps> = ({
         <Text style={[styles.presetHeader, { color: customTextSec }]}>Raccourcis rapides :</Text>
         <View style={styles.presetsRow}>
           <TouchableOpacity onPress={() => handlePreset(8, 30)} style={[styles.presetBtn, { backgroundColor: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)' }]}>
-            <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '700' }}>🌅 08:30</Text>
+            <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '700' }}>🌅 09:00</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => handlePreset(12, 30)} style={[styles.presetBtn, { backgroundColor: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)' }]}>
             <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '700' }}>☀️ 12:30</Text>

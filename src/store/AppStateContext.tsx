@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Platform } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { NotificationService } from './NotificationService';
 import { db } from './firebase';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
@@ -164,6 +166,22 @@ interface AppStateContextType {
   updateMasterAccount: (email: string, pass: string) => void;
   deleteMasterAccount: (onComplete: () => void) => void;
   logout: (onComplete: () => void) => void;
+
+  // Active Session states & methods
+  isSessionActive: boolean;
+  activeSessionCares: RoutineItem[];
+  currentStepIndex: number;
+  activeSessionTimerEnd: number | null;
+  activeSessionTimerDuration: number | null;
+  activeSessionTimerRemaining: number | null;
+  isTimerRunning: boolean;
+  startActiveSession: (date?: string) => void;
+  stopActiveSession: () => void;
+  startStepTimer: (durationSeconds: number) => void;
+  pauseStepTimer: () => void;
+  completeCurrentStep: () => void;
+  isSessionSuspended: boolean;
+  setIsSessionSuspended: (val: boolean) => void;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -251,7 +269,7 @@ const getProductForTask = (category: string, column: 'naturel' | 'chimique' | 'l
     return 'Masque Nourrissant au Beurre de Karité & Miel';
   }
   if (category === 'Soin sans rinçage') {
-    if (column === 'raides') return 'Spray Hydratant Léger aux Protéines de Soie';
+    if (column === 'raides') return 'Pre-poo Spray Hydratant Léger aux Protéines de Soie';
     return 'Lait Capillaire Hydratant à l\'Hibiscus';
   }
   if (category === 'Clarification') {
@@ -477,6 +495,16 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
+  // Active Session states (Fil d'Ariane)
+  const [isSessionActive, setIsSessionActive] = useState<boolean>(false);
+  const [activeSessionCares, setActiveSessionCares] = useState<RoutineItem[]>([]);
+  const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
+  const [activeSessionTimerEnd, setActiveSessionTimerEnd] = useState<number | null>(null);
+  const [activeSessionTimerDuration, setActiveSessionTimerDuration] = useState<number | null>(null);
+  const [activeSessionTimerRemaining, setActiveSessionTimerRemaining] = useState<number | null>(null);
+  const [isTimerRunning, setIsTimerRunning] = useState<boolean>(false);
+  const [isSessionSuspended, setIsSessionSuspended] = useState<boolean>(false);
+
   const [logs, setLogs] = useState<ActionLog[]>([]);
 
   const [bathroomProducts, setBathroomProducts] = useState<BathroomProduct[]>([]);
@@ -549,7 +577,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           });
         }
       } catch (error) {
-        console.error("Erreur de chargement Firestore :", error);
+        console.warn("Erreur de chargement Firestore :", error);
       } finally {
         setIsLoading(false);
       }
@@ -577,7 +605,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           updatedAt: new Date().toISOString()
         }, { merge: true });
       } catch (error) {
-        console.error("Erreur de synchronisation Firestore :", error);
+        console.warn("Erreur de synchronisation Firestore :", error);
       }
     };
 
@@ -603,7 +631,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Automatically schedule/cancel native notifications in the background
   useEffect(() => {
     if (activeProfile && activeProfileId && routine.length > 0) {
-      const notifications = activeProfile.notifications || { enabled: true, time: '08:30', tone: 'Motivant' };
+      const notifications = activeProfile.notifications || { enabled: true, time: '09:00', tone: 'Motivant' };
       const { time, tone, enabled } = notifications;
       if (enabled) {
         NotificationService.scheduleDailyCareReminders(
@@ -649,7 +677,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       scalp: 75,
       notifications: {
         enabled: notificationsEnabled ?? true,
-        time: '08:30',
+        time: '09:00',
         tone: tone ?? 'Motivant',
       },
       createdAt: todayStr,
@@ -1426,6 +1454,239 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const deleteRoutineItem = (id: string) => {
     setRoutine(prev => prev.filter(item => item.id !== id));
+    
+    // Sync active session cares if active
+    setActiveSessionCares(prev => {
+      const filtered = prev.filter(item => item.id !== id);
+      if (filtered.length === 0) {
+        setIsSessionActive(false);
+        setIsSessionSuspended(false);
+      }
+      // Safely update step index to stay in bounds of the filtered session cares
+      setCurrentStepIndex(curr => Math.max(0, Math.min(curr, filtered.length - 1)));
+      return filtered;
+    });
+  };
+
+  // Active Session Actions
+  const startActiveSession = (date?: string) => {
+    const targetDate = date || getLocalDateString();
+    
+    // Find uncompleted cares for active profile on this day
+    const dayCares = routine.filter(
+      r => r.profileId === activeProfileId && r.date === targetDate && !r.completed
+    );
+
+    if (dayCares.length === 0) return;
+
+    // Sort using sortRoutineItems order
+    const sortedCares = sortRoutineItems(dayCares);
+    
+    setActiveSessionCares(sortedCares);
+    setCurrentStepIndex(0);
+    setIsSessionActive(true);
+    setIsSessionSuspended(false);
+    // Reset timer
+    setActiveSessionTimerEnd(null);
+    setActiveSessionTimerDuration(null);
+    setActiveSessionTimerRemaining(null);
+    setIsTimerRunning(false);
+  };
+
+  const stopActiveSession = () => {
+    setIsSessionActive(false);
+    setIsSessionSuspended(false);
+    setActiveSessionCares([]);
+    setCurrentStepIndex(0);
+    setActiveSessionTimerEnd(null);
+    setActiveSessionTimerDuration(null);
+    setActiveSessionTimerRemaining(null);
+    setIsTimerRunning(false);
+    
+    // Re-schedule regular alerts
+    if (Platform.OS !== 'web' && activeProfile) {
+      const notifications = activeProfile.notifications || { enabled: true, time: '09:00', tone: 'Motivant' };
+      if (notifications.enabled) {
+        NotificationService.scheduleDailyCareReminders(
+          notifications.time,
+          routine.filter(r => r.profileId === activeProfileId),
+          activeProfile.name,
+          notifications.tone
+        );
+      }
+    }
+  };
+
+  const startStepTimer = async (durationSeconds: number) => {
+    const endTime = Date.now() + durationSeconds * 1000;
+    setActiveSessionTimerDuration(durationSeconds);
+    setActiveSessionTimerEnd(endTime);
+    setIsTimerRunning(true);
+    setActiveSessionTimerRemaining(null);
+
+    // If there is a next step, schedule a notification for when the timer ends
+    if (currentStepIndex + 1 < activeSessionCares.length && Platform.OS !== 'web') {
+      const nextCare = activeSessionCares[currentStepIndex + 1];
+      const getNextStepNotificationBody = (nextCategory: string): string => {
+        const cat = nextCategory.toLowerCase();
+        if (cat.includes('lavage') || cat.includes('shampoing')) {
+          return "🚿 Étape suivante : C'est l'heure de rincer et de passer au shampoing !";
+        }
+        if (cat.includes('masque')) {
+          return "🍯 Étape suivante : C'est l'heure d'appliquer ton masque !";
+        }
+        if (cat.includes('bain')) {
+          return "🌿 Étape suivante : C'est l'heure de rincer ton bain d'huile !";
+        }
+        if (cat.includes('rinçage') || cat.includes('rincage') || cat.includes('leave')) {
+          return "🧴 Étape suivante : C'est le moment d'appliquer ton soin sans rinçage pour sceller l'hydratation !";
+        }
+        if (cat.includes('retwist')) {
+          return "👑 Étape suivante : C'est le moment de passer au retwist !";
+        }
+        if (cat.includes('clarif')) {
+          return "🫧 Étape suivante : C'est l'heure de passer à la clarification !";
+        }
+        return `💆‍♀️ Étape suivante : Passons au soin : ${nextCategory} !`;
+      };
+
+      const bodyText = getNextStepNotificationBody(nextCare.category);
+
+      try {
+        await Notifications.cancelAllScheduledNotificationsAsync();
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: "My Root'In 🌿 Étape Suivante",
+            body: bodyText,
+            sound: 'two_pshit.mp3',
+            data: {
+              isNextStepNotification: true,
+              nextStepIndex: currentStepIndex + 1
+            }
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: new Date(endTime),
+            channelId: 'my-root-in-reminders-v4',
+          }
+        });
+      } catch (e) {
+        console.warn("Error scheduling step timer notification:", e);
+      }
+    }
+  };
+
+  const pauseStepTimer = () => {
+    if (activeSessionTimerEnd) {
+      const remaining = Math.max(0, Math.round((activeSessionTimerEnd - Date.now()) / 1000));
+      setActiveSessionTimerRemaining(remaining);
+    }
+    setIsTimerRunning(false);
+    setActiveSessionTimerEnd(null);
+    if (Platform.OS !== 'web' && activeProfile) {
+      Notifications.cancelAllScheduledNotificationsAsync().then(() => {
+        const notifications = activeProfile.notifications || { enabled: true, time: '09:00', tone: 'Motivant' };
+        if (notifications.enabled) {
+          NotificationService.scheduleDailyCareReminders(
+            notifications.time,
+            routine.filter(r => r.profileId === activeProfileId),
+            activeProfile.name,
+            notifications.tone
+          );
+        }
+      });
+    }
+  };
+
+  const completeCurrentStep = async () => {
+    const currentCare = activeSessionCares[currentStepIndex];
+    if (!currentCare) return;
+
+    setRoutine(prev => prev.map(item => {
+      if (item.id === currentCare.id) {
+        return { ...item, completed: true };
+      }
+      return item;
+    }));
+
+    const newLog: ActionLog = {
+      id: uuid(),
+      profileId: activeProfileId,
+      date: currentCare.date,
+      category: currentCare.category,
+      completed: true,
+    };
+    setLogs(prev => [...prev, newLog]);
+    setLastLoggedCategory(currentCare.category);
+    setLastValidatedCare({ category: currentCare.category, date: currentCare.date });
+
+    if (Platform.OS !== 'web') {
+      try {
+        await Notifications.cancelAllScheduledNotificationsAsync();
+      } catch {}
+    }
+
+    if (currentStepIndex + 1 < activeSessionCares.length) {
+      setCurrentStepIndex(prev => prev + 1);
+      setActiveSessionTimerEnd(null);
+      setActiveSessionTimerDuration(null);
+      setActiveSessionTimerRemaining(null);
+      setIsTimerRunning(false);
+    } else {
+      setIsSessionActive(false);
+      setIsSessionSuspended(false);
+      setActiveSessionCares([]);
+      setCurrentStepIndex(0);
+      setActiveSessionTimerEnd(null);
+      setActiveSessionTimerDuration(null);
+      setActiveSessionTimerRemaining(null);
+      setIsTimerRunning(false);
+
+      if (Platform.OS !== 'web' && activeProfile) {
+        const notifications = activeProfile.notifications || { enabled: true, time: '09:00', tone: 'Motivant' };
+        if (notifications.enabled) {
+          NotificationService.scheduleDailyCareReminders(
+            notifications.time,
+            routine.filter(r => r.profileId === activeProfileId),
+            activeProfile.name,
+            notifications.tone
+          );
+        }
+      }
+
+      const isCustom = currentCare.isCustom || currentCare.recurrence === 'Unique' || !isAppRoutineCategory(currentCare.category) || currentCare.category === 'Soin personnalisé';
+      if (!isCustom) {
+        setTimeout(() => {
+          setShowFeedbackQuiz(true);
+        }, 600);
+      } else {
+        if (activeProfile) {
+          const oldScore = activeProfile.healthScore;
+          const newHydration = Math.min(100, activeProfile.hydration + 10);
+          const newNutrition = Math.min(100, activeProfile.nutrition + 10);
+          const newScore = Math.round((newHydration + newNutrition + activeProfile.scalp) / 3);
+          const delta = newScore - oldScore;
+
+          setProfiles(prev => prev.map(p => {
+            if (p.id === activeProfileId) {
+              return {
+                ...p,
+                hydration: newHydration,
+                nutrition: newNutrition,
+                healthScore: newScore,
+              };
+            }
+            return p;
+          }));
+
+          setLastFeedbackDelta(delta);
+          setLastFeedbackReason("Soin personnalisé complété avec succès ! Prends soin de toi au quotidien.");
+          setTimeout(() => {
+            setShowCareSummary(true);
+          }, 600);
+        }
+      }
+    }
   };
 
   return (
@@ -1477,7 +1738,23 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       toggleThemeMode,
       updateMasterAccount,
       deleteMasterAccount,
-      logout
+      logout,
+
+      // Active Session exposed
+      isSessionActive,
+      activeSessionCares,
+      currentStepIndex,
+      activeSessionTimerEnd,
+      activeSessionTimerDuration,
+      activeSessionTimerRemaining,
+      isTimerRunning,
+      startActiveSession,
+      stopActiveSession,
+      startStepTimer,
+      pauseStepTimer,
+      completeCurrentStep,
+      isSessionSuspended,
+      setIsSessionSuspended
     }}>
       {children}
     </AppStateContext.Provider>

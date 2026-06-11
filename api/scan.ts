@@ -1,326 +1,238 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
+// ─── Vercel Edge Runtime ─────────────────────────────────────────────────────
+// Edge Runtime has NO 10s timeout (unlike Serverless on Hobby plan).
+// It uses Web APIs only (fetch, Request, Response) — no Node.js imports.
+// ─────────────────────────────────────────────────────────────────────────────
+export const config = { runtime: 'edge' };
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS Headers
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-  );
+const CORS_HEADERS = {
+  'Access-Control-Allow-Credentials': 'true',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,OPTIONS,POST,PUT,PATCH,DELETE',
+  'Access-Control-Allow-Headers': 'Content-Type, Accept, X-Requested-With',
+  'Content-Type': 'application/json',
+};
 
+function json(data: any, status = 200) {
+  return new Response(JSON.stringify(data), { status, headers: CORS_HEADERS });
+}
+
+export default async function handler(req: Request) {
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    return new Response(null, { status: 200, headers: CORS_HEADERS });
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Méthode non autorisée. Utilisez POST.' });
+    return json({ error: 'Méthode non autorisée. Utilisez POST.' }, 405);
   }
 
-  const { frontImage, backImage, image, ingredientsText, manualBrand, manualName, manualType, texture, porosity, barcodeImage, barcode } = req.body;
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: 'Corps de requête JSON invalide.' }, 400);
+  }
 
-  if (!frontImage && !backImage && !image && !ingredientsText && (!manualBrand || !manualName) && !barcodeImage && !barcode) {
-    return res.status(400).json({ error: 'Aucune image, liste d\'ingrédients, ni informations de saisie manuelle fournies.' });
+  const {
+    frontImage, backImage, image, ingredientsText,
+    manualBrand, manualName, manualType,
+    texture, porosity, barcodeImage, barcode
+  } = body;
+
+  if (!frontImage && !backImage && !image && !ingredientsText &&
+      (!manualBrand || !manualName) && !barcodeImage && !barcode) {
+    return json({ error: 'Aucune donnée fournie.' }, 400);
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
-
   if (!apiKey) {
-    return res.status(500).json({
+    return json({
       error: 'Clé API manquante.',
-      details: 'La variable d\'environnement GEMINI_API_KEY n\'est pas configurée sur Vercel. Veuillez l\'ajouter dans Settings > Environment Variables.'
-    });
+      details: 'GEMINI_API_KEY non configurée dans Vercel Settings > Environment Variables.'
+    }, 500);
   }
 
   try {
-    let promptText = '';
     const parts: any[] = [];
+    let promptText = '';
 
+    // ── Option 1 : Barcode text lookup ───────────────────────────────────────
     if (barcode) {
-      // Option -1 : Barcode text lookup using Gemini knowledge base
-      promptText = `Tu es un expert en cosmétologie capillaire et ingrédients INCI, spécialisé dans les cheveux afro et texturés (crépus, frisés, bouclés, ondulés, locksés).
-On te fournit un code-barres EAN-13 : ${barcode}.
-Si tu connais le produit capillaire exact correspondant à ce code-barres, reconstitue sa marque, son nom et sa liste d'ingrédients INCI officielle pour faire son analyse.
+      promptText = `Tu es un expert INCI capillaire (cheveux afro/texturés). Code-barres EAN-13 reçu : ${barcode}
+Profil utilisateur : Texture ${texture || 'Crépus'}, Porosité ${porosity || 'Moyenne'}
 
-RÈGLES STRICTES DE CATÉGORISATION ET D'INTERDICTION CAPILLAIRE :
-- Interdiction totale de conseiller d'utiliser un produit de type 'Gel', 'Gelée' ou 'Cire' pour un 'Bain d'huile' ou pour un 'Masque / Soin Profond', même si le produit contient des huiles dans ses ingrédients. Les gels sont formulés avec des agents fixants et gélifiants et ne sont techniquement pas adaptés aux soins profonds ou bains d'huiles.
-- Pour un soin 'Bain d'huile', conseille exclusivement des huiles végétales pures, des beurres ou des sérums huileux.
-- Pour un soin 'Masque / Soin Profond', conseille uniquement des masques capillaires spécifiques.
-- Pour un soin 'Shampoing / Clarification', conseille uniquement des shampoings (avec ou sans sulfates) ou des argiles détox.
-- Pour un soin 'Hydratation / Coiffage', conseille uniquement des leave-in, laits, crèmes, gels ou gelées.
-
-Prends en compte le profil capillaire de l'utilisateur :
-- Texture : ${texture || 'Crépus'}
-- Porosité : ${porosity || 'Moyenne'}
-
-Fournis ton analyse en français au format JSON STRICT avec cette structure exacte :
-{
-  "brand": "Marque détectée (ex: Cantu)",
-  "name": "Nom du produit détecté (ex: Shea Butter Leave-in)",
-  "score": 85, // Score de 0 à 100 indiquant la compatibilité exacte avec son profil (sois honnête et sévère s'il y a des ingrédients toxiques ou occlusifs inadaptés)
-  "title": "Titre court de compatibilité (ex: Excellent pour ton profil ! 🌿)",
-  "description": "Explication détaillée et personnalisée de ton avis en tant que coach capillaire IA, en expliquant spécifiquement pourquoi les ingrédients de ce produit conviennent ou non à sa porosité et sa texture. Adresse-toi directement à l'utilisateur de manière bienveillante. Mentionne au début que tu analyses ce produit via ta base de connaissances à partir de son code-barres.",
-  "inciReport": {
-    "good": ["Ingrédient 1 (Explication rapide de son effet bénéfique)", "Ingrédient 2 (Explication)"],
-    "neutral": ["Ingrédient 1 (Explication)", "Ingrédient 2 (Explication)"],
-    "avoid": ["Ingrédient 1 (Pourquoi l'éviter : ex: occlusif, cire minérale, sulfate décapant, alcool desséchant)", "Ingrédient 2 (Pourquoi l'éviter)"]
-  }
-}
-Si tu ne connais pas du tout ce code-barres ou que ce n'est pas un produit capillaire, renvoie exactement cet objet JSON d'erreur :
-{
-  "error": "Produit inconnu dans notre base de connaissances."
-}`;
-
+RÈGLE ABSOLUE : Tu n'as PAS le droit d'inventer un produit, de supposer, ni de reconstituer une formule fictive.
+Si ce code-barres correspond à un produit capillaire que tu connais avec CERTITUDE (≥90% de confiance), retourne :
+{"recognized":true,"brand":"Marque exacte","name":"Nom exact","score":75,"title":"Titre court 🌿","description":"Analyse personnalisée 2-3 phrases.","inciReport":{"good":["Ingrédient (bénéfice)"],"neutral":["Ingrédient"],"avoid":["Ingrédient (risque)"]}}
+Dans TOUS les autres cas (produit inconnu, doute, non capillaire, code-barres non reconnu) retourne UNIQUEMENT :
+{"recognized":false}`;
       parts.push({ text: promptText });
+
+    // ── Option 2 : Barcode image (OCR) ───────────────────────────────────────
     } else if (barcodeImage) {
-      // Option 0 : Barcode image extraction (OCR)
       const base64Data = barcodeImage.replace(/^data:image\/\w+;base64,/, '');
-      let mimeType = 'image/jpeg';
       const mimeMatch = barcodeImage.match(/^data:(image\/\w+);base64,/);
-      if (mimeMatch) {
-        mimeType = mimeMatch[1];
-      }
-
-      promptText = `Tu es un assistant IA spécialisé dans la lecture optique et le décodage de codes-barres (OCR).
-Analyse l'image fournie pour identifier le code-barres (généralement EAN-13, 13 chiffres imprimés sous les barres verticales) du produit capillaire.
-Extrais les 13 chiffres du code-barres.
-Fournis ta réponse en français au format JSON STRICT avec cette structure exacte :
-{
-  "barcode": "les 13 chiffres extraits sans aucun espace (ex: 3596710406087)"
-}
-Si aucun code-barres ou numéro de code-barres valide n'est visible sur la photo, renvoie une explication d'erreur sous ce format :
-{
-  "error": "Aucun code-barres lisible trouvé sur cette photo. Essaie de bien centrer le code-barres et d'éviter les reflets."
-}`;
-
+      const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+      promptText = `Extrais le code-barres EAN-13 (13 chiffres) de cette image.
+Réponds UNIQUEMENT en JSON : {"barcode":"les13chiffres"}
+Si illisible : {"error":"Aucun code-barres lisible."}`;
       parts.push({ text: promptText });
-      parts.push({
-        inlineData: {
-          mimeType: mimeType,
-          data: base64Data
-        }
-      });
+      parts.push({ inlineData: { mimeType, data: base64Data } });
+
+    // ── Option 3 : Double photo (front + back) ───────────────────────────────
     } else if (frontImage && backImage) {
-      // Option 1 : Double-image scan (front + back)
       const base64Front = frontImage.replace(/^data:image\/\w+;base64,/, '');
-      const base64Back = backImage.replace(/^data:image\/\w+;base64,/, '');
+      const base64Back  = backImage.replace(/^data:image\/\w+;base64,/, '');
+      const mimeFront = (frontImage.match(/^data:(image\/\w+);base64,/) || [])[1] || 'image/jpeg';
+      const mimeBack  = (backImage.match(/^data:(image\/\w+);base64,/)  || [])[1] || 'image/jpeg';
 
-      let mimeTypeFront = 'image/jpeg';
-      const mimeMatchFront = frontImage.match(/^data:(image\/\w+);base64,/);
-      if (mimeMatchFront) {
-        mimeTypeFront = mimeMatchFront[1];
-      }
+      promptText = `Tu es un expert INCI capillaire (cheveux afro/texturés).
+Image 1 = recto du produit. Image 2 = verso avec la liste INCI.
+Profil utilisateur : Texture ${texture || 'Crépus'}, Porosité ${porosity || 'Moyenne'}
 
-      let mimeTypeBack = 'image/jpeg';
-      const mimeMatchBack = backImage.match(/^data:(image\/\w+);base64,/);
-      if (mimeMatchBack) {
-        mimeTypeBack = mimeMatchBack[1];
-      }
-
-      promptText = `Tu es un expert en cosmétologie capillaire et ingrédients INCI, spécialisé dans les cheveux afro et texturés (crépus, frisés, bouclés, ondulés, locksés). 
-On te fournit deux images d'un produit capillaire :
-- L'Image 1 montre le DEVANT (le recto) du produit.
-- L'Image 2 montre le DOS (le verso) avec la liste des ingrédients INCI.
-
-RÈGLES STRICTES DE CATÉGORISATION ET D'INTERDICTION CAPILLAIRE :
-- Interdiction totale de conseiller d'utiliser un produit de type 'Gel', 'Gelée' ou 'Cire' pour un 'Bain d'huile' ou pour un 'Masque / Soin Profond', même si le produit contient des huiles dans ses ingrédients. Les gels sont formulés avec des agents fixants et gélifiants et ne sont techniquement pas adaptés aux soins profonds ou bains d'huiles.
-- Pour un soin 'Bain d'huile', conseille exclusivement des huiles végétales pures, des beurres ou des sérums huileux.
-- Pour un soin 'Masque / Soin Profond', conseille uniquement des masques capillaires spécifiques.
-- Pour un soin 'Shampoing / Clarification', conseille uniquement des shampoings (avec ou sans sulfates) ou des argiles détox.
-- Pour un soin 'Hydratation / Coiffage', conseille uniquement des leave-in, laits, crèmes, gels ou gelées.
-
-Analyse l'Image 1 pour extraire la Marque et le Nom exact du produit, puis analyse l'Image 2 (la liste INCI) pour exécuter les 4 fonctions Premium (Analyse, Ajout Salle de Bain, Comparateur, Dupe DIY).
-
-Prends en compte le profil capillaire de l'utilisateur :
-- Texture : ${texture || 'Crépus'}
-- Porosité : ${porosity || 'Moyenne'}
-
-Fournis ton analyse en français au format JSON STRICT avec cette structure exacte :
-{
-  "brand": "Marque exacte extraite de l'Image 1 (ex: Cantu)",
-  "name": "Nom exact du produit extrait de l'Image 1 (ex: Shea Butter Hydrating Conditioner)",
-  "score": 85, // Score de 0 à 100 indiquant la compatibilité exacte avec son profil (sois honnête et sévère s'il y a des ingrédients toxiques ou occlusifs inadaptés)
-  "title": "Titre court de compatibilité (ex: Excellent pour ton profil ! 🌿)",
-  "description": "Explication détaillée et personnalisée de ton avis en tant que coach capillaire IA, en expliquant spécifiquement pourquoi les ingrédients conviennent ou non à sa porosité et sa texture. Adresse-toi directement à l'utilisateur de manière bienveillante.",
-  "inciReport": {
-    "good": ["Ingrédient 1 (Explication rapide de son effet bénéfique)", "Ingrédient 2 (Explication)"],
-    "neutral": ["Ingrédient 1 (Explication)", "Ingrédient 2 (Explication)"],
-    "avoid": ["Ingrédient 1 (Pourquoi l'éviter : ex: occlusif, cire minérale, sulfate décapant, alcool desséchant)", "Ingrédient 2 (Pourquoi l'éviter)"]
-  }
-}`;
-
+RÈGLE ABSOLUE : Tu n'as PAS le droit d'inventer une formule, une marque, ou un nom de produit.
+- Si les images sont floues, illisibles, ou si tu ne peux pas lire clairement la liste INCI et identifier la marque avec certitude → retourne UNIQUEMENT : {"recognized":false}
+- Si le produit n'est PAS capillaire → retourne UNIQUEMENT : {"recognized":false}
+- Si le produit est clairement identifié ET la liste INCI est lisible avec certitude, retourne :
+{"recognized":true,"brand":"Marque exacte lue sur le produit","name":"Nom exact lu sur le produit","score":75,"title":"Titre court 🌿","description":"Analyse personnalisée 2-3 phrases.","inciReport":{"good":["Ingrédient (bénéfice)"],"neutral":["Ingrédient"],"avoid":["Ingrédient (risque)"]}}
+Réponds UNIQUEMENT en JSON valide (sans markdown).`;
       parts.push({ text: promptText });
-      parts.push({
-        inlineData: {
-          mimeType: mimeTypeFront,
-          data: base64Front
-        }
-      });
-      parts.push({
-        inlineData: {
-          mimeType: mimeTypeBack,
-          data: base64Back
-        }
-      });
+      parts.push({ inlineData: { mimeType: mimeFront, data: base64Front } });
+      parts.push({ inlineData: { mimeType: mimeBack,  data: base64Back  } });
+
+    // ── Option 4 : Single image ───────────────────────────────────────────────
     } else if (image) {
-      // Option 2 : Single Image-based scan
       const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
-      let mimeType = 'image/jpeg';
       const mimeMatch = image.match(/^data:(image\/\w+);base64,/);
-      if (mimeMatch) {
-        mimeType = mimeMatch[1];
-      }
+      const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+      promptText = `Tu es un expert INCI capillaire (cheveux afro/texturés). Photo de la liste INCI d'un produit.
+Profil utilisateur : Texture ${texture || 'Crépus'}, Porosité ${porosity || 'Moyenne'}
 
-      promptText = `Tu es un expert en cosmétologie capillaire et ingrédients INCI, spécialisé dans les cheveux afro et texturés (crépus, frisés, bouclés, ondulés, locksés). Analyse cette photo qui montre la liste des ingrédients d'un produit capillaire.
-
-RÈGLES STRICTES DE CATÉGORISATION ET D'INTERDICTION CAPILLAIRE :
-- Interdiction totale de conseiller d'utiliser un produit de type 'Gel', 'Gelée' ou 'Cire' pour un 'Bain d'huile' ou pour un 'Masque / Soin Profond', même si le produit contient des huiles dans ses ingrédients. Les gels sont formulés avec des agents fixants et gélifiants et ne sont techniquement pas adaptés aux soins profonds ou bains d'huiles.
-- Pour un soin 'Bain d'huile', conseille exclusivement des huiles végétales pures, des beurres ou des sérums huileux.
-- Pour un soin 'Masque / Soin Profond', conseille uniquement des masques capillaires spécifiques.
-- Pour un soin 'Shampoing / Clarification', conseille uniquement des shampoings (avec ou sans sulfates) ou des argiles détox.
-- Pour un soin 'Hydratation / Coiffage', conseille uniquement des leave-in, laits, crèmes, gels ou gelées.
-
-Prends en compte le profil capillaire de l'utilisateur :
-- Texture : ${texture || 'Crépus'}
-- Porosité : ${porosity || 'Moyenne'}
-
-Fournis ton analyse en français au format JSON STRICT avec cette structure exacte :
-{
-  "brand": "Marque détectée (ex: Shea Moisture)",
-  "name": "Nom du produit détecté",
-  "score": 85, // Score de 0 à 100 indiquant la compatibilité exacte avec son profil (sois honnête et sévère s'il y a des ingrédients toxiques ou occlusifs inadaptés)
-  "title": "Titre court de compatibilité (ex: Excellent pour ton profil ! 🌿)",
-  "description": "Explication détaillée et personnalisée de ton avis en tant que coach capillaire IA, en expliquant spécifiquement pourquoi les ingrédients conviennent ou non à sa porosité et sa texture. Adresse-toi directement à l'utilisateur de manière bienveillante.",
-  "inciReport": {
-    "good": ["Ingrédient 1 (Explication rapide de son effet bénéfique)", "Ingrédient 2 (Explication)"],
-    "neutral": ["Ingrédient 1 (Explication)", "Ingrédient 2 (Explication)"],
-    "avoid": ["Ingrédient 1 (Pourquoi l'éviter : ex: occlusif, cire minérale, sulfate décapant, alcool desséchant)", "Ingrédient 2 (Pourquoi l'éviter)"]
-  }
-}`;
-
+RÈGLE ABSOLUE : Tu n'as PAS le droit d'inventer une formule ou une marque.
+- Si l'image est floue, illisible ou que la liste INCI n'est pas clairement visible → retourne UNIQUEMENT : {"recognized":false}
+- Si la liste INCI est clairement lisible, retourne :
+{"recognized":true,"brand":"Marque si visible sinon \"Marque non identifiée\"","name":"Nom si visible sinon \"Produit scanné\"","score":75,"title":"Titre court 🌿","description":"Analyse personnalisée 2-3 phrases.","inciReport":{"good":["Ingrédient (bénéfice)"],"neutral":["Ingrédient"],"avoid":["Ingrédient (risque)"]}}
+Réponds UNIQUEMENT en JSON valide (sans markdown).`;
       parts.push({ text: promptText });
-      parts.push({
-        inlineData: {
-          mimeType: mimeType,
-          data: base64Data
-        }
-      });
+      parts.push({ inlineData: { mimeType, data: base64Data } });
+
+    // ── Option 5 : Ingredients text (from barcode lookup) ────────────────────
     } else if (ingredientsText) {
-      // Option 2 : Text-based scan (from barcode lookup)
-      promptText = `Tu es un expert en cosmétologie capillaire et ingrédients INCI, spécialisé dans les cheveux afro et texturés (crépus, frisés, bouclés, ondulés, locksés). Analyse cette liste d'ingrédients d'un produit capillaire.
+      promptText = `Expert INCI capillaire (cheveux afro/texturés).
+Liste INCI : ${ingredientsText}
+Profil : Texture ${texture || 'Crépus'}, Porosité ${porosity || 'Moyenne'}
 
-RÈGLES STRICTES DE CATÉGORISATION ET D'INTERDICTION CAPILLAIRE :
-- Interdiction totale de conseiller d'utiliser un produit de type 'Gel', 'Gelée' ou 'Cire' pour un 'Bain d'huile' ou pour un 'Masque / Soin Profond', même si le produit contient des huiles dans ses ingrédients. Les gels sont formulés avec des agents fixants et gélifiants et ne sont techniquement pas adaptés aux soins profonds ou bains d'huiles.
-- Pour un soin 'Bain d'huile', conseille exclusivement des huiles végétales pures, des beurres ou des sérums huileux.
-- Pour un soin 'Masque / Soin Profond', conseille uniquement des masques capillaires spécifiques.
-- Pour un soin 'Shampoing / Clarification', conseille uniquement des shampoings (avec ou sans sulfates) ou des argiles détox.
-- Pour un soin 'Hydratation / Coiffage', conseille uniquement des leave-in, laits, crèmes, gels ou gelées.
-
-Liste des ingrédients :
-${ingredientsText}
-
-Prends en compte le profil capillaire de l'utilisateur :
-- Texture : ${texture || 'Crépus'}
-- Porosité : ${porosity || 'Moyenne'}
-
-Fournis ton analyse en français au format JSON STRICT avec cette structure exacte :
-{
-  "brand": "Marque détectée (ex: Shea Moisture)",
-  "name": "Nom du produit détecté",
-  "score": 85, // Score de 0 à 100 indiquant la compatibilité exacte avec son profil (sois honnête et sévère s'il y a des ingrédients toxiques ou occlusifs inadaptés)
-  "title": "Titre court de compatibilité (ex: Excellent pour ton profil ! 🌿)",
-  "description": "Explication détaillée et personnalisée de ton avis en tant que coach capillaire IA, en expliquant spécifiquement pourquoi les ingrédients conviennent ou non à sa porosité et sa texture. Adresse-toi directement à l'utilisateur de manière bienveillante.",
-  "inciReport": {
-    "good": ["Ingrédient 1 (Explication rapide de son effet bénéfique)", "Ingrédient 2 (Explication)"],
-    "neutral": ["Ingrédient 1 (Explication)", "Ingrédient 2 (Explication)"],
-    "avoid": ["Ingrédient 1 (Pourquoi l'éviter : ex: occlusif, cire minérale, sulfate décapant, alcool desséchant)", "Ingrédient 2 (Pourquoi l'éviter)"]
-  }
-}`;
-
+Réponds UNIQUEMENT en JSON valide (sans markdown) :
+{"brand":"Marque","name":"Nom","score":75,"title":"Titre court 🌿","description":"Analyse personnalisée 2-3 phrases.","inciReport":{"good":["Ingrédient (bénéfice)"],"neutral":["Ingrédient"],"avoid":["Ingrédient (risque)"]}}`;
       parts.push({ text: promptText });
+
+    // ── Option 6 : Manual entry ───────────────────────────────────────────────
     } else {
-      // Option 3 : Manual Express Entry Search
-      promptText = `Tu es un expert en cosmétologie capillaire et ingrédients INCI, spécialisé dans les cheveux afro et texturés (crépus, frisés, bouclés, ondulés, locksés). L'utilisateur a fait une saisie manuelle car le scan de son produit a échoué.
+      promptText = `Expert INCI capillaire (cheveux afro/texturés). Analyse ce produit via ta base de connaissances.
+Produit : ${manualBrand} — ${manualName} (${manualType || 'Non spécifié'})
+Profil : Texture ${texture || 'Crépus'}, Porosité ${porosity || 'Moyenne'}
 
-RÈGLES STRICTES DE CATÉGORISATION ET D'INTERDICTION CAPILLAIRE :
-- Interdiction totale de conseiller d'utiliser un produit de type 'Gel', 'Gelée' ou 'Cire' pour un 'Bain d'huile' ou pour un 'Masque / Soin Profond', même si le produit contient des huiles dans ses ingrédients. Les gels sont formulés avec des agents fixants et gélifiants et ne sont techniquement pas adaptés aux soins profonds ou bains d'huiles.
-- Pour un soin 'Bain d'huile', conseille exclusivement des huiles végétales pures, des beurres ou des sérums huileux.
-- Pour un soin 'Masque / Soin Profond', conseille uniquement des masques capillaires spécifiques.
-- Pour un soin 'Shampoing / Clarification', conseille uniquement des shampoings (avec ou sans sulfates) ou des argiles détox.
-- Pour un soin 'Hydratation / Coiffage', conseille uniquement des leave-in, laits, crèmes, gels ou gelées.
-      
-Produit saisi à la main :
-- Marque : ${manualBrand}
-- Nom du produit : ${manualName}
-- Type de produit : ${manualType || 'Non spécifié'}
-
-Utilise ta propre base de connaissances sur ce produit exact. Si tu connais ce produit, reconstitue mentalement sa liste d'ingrédients INCI officielle. Si c'est un produit générique ou peu connu, imagine la liste d'ingrédients la plus probable pour ce type de produit de cette marque.
-
-Prends en compte le profil capillaire de l'utilisateur :
-- Texture : ${texture || 'Crépus'}
-- Porosité : ${porosity || 'Moyenne'}
-
-Fournis ton analyse en français au format JSON STRICT avec cette structure exacte :
-{
-  "brand": "${manualBrand}",
-  "name": "${manualName}",
-  "score": 85, // Score de 0 à 100 indiquant la compatibilité exacte avec son profil (sois honnête et sévère s'il y a des ingrédients toxiques ou occlusifs inadaptés)
-  "title": "Titre court de compatibilité (ex: Excellent pour ton profil ! 🌿)",
-  "description": "Explication détaillée et personnalisée de ton avis en tant que coach capillaire IA, en expliquant spécifiquement pourquoi les ingrédients de ce produit conviennent ou non à sa porosité et sa texture. Adresse-toi directement à l'utilisateur de manière bienveillante. Mentionne au début que tu analyses ce produit via ta base de connaissances.",
-  "inciReport": {
-    "good": ["Ingrédient 1 (Explication rapide de son effet bénéfique)", "Ingrédient 2 (Explication)"],
-    "neutral": ["Ingrédient 1 (Explication)", "Ingrédient 2 (Explication)"],
-    "avoid": ["Ingrédient 1 (Pourquoi l'éviter : ex: occlusif, cire minérale, sulfate décapant, alcool desséchant)", "Ingrédient 2 (Pourquoi l'éviter)"]
-  }
-}`;
-
+Reconstitue la formule INCI officielle de ce produit. Évalue sa compatibilité.
+Réponds UNIQUEMENT en JSON valide (sans markdown) :
+{"brand":"${manualBrand}","name":"${manualName}","score":75,"title":"Titre court 🌿","description":"Analyse personnalisée 2-3 phrases, mentionne l'analyse via base de connaissances.","inciReport":{"good":["Ingrédient (bénéfice)"],"neutral":["Ingrédient"],"avoid":["Ingrédient (risque)"]}}
+Si ce n'est PAS un produit capillaire : {"error":"Non capillaire"}`;
       parts.push({ text: promptText });
     }
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-
-    const response = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
+    const models = [
+      {
+        name: 'gemini-2.5-flash',
+        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        config: {
+          responseMimeType: 'application/json',
+          thinkingConfig: { thinkingBudget: 0 }
+        }
       },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: parts
-          }
-        ],
-        generationConfig: {
+      {
+        name: 'gemini-1.5-flash',
+        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        config: {
           responseMimeType: 'application/json'
         }
-      })
-    });
+      }
+    ];
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Gemini API Error: ${response.status} - ${errorText}`);
+    let geminiResponse: Response | null = null;
+    let lastErrorMsg = '';
+
+    for (const model of models) {
+      const MAX_RETRIES = 1;
+      let success = false;
+
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          geminiResponse = await fetch(model.url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts }],
+              generationConfig: model.config
+            })
+          });
+
+          if (geminiResponse.ok) {
+            success = true;
+            break;
+          }
+
+          const errorText = await geminiResponse.text().catch(() => '');
+          lastErrorMsg = `Gemini ${model.name} ${geminiResponse.status}: ${errorText}`;
+
+          if (geminiResponse.status === 429 && attempt < MAX_RETRIES) {
+            let errJson: any = {};
+            try {
+              errJson = JSON.parse(errorText);
+            } catch {}
+            const retryMatch = JSON.stringify(errJson).match(/retry in ([0-9.]+)s/);
+            const waitMs = retryMatch ? Math.ceil(parseFloat(retryMatch[1]) * 1000) + 500 : 5000;
+            await new Promise(r => setTimeout(r, waitMs));
+            continue;
+          }
+
+          break;
+        } catch (fetchErr: any) {
+          lastErrorMsg = `Fetch error for ${model.name}: ${fetchErr.message || String(fetchErr)}`;
+          break;
+        }
+      }
+
+      if (success && geminiResponse && geminiResponse.ok) {
+        break;
+      }
     }
 
-    const data = await response.json();
-    
-    // Extract JSON response text from Gemini
-    const geminiText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    
+    if (!geminiResponse || !geminiResponse.ok) {
+      throw new Error(`Gemini API indisponible. Détails: ${lastErrorMsg}`);
+    }
+
+    const data = await geminiResponse.json();
+
+    // gemini-2.5-flash may return multiple parts: thought tokens (thought:true)
+    // followed by the actual response. We skip thought parts and find the real text.
+    const allParts = data.candidates?.[0]?.content?.parts ?? [];
+    const textPart = allParts.find((p: any) => !p.thought && typeof p.text === 'string');
+    const geminiText = textPart?.text;
+
     if (!geminiText) {
-      throw new Error("L'IA n'a pas renvoyé de texte d'analyse.");
+      const raw = JSON.stringify(data).substring(0, 300);
+      throw new Error(`L'IA n'a pas renvoyé de texte. Raw: ${raw}`);
     }
 
-    // Parse the JSON returned by Gemini
-    const parsedAnalysis = JSON.parse(geminiText.trim());
-
-    return res.status(200).json(parsedAnalysis);
+    // Extract JSON — strip any accidental markdown fences
+    const jsonStr = geminiText.trim().replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+    const parsedAnalysis = JSON.parse(jsonStr);
+    return json(parsedAnalysis, 200);
 
   } catch (error: any) {
     console.error('Scanner Error:', error);
-    return res.status(500).json({
+    return json({
       error: 'Erreur lors de l\'analyse du produit.',
-      details: error.message || error
-    });
+      details: error.message || String(error)
+    }, 500);
   }
 }
