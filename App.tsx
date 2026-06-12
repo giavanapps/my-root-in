@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Image, Platform } from 'react-native';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
@@ -25,6 +25,7 @@ function MainApp() {
   const [isEditingDiagnostic, setIsEditingDiagnostic] = useState(false);
   const [autoOpenCalendarModal, setAutoOpenCalendarModal] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const hasProcessedColdLaunch = useRef(false);
 
   const { themeMode, activeProfile, profiles, isLoading, masterEmail, isPremium, logout: logoutSession, startActiveSession } = useAppState();
 
@@ -51,13 +52,16 @@ function MainApp() {
       handleNotificationClick(data);
     });
 
-    // 2. Check if launched cold from a clicked notification on startup
-    Notifications.getLastNotificationResponseAsync().then(response => {
-      if (response) {
-        const data = response.notification.request.content.data;
-        handleNotificationClick(data);
-      }
-    });
+    // 2. Check if launched cold from a clicked notification on startup (only once)
+    if (!hasProcessedColdLaunch.current) {
+      hasProcessedColdLaunch.current = true;
+      Notifications.getLastNotificationResponseAsync().then(response => {
+        if (response) {
+          const data = response.notification.request.content.data;
+          handleNotificationClick(data);
+        }
+      });
+    }
 
     return () => {
       subscription.remove();
