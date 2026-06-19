@@ -2864,18 +2864,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
                 cardEmoji = "🌿";
               } else if (categories.some(c => c.includes("clarification") || c.includes("lavage") || c.includes("shampoing") || c.includes("shampoo"))) {
                 cardTitle = "Grand Nettoyage";
-                cardDesc = `Détox capillaire : on libère tes ${textureTerm} de tous les résidus !`;
+                cardDesc = `Aujourd'hui, c'est détox capillaire : on libère tes ${textureTerm} de tous les résidus !`;
                 cardEmoji = "🫧";
               } else if (categories.some(c => c.includes("retwist") || c.includes("coiffage"))) {
                 cardTitle = "Alerte Fraîcheur";
-                cardDesc = "On s'occupe de tes racines et de ta définition. On lance le chrono ?";
+                cardDesc = "Aujourd'hui, on s'occupe de tes racines et de ta définition. On lance le chrono ?";
                 cardEmoji = "👑";
               } else if (categories.some(c => c.includes("vapo") || c.includes("hydratation") || c.includes("sans rinçage") || c.includes("sans rincage") || c.includes("leave"))) {
                 cardTitle = "Hydratation Express";
-                cardDesc = "Un petit coup de boost ? 2 minutes pour hydrater tes longueurs et c'est plié !";
+                cardDesc = "Aujourd'hui, besoin d'un petit coup de boost ? 2 minutes pour hydrater tes longueurs et c'est plié !";
                 cardEmoji = "🌊";
               } else {
-                cardDesc = `Tu as ${caresList.length} soin${caresList.length > 1 ? 's' : ''} prévus. C'est parti !`;
+                cardDesc = `Aujourd'hui, tu as ${caresList.length} soin${caresList.length > 1 ? 's' : ''} prévus. C'est parti !`;
               }
 
               if (isSessionActive) {
