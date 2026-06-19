@@ -38,7 +38,7 @@ const getMorningNotificationBody = (categories: string[]): string => {
   const cats = categories.map(c => c.toLowerCase().trim());
   
   if (cats.some(c => c.includes("bain d'huile") || c.includes("bain d’huile") || c.includes("masque"))) {
-    return "🌿 Le rituel du jour : Aujourd'hui, on répare et on nourrit en profondeur. Prête pour ta session soin ?";
+    return "🌿 Le rituel du jour : Aujourd'hui, on répare et on nourrit en profondeur. C'est parti pour ta session soin ?";
   }
   if (cats.some(c => c.includes("clarification") || c.includes("lavage") || c.includes("shampoing") || c.includes("shampoo") || c.includes("detox") || c.includes("détox"))) {
     return "🫧 Détox capillaire : On libère tes cheveux de tous les résidus aujourd'hui. C'est parti !";
@@ -50,7 +50,7 @@ const getMorningNotificationBody = (categories: string[]): string => {
     return "🌊 Un petit coup de boost pour tes cheveux ? 2 minutes pour hydrater et c'est plié !";
   }
   if (cats.some(c => c.includes("massage"))) {
-    return "💆‍♀️ Détente absolue : C'est l'heure de ton massage crânien pour stimuler la pousse. Prête à te relaxer ?";
+    return "💆‍♀️ Détente absolue : C'est l'heure de ton massage crânien pour stimuler la pousse. C'est le moment de se relaxer ?";
   }
   if (cats.some(c => c.includes("porosité") || c.includes("porosite") || c.includes("test"))) {
     return "🔬 Test de porosité : Découvre la porosité de tes cheveux aujourd'hui pour adapter tes soins. C'est simple et rapide !";

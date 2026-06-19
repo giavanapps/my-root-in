@@ -2860,7 +2860,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
 
               if (categories.some(c => c.includes("bain d'huile") || c.includes("bain d’huile") || c.includes("masque"))) {
                 cardTitle = "Routine Cocooning";
-                cardDesc = "Aujourd'hui, on répare et on nourrit tes longueurs en profondeur. Prête ?";
+                cardDesc = "Aujourd'hui, on répare et on nourrit tes longueurs en profondeur. On s'y met ?";
                 cardEmoji = "🌿";
               } else if (categories.some(c => c.includes("clarification") || c.includes("lavage") || c.includes("shampoing") || c.includes("shampoo"))) {
                 cardTitle = "Grand Nettoyage";
@@ -3732,7 +3732,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAddProfilePress, onLog
               return (
                 <ScrollView contentContainerStyle={styles.guideScrollContent} showsVerticalScrollIndicator={false}>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: customText, marginBottom: 12 }}>
-                    Coucou {activeProfile.name} ! {nextCareDate === todayStr ? "Prêt(e) pour ton rituel d'aujourd'hui ? 🌸" : "Prêt(e) pour ton prochain moment bien-être ? 🌸"}
+                    Coucou {activeProfile.name} ! {nextCareDate === todayStr ? "On commence ton rituel d'aujourd'hui ? 🌸" : "On se prépare pour ton prochain moment bien-être ? 🌸"}
                   </Text>
                   
                   {nextCareDate === todayStr ? (
