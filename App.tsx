@@ -5,6 +5,7 @@ import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { colors } from './src/theme/colors';
 import { AppStateProvider, useAppState } from './src/store/AppStateContext';
+import { auth } from './src/store/firebase';
 import { AuthScreen } from './src/screens/onboarding/AuthScreen';
 import { DiagnosticScreen, avatarImageMap } from './src/screens/onboarding/DiagnosticScreen';
 import { HomeScreen } from './src/screens/home/HomeScreen';
@@ -14,6 +15,7 @@ import { BathroomScreen } from './src/screens/bathroom/BathroomScreen';
 import { ShopScreen } from './src/screens/shop/ShopScreen';
 import { PremiumPaywallModal } from './src/components/premium/PremiumPaywallModal';
 import { FeedbackSystem } from './src/components/common/FeedbackSystem';
+import { SettingsModal } from './src/components/settings/SettingsModal';
 
 type ActiveScreen = 'auth' | 'diagnostic' | 'home';
 type ActiveTab = 'dashboard' | 'calendar' | 'bathroom' | 'shop' | 'profile';
@@ -25,6 +27,7 @@ function MainApp() {
   const [isEditingDiagnostic, setIsEditingDiagnostic] = useState(false);
   const [autoOpenCalendarModal, setAutoOpenCalendarModal] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const hasProcessedColdLaunch = useRef(false);
 
   const { themeMode, activeProfile, profiles, isLoading, masterEmail, isPremium, logout: logoutSession, startActiveSession } = useAppState();
@@ -82,10 +85,19 @@ function MainApp() {
       } else {
         // New user or no profiles: redirect to diagnostic onboarding!
         setCurrentScreen('diagnostic');
-        setTempUserName('Utilisateur');
+        const displayName = auth.currentUser?.displayName || 'Utilisateur';
+        setTempUserName(displayName);
       }
     }
   }, [profiles, isLoading, masterEmail, currentScreen]);
+
+  // Strict block: if user is not authenticated and loading is complete, redirect to Auth/Login screen
+  useEffect(() => {
+    if (currentScreen !== 'auth' && !masterEmail && !isLoading) {
+      setCurrentScreen('auth');
+    }
+  }, [masterEmail, isLoading, currentScreen]);
+
 
   const navigateToDiagnostic = (userName: string) => {
     setTempUserName(userName);
@@ -147,6 +159,7 @@ function MainApp() {
                     setAutoOpenCalendarModal(true);
                     setActiveTab('calendar');
                   }}
+                  onProfilePress={() => setActiveTab('profile')}
                 />
               )}
               {activeTab === 'calendar' && (
@@ -172,6 +185,22 @@ function MainApp() {
                 />
               )}
             </View>
+
+            {/* AdMob Banner Placeholder (for Free Users only) */}
+            {!isPremium && (
+              <View style={[styles.adMobContainer, isLight ? styles.adMobContainerLight : styles.adMobContainerDark]}>
+                <TouchableOpacity 
+                  activeOpacity={0.9} 
+                  onPress={() => setShowPaywall(true)}
+                  style={[styles.adMobBanner, isLight ? styles.adMobBannerLight : styles.adMobBannerDark]}
+                >
+                  <Text style={styles.adMobLabel}>SPONSORISÉ • Retirer les publicités ➔</Text>
+                  <Text style={[styles.adMobTitle, { color: isLight ? '#1C1E26' : '#FFFFFF' }]}>
+                    My Root'In Premium ✨ | Accès Illimité & Zéro Publicité
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Custom Premium Bottom Navigation Bar */}
             <View style={[
@@ -215,31 +244,20 @@ function MainApp() {
                 </Text>
               </TouchableOpacity>
 
-              {/* Tab 3: Salle de Bain */}
+              {/* Tab 3: Mon Espace */}
               <TouchableOpacity 
                 activeOpacity={0.8}
                 style={styles.tabItem} 
-                onPress={() => {
-                  if (isPremium) {
-                    setActiveTab('bathroom');
-                  } else {
-                    setShowPaywall(true);
-                  }
-                }}
+                onPress={() => setActiveTab('bathroom')}
               >
-                <View style={styles.badgeWrapper}>
-                  <Text style={[styles.tabIcon, { opacity: activeTab === 'bathroom' ? 1 : 0.6 }]}>
-                    🧴
-                  </Text>
-                  <View style={[styles.proBadge, { borderColor: barBackground }]}>
-                    <Text style={styles.proBadgeText}>PRO</Text>
-                  </View>
-                </View>
+                <Text style={[styles.tabIcon, { opacity: activeTab === 'bathroom' ? 1 : 0.6 }]}>
+                  🧴
+                </Text>
                 <Text style={[
                   styles.tabLabel, 
                   { color: activeTab === 'bathroom' ? activeTextColor : inactiveTextColor }
                 ]}>
-                  Salle de Bain
+                  Mon Espace
                 </Text>
               </TouchableOpacity>
 
@@ -260,20 +278,20 @@ function MainApp() {
                 </Text>
               </TouchableOpacity>
 
-              {/* Tab 5: Mon Profil */}
+              {/* Tab 5: Paramètres */}
               <TouchableOpacity 
                 activeOpacity={0.8}
                 style={styles.tabItem} 
-                onPress={() => setActiveTab('profile')}
+                onPress={() => setShowSettings(true)}
               >
-                <Text style={[styles.tabIcon, { opacity: activeTab === 'profile' ? 1 : 0.6, color: activeTab === 'profile' ? activeTextColor : inactiveTextColor }]}>
-                  👤
+                <Text style={[styles.tabIcon, { opacity: showSettings ? 1 : 0.6, color: showSettings ? activeTextColor : inactiveTextColor }]}>
+                  ⚙️
                 </Text>
                 <Text style={[
                   styles.tabLabel, 
-                  { color: activeTab === 'profile' ? activeTextColor : inactiveTextColor }
+                  { color: showSettings ? activeTextColor : inactiveTextColor }
                 ]}>
-                  Mon Profil
+                  Paramètres
                 </Text>
               </TouchableOpacity>
             </View>
@@ -285,6 +303,15 @@ function MainApp() {
       <PremiumPaywallModal
         visible={showPaywall}
         onClose={() => setShowPaywall(false)}
+      />
+
+      {/* ⚙️ Settings Modal */}
+      <SettingsModal
+        visible={showSettings}
+        onClose={() => setShowSettings(false)}
+        onLogout={logout}
+        themeMode={themeMode}
+        masterEmail={masterEmail}
       />
 
       {/* 💬 POP-UP Feedback Quiz & Care Summary Modal Overlay */}
@@ -366,5 +393,46 @@ const styles = StyleSheet.create({
     fontSize: 7.5,
     fontWeight: '900',
     letterSpacing: 0.2,
+  },
+  adMobContainer: {
+    width: '100%',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adMobContainerLight: {
+    backgroundColor: '#F5F6FA',
+  },
+  adMobContainerDark: {
+    backgroundColor: '#0B0D17',
+  },
+  adMobBanner: {
+    width: '100%',
+    height: 50,
+    borderWidth: 1,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'column',
+  },
+  adMobBannerLight: {
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  adMobBannerDark: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  adMobLabel: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: colors.primary,
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  adMobTitle: {
+    fontSize: 11,
+    fontWeight: 'bold',
   },
 });

@@ -7,11 +7,19 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "@types/react": "~19.1.10",
     "expo": "~54.0.0",
+    "expo-apple-authentication": "~8.0.8",
+    "expo-auth-session": "~7.0.11",
     "expo-camera": "~17.0.10",
+    "expo-constants": "~18.0.13",
+    "expo-crypto": "~15.0.9",
+    "expo-dev-client": "~6.0.21",
     "expo-image-manipulator": "~14.0.8",
     "expo-image-picker": "~17.0.11",
+    "expo-location": "~19.0.8",
     "expo-notifications": "~0.32.17",
     "expo-status-bar": "~3.0.9",
+    "expo-updates": "~29.0.18",
+    "expo-web-browser": "~15.0.11",
     "firebase": "^12.14.0",
     "html5-qrcode": "^2.3.8",
     "react": "19.1.0",
@@ -23,14 +31,14 @@
     "typescript": "~5.9.2"
   },
   "devDependencies": {
-    "@types/react": "~19.2.2",
+    "@types/react": "~19.1.10",
     "@vercel/node": "^5.8.8",
-    "typescript": "~6.0.3"
+    "typescript": "~5.9.2"
   },
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web"
   },
   "private": true

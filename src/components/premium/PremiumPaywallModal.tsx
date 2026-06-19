@@ -28,23 +28,23 @@ export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visibl
   const benefits = [
     {
       icon: '🔬',
-      title: 'Analyse Totale & Profil Capillaire',
-      desc: 'Analyse moléculaire complète de la formule INCI et diagnostic personnalisé de compatibilité avec tes cuticules.',
+      title: 'Analyses & Dupes en Illimité',
+      desc: 'Fais sauter la limite des 5 scans par mois. Analyse tes produits et génère tes alternatives naturelles DIY sans aucune restriction.',
     },
     {
-      icon: '🌿',
-      title: 'Dupe Végétal DIY',
-      desc: 'Conçois une alternative saine, 100% naturelle et économique sous forme de recette maison sur-mesure pour ton type de cheveu.',
+      icon: '📷',
+      title: 'Rangement Rapide par Scan',
+      desc: 'Ne perds plus de temps à tout taper à la main. Remplis ton placard virtuel en flashant directement la photo ou le code-barres de tes flacons.',
     },
     {
       icon: '➕',
-      title: 'Ajouter à ma Salle de Bain',
-      desc: 'Enregistre ton produit dans ton placard virtuel pour que l\'IA intelligente l\'associe automatiquement à tes futurs soins du calendrier.',
+      title: 'Tableau de Bord & Budget Pro',
+      desc: 'Débloque le suivi en temps réel de ton budget cosmétique, ton coût à la dose et ta jauge d\'assiduité pour tes soins.',
     },
     {
       icon: '🗄️',
-      title: 'Est-ce que j\'ai un équivalent chez moi ?',
-      desc: 'Flashe un produit en magasin pour comparer sa formule et détecter instantanément si tu as déjà un doublon identique à la maison.',
+      title: 'Détecteur d\'Équivalents Anti-Gaspi',
+      desc: 'Flashe un produit en magasin pour savoir instantanément si tu as déjà un équivalent identique ou similaire qui t\'attend à la maison.',
     },
   ];
 
@@ -129,10 +129,10 @@ export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visibl
                 </View>
                 <View style={styles.planHeader}>
                   <Text style={[styles.planTitle, isDark ? styles.textLight : styles.textDark]}>Annuel</Text>
-                  <Text style={[styles.planPrice, styles.highlightText]}>39,99 € / an</Text>
+                  <Text style={[styles.planPrice, styles.highlightText]}>29,99 € / an</Text>
                 </View>
                 <Text style={[styles.planPeriod, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                  Soit 3,33 €/mois • Économise plus de 44% • 7 jours d'essai gratuit
+                  Soit 2,50 €/mois • Économise plus de 37% • 7 jours d'essai gratuit
                 </Text>
               </TouchableOpacity>
 
@@ -147,7 +147,7 @@ export const PremiumPaywallModal: React.FC<PremiumPaywallModalProps> = ({ visibl
               >
                 <View style={styles.planHeader}>
                   <Text style={[styles.planTitle, isDark ? styles.textLight : styles.textDark]}>Mensuel</Text>
-                  <Text style={[styles.planPrice, isDark ? styles.textLight : styles.textDark]}>5,99 € / mois</Text>
+                  <Text style={[styles.planPrice, isDark ? styles.textLight : styles.textDark]}>3,99 € / mois</Text>
                 </View>
                 <Text style={[styles.planPeriod, isDark ? styles.textMutedDark : styles.textMutedLight]}>
                   Annulable à tout moment • 7 jours d'essai gratuit

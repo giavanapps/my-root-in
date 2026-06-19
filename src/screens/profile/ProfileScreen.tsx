@@ -2,11 +2,50 @@ import React, { useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, TextInput, Modal, Alert, Dimensions, Platform, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
-import { useAppState, Profile } from '../../store/AppStateContext';
+import { useAppState, Profile, HairDiagnostic } from '../../store/AppStateContext';
 import { Button } from '../../components/common/Button';
 import { avatarList, avatarImageMap } from '../onboarding/DiagnosticScreen';
 
 const { width } = Dimensions.get('window');
+
+const fieldOptionsMap = {
+  texture: [
+    { value: 'Raides', label: 'Raides 📏', desc: 'Cheveux lisses, pas d\'ondulations' },
+    { value: 'Ondulés', label: 'Ondulés 🌊', desc: 'Forme en S détendue' },
+    { value: 'Bouclés', label: 'Bouclés 🌀', desc: 'Boucles spirales bien définies' },
+    { value: 'Frisés', label: 'Frisés 🌀✨', desc: 'Ressorts serrés, volume marqué' },
+    { value: 'Crépus', label: 'Crépus 🪮', desc: 'Boucles très serrées ou en Z' },
+    { value: 'Locksés', label: 'Locksés 👑', desc: 'Dreadlocks en évolution ou matures' },
+  ],
+  porosity: [
+    { value: 'Faible', label: 'Faible 💧', desc: 'Écailles fermées, l\'eau pénètre difficilement' },
+    { value: 'Moyenne', label: 'Moyenne 🌿', desc: 'Écailles équilibrées, hydratation idéale' },
+    { value: 'Forte', label: 'Forte 🔥', desc: 'Écailles très ouvertes, sèche très vite' },
+  ],
+  thickness: [
+    { value: 'Fins', label: 'Fins 📏', desc: 'Fibre délicate, s\'alourdit facilement' },
+    { value: 'Moyens', label: 'Moyens 📐', desc: 'Épaisseur standard, équilibrée' },
+    { value: 'Épais', label: 'Épais 🪵', desc: 'Forte densité, demande des soins riches' },
+  ],
+  activeStyle: [
+    { value: 'Naturel', label: 'Naturel 🥥', desc: 'Cheveux libres (afro, twist out, etc.)' },
+    { value: 'Coiffure protectrice', label: 'Coiffure protectrice 🪮', desc: 'Tresses, nattes, vanilles' },
+    { value: 'Locks en évolution', label: 'Locks en évolution 👑', desc: 'Dreadlocks' },
+  ],
+  scalpCondition: [
+    { value: 'Aucune de ces situations', label: 'Sain / Normal 💆‍♀️', desc: 'Pas de condition médicale' },
+    { value: 'Pellicules/Dermite séborrhéique', label: 'Pellicules / Dermite 🫧', desc: 'Desquamations ou démangeaisons' },
+    { value: 'Psoriasis', label: 'Psoriasis 🩹', desc: 'Plaques épaisses de peaux mortes' },
+    { value: 'Cuir chevelu très réactif/sensible', label: 'Très sensible ⚡', desc: 'Échauffements et tiraillements' },
+    { value: 'Alopécie/Chute importante', label: 'Alopécie / Chute 📉', desc: 'Perte de cheveux localisée ou diffuse' },
+  ],
+  sensitivity: [
+    { value: 'Cuir chevelu sensible', label: 'Cuir chevelu sensible ⚡', desc: 'Sujet aux irritations' },
+    { value: 'Casse/Fourches', label: 'Casse / Fourches ✂️', desc: 'Cheveux cassants ou pointes abîmées' },
+    { value: 'Naturels', label: 'Naturels 🌿', desc: 'Sans traitement chimique' },
+    { value: 'Traités chimiquement', label: 'Traités chimiquement 🧪', desc: 'Défrisés, colorés ou décolorés' },
+  ]
+};
 
 interface ProfileScreenProps {
   onRefireDiagnostic: () => void;
@@ -24,7 +63,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
     changeAvatar,
     deleteProfile,
     themeMode,
-    completePorosity
+    completePorosity,
+    updateDiagnostic
   } = useAppState();
 
   // Collapsible panels state
@@ -35,10 +75,32 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
   const [targetAvatarProfileId, setTargetAvatarProfileId] = useState<string | null>(null);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   
-  // Porosity edit modal state
-  const [showPorosityEditModal, setShowPorosityEditModal] = useState(false);
-
+  // Diagnostic edit modal state
+  const [editingField, setEditingField] = useState<'texture' | 'porosity' | 'thickness' | 'activeStyle' | 'scalpCondition' | 'sensitivity' | null>(null);
   if (!activeProfile) return null;
+
+  const handleSelectOption = (field: string, value: any) => {
+    if (field === 'porosity') {
+      completePorosity(value);
+      setEditingField(null);
+    } else if (field === 'sensitivity') {
+      const currentSens = activeProfile.diagnostic.sensitivity || [];
+      const updatedSens = currentSens.includes(value)
+        ? currentSens.filter((x: string) => x !== value)
+        : [...currentSens, value];
+      
+      updateDiagnostic({
+        ...activeProfile.diagnostic,
+        sensitivity: updatedSens
+      });
+    } else {
+      updateDiagnostic({
+        ...activeProfile.diagnostic,
+        [field]: value
+      });
+      setEditingField(null);
+    }
+  };
 
   const togglePanel = (panelName: string) => {
     setActivePanel(prev => prev === panelName ? null : panelName);
@@ -115,7 +177,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
       {/* 👤 TOP HORIZONTAL SELECTOR */}
       <View style={[styles.profileSelectorContainer, { backgroundColor: customCard, borderColor: customBorder }]}>
         <Text style={[styles.topLabel, { color: isLight ? '#888' : colors.textSecondary }]}>
-          Gérer les profils familiaux :
+          Gérer les profils :
         </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} nestedScrollEnabled={true} contentContainerStyle={styles.profileScroll}>
           {profiles.map(p => {
@@ -151,18 +213,47 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
         {/* 🌿 ACTIVE HAIR PROFILE CARD (Fiche d'identité capillaire) */}
         <View style={[styles.identityCard, { backgroundColor: customCard, borderColor: customBorder }]}>
           <View style={styles.identityHeader}>
-            {avatarImageMap[activeProfile.avatar] ? (
-              <Image
-                source={avatarImageMap[activeProfile.avatar]}
-                style={{ width: 70, height: 70, borderRadius: 35, marginRight: 16 }}
-                resizeMode="contain"
-              />
-            ) : (
-              <Text style={styles.identityEmoji}>{activeProfile.avatar}</Text>
-            )}
-            <View>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                setTargetAvatarProfileId(activeProfile.id);
+                setShowAvatarPicker(true);
+              }}
+            >
+              {avatarImageMap[activeProfile.avatar] ? (
+                <Image
+                  source={avatarImageMap[activeProfile.avatar]}
+                  style={{ width: 70, height: 70, borderRadius: 35, marginRight: 16 }}
+                  resizeMode="contain"
+                />
+              ) : (
+                <Text style={styles.identityEmoji}>{activeProfile.avatar}</Text>
+              )}
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
               <Text style={[styles.identityName, { color: customText }]}>{activeProfile.name}</Text>
               <Text style={styles.identitySub}>Identité capillaire active</Text>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setTargetAvatarProfileId(activeProfile.id);
+                  setShowAvatarPicker(true);
+                }}
+                style={{
+                  marginTop: 6,
+                  alignSelf: 'flex-start',
+                  backgroundColor: isLight ? 'rgba(229, 169, 130, 0.08)' : 'rgba(229, 169, 130, 0.15)',
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 8,
+                  borderWidth: 0.5,
+                  borderColor: colors.primary,
+                }}
+              >
+                <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '800' }}>
+                  🎭 Changer d'avatar
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
           
@@ -271,7 +362,133 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
           )}
         </View>
 
-        {/* 2. PARAMÈTRES CAPILLAIRES */}
+        {/* 2. SYNTHÈSE DU DIAGNOSTIC */}
+        <View style={[styles.accordionItem, { backgroundColor: customCard, borderColor: customBorder }]}>
+          <TouchableOpacity style={styles.accordionHeader} onPress={() => togglePanel('diagnostic_summary')}>
+            <Text style={[styles.accordionTitle, { color: customText }]}>📋 Synthèse de mon Diagnostic</Text>
+            <Text style={styles.accordionArrow}>{activePanel === 'diagnostic_summary' ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+          
+          {activePanel === 'diagnostic_summary' && (
+            <View style={styles.panelContent}>
+              <Text style={styles.panelDesc}>
+                Voici le détail de vos caractéristiques capillaires issues de votre diagnostic pour {activeProfile.name}. Appuyez sur une ligne pour la modifier directement :
+              </Text>
+              
+              <View style={styles.diagSummaryGrid}>
+                {/* Texture */}
+                <TouchableOpacity 
+                  style={[styles.diagSummaryItem, { borderBottomColor: customBorder }]}
+                  activeOpacity={0.7}
+                  onPress={() => setEditingField('texture')}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.diagSummaryLabel}>👩‍🦱 Texture de cheveux</Text>
+                    <Text style={[styles.diagSummaryValue, { color: customText }]}>
+                      {activeProfile.diagnostic.texture || 'Non renseignée'}
+                    </Text>
+                  </View>
+                  <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Modifier ➔</Text>
+                </TouchableOpacity>
+
+                {/* Porosité */}
+                <TouchableOpacity 
+                  style={[styles.diagSummaryItem, { borderBottomColor: customBorder }]}
+                  activeOpacity={0.7}
+                  onPress={() => setEditingField('porosity')}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.diagSummaryLabel}>💧 Porosité</Text>
+                    <Text style={[styles.diagSummaryValue, { color: colors.primary }]}>
+                      {activeProfile.diagnostic.porosity || 'Non renseignée'}
+                    </Text>
+                  </View>
+                  <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Modifier ➔</Text>
+                </TouchableOpacity>
+
+                {/* Épaisseur */}
+                <TouchableOpacity 
+                  style={[styles.diagSummaryItem, { borderBottomColor: customBorder }]}
+                  activeOpacity={0.7}
+                  onPress={() => setEditingField('thickness')}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.diagSummaryLabel}>📏 Épaisseur de la fibre</Text>
+                    <Text style={[styles.diagSummaryValue, { color: customText }]}>
+                      {activeProfile.diagnostic.thickness || 'Non renseignée'}
+                    </Text>
+                  </View>
+                  <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Modifier ➔</Text>
+                </TouchableOpacity>
+
+                {/* Style Actuel */}
+                <TouchableOpacity 
+                  style={[styles.diagSummaryItem, { borderBottomColor: customBorder }]}
+                  activeOpacity={0.7}
+                  onPress={() => setEditingField('activeStyle')}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.diagSummaryLabel}>🪮 Style / Coiffure actuelle</Text>
+                    <Text style={[styles.diagSummaryValue, { color: customText }]}>
+                      {activeProfile.diagnostic.activeStyle || 'Non renseigné'}
+                    </Text>
+                  </View>
+                  <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Modifier ➔</Text>
+                </TouchableOpacity>
+
+                {/* Cuir Chevelu */}
+                <TouchableOpacity 
+                  style={[styles.diagSummaryItem, { borderBottomColor: customBorder }]}
+                  activeOpacity={0.7}
+                  onPress={() => setEditingField('scalpCondition')}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.diagSummaryLabel}>💆‍♀️ État du cuir chevelu</Text>
+                    <Text style={[styles.diagSummaryValue, { color: customText }]}>
+                      {activeProfile.diagnostic.scalpCondition || 'Sain / Normal'}
+                    </Text>
+                  </View>
+                  <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Modifier ➔</Text>
+                </TouchableOpacity>
+
+                {/* Sensibilité & Besoins */}
+                <TouchableOpacity 
+                  style={[styles.diagSummaryItem, { borderBottomWidth: 0, flexDirection: 'row', alignItems: 'center' }]}
+                  activeOpacity={0.7}
+                  onPress={() => setEditingField('sensitivity')}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.diagSummaryLabel}>🎯 Sensibilités / Besoins ciblés</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                      {activeProfile.diagnostic.sensitivity && activeProfile.diagnostic.sensitivity.length > 0 ? (
+                        activeProfile.diagnostic.sensitivity.map((sens: string, idx: number) => (
+                          <View 
+                            key={idx} 
+                            style={{ 
+                              backgroundColor: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.04)', 
+                              borderRadius: 8, 
+                              paddingHorizontal: 8, 
+                              paddingVertical: 4, 
+                              borderWidth: 0.5, 
+                              borderColor: customBorder 
+                            }}
+                          >
+                            <Text style={{ fontSize: 11, color: customText, fontWeight: '600' }}>{sens}</Text>
+                          </View>
+                        ))
+                      ) : (
+                        <Text style={[styles.diagSummaryValue, { color: customText }]}>Aucun besoin particulier</Text>
+                      )}
+                    </View>
+                  </View>
+                  <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Modifier ➔</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* 3. PARAMÈTRES CAPILLAIRES */}
         <View style={[styles.accordionItem, { backgroundColor: customCard, borderColor: customBorder }]}>
           <TouchableOpacity style={styles.accordionHeader} onPress={() => togglePanel('hair')}>
             <Text style={[styles.accordionTitle, { color: customText }]}>🔬 Paramètres Capillaires</Text>
@@ -291,7 +508,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
               />
               <Button
                 title="💧 Modifier uniquement la porosité"
-                onPress={() => setShowPorosityEditModal(true)}
+                onPress={() => setEditingField('porosity')}
                 variant="secondary"
                 style={styles.hairOptionBtn}
               />
@@ -357,60 +574,73 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onRefireDiagnostic
         </View>
       </Modal>
 
-      {/* 💧 EDIT POROSITY MODAL */}
+      {/* 🔮 UNIFIED DIAGNOSTIC EDIT MODAL */}
       <Modal
-        visible={showPorosityEditModal}
+        visible={editingField !== null}
         transparent={true}
         animationType="fade"
+        onRequestClose={() => setEditingField(null)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>🔬 Modifier la porosité</Text>
+            <Text style={styles.modalTitle}>
+              {editingField === 'texture' && '👩‍🦱 Modifier la texture'}
+              {editingField === 'porosity' && '💧 Modifier la porosité'}
+              {editingField === 'thickness' && '📏 Modifier l\'épaisseur'}
+              {editingField === 'activeStyle' && '✨ Modifier le style actuel'}
+              {editingField === 'scalpCondition' && '💆‍♀️ État du cuir chevelu'}
+              {editingField === 'sensitivity' && '🎯 Sensibilités & Besoins'}
+            </Text>
             
-            <View style={styles.modalOptionsContainer}>
-              <TouchableOpacity
-                style={[styles.modalOptionPill, { borderColor: colors.porosityLow }]}
-                onPress={() => {
-                  completePorosity('Faible');
-                  setShowPorosityEditModal(false);
-                  Alert.alert('Porosité modifiée', 'Votre profil est désormais réglé sur porosité Faible.');
-                }}
-              >
-                <Text style={styles.modalOptionEmoji}>🌊</Text>
-                <Text style={styles.modalOptionLabel}>Porosité Faible</Text>
-              </TouchableOpacity>
+            <ScrollView style={styles.avatarScrollView}>
+              <View style={styles.modalOptionsContainer}>
+                {editingField && (fieldOptionsMap as any)[editingField]?.map((opt: any) => {
+                  let isActive = false;
+                  if (editingField === 'sensitivity') {
+                    isActive = (activeProfile.diagnostic.sensitivity || []).includes(opt.value);
+                  } else {
+                    isActive = activeProfile.diagnostic[editingField] === opt.value;
+                  }
 
-              <TouchableOpacity
-                style={[styles.modalOptionPill, { borderColor: colors.porosityMedium }]}
-                onPress={() => {
-                  completePorosity('Moyenne');
-                  setShowPorosityEditModal(false);
-                  Alert.alert('Porosité modifiée', 'Votre profil est désormais réglé sur porosité Moyenne.');
-                }}
-              >
-                <Text style={styles.modalOptionEmoji}>🌿</Text>
-                <Text style={styles.modalOptionLabel}>Porosité Moyenne</Text>
-              </TouchableOpacity>
+                  return (
+                    <TouchableOpacity
+                      key={opt.value}
+                      style={[
+                        styles.modalOptionPill, 
+                        { 
+                          borderColor: isActive ? colors.primary : customBorder,
+                          backgroundColor: isActive ? (isLight ? 'rgba(229, 169, 130, 0.06)' : 'rgba(229, 169, 130, 0.1)') : 'rgba(255, 255, 255, 0.02)'
+                        }
+                      ]}
+                      onPress={() => handleSelectOption(editingField, opt.value)}
+                    >
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <Text style={[styles.modalOptionLabel, { color: isActive ? colors.primary : customText }]}>
+                          {opt.label}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: isLight ? '#666' : colors.textSecondary, marginTop: 2 }}>
+                          {opt.desc}
+                        </Text>
+                      </View>
+                      {editingField === 'sensitivity' && (
+                        <Text style={{ fontSize: 18, color: colors.primary }}>
+                          {isActive ? '✅' : '⬜'}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
 
-              <TouchableOpacity
-                style={[styles.modalOptionPill, { borderColor: colors.porosityHigh }]}
-                onPress={() => {
-                  completePorosity('Forte');
-                  setShowPorosityEditModal(false);
-                  Alert.alert('Porosité modifiée', 'Votre profil est désormais réglé sur porosité Forte.');
-                }}
-              >
-                <Text style={styles.modalOptionEmoji}>🔥</Text>
-                <Text style={styles.modalOptionLabel}>Porosité Forte</Text>
-              </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+              <Button
+                title={editingField === 'sensitivity' ? "Terminer" : "Fermer"}
+                onPress={() => setEditingField(null)}
+                variant="primary"
+                style={{ flex: 1, marginVertical: 0 }}
+              />
             </View>
-
-            <Button
-              title="Annuler"
-              onPress={() => setShowPorosityEditModal(false)}
-              variant="outline"
-              style={styles.modalCloseBtn}
-            />
           </View>
         </View>
       </Modal>
@@ -752,5 +982,24 @@ const styles = StyleSheet.create({
   bottomActionBtn: {
     marginVertical: 0,
     paddingVertical: 14,
+  },
+  diagSummaryGrid: {
+    marginTop: 4,
+  },
+  diagSummaryItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 0.5,
+  },
+  diagSummaryLabel: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  diagSummaryValue: {
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

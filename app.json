@@ -2,12 +2,43 @@
   "expo": {
     "name": "my-root-in",
     "slug": "my-root-in",
+    "scheme": [
+      "myrootin",
+      "com.googleusercontent.apps.907074249813-f135370i5o54jsq44s7mf65it2vavvva"
+    ],
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.myrootin.app",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.907074249813-f135370i5o54jsq44s7mf65it2vavvva"
+            ]
+          },
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.907074249813-f135370i5o54jsq44s7mf65it2vavvva"
+            ]
+          },
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.907074249813-f135370i5o54jsq44s7mf65it2vavvva"
+            ]
+          },
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.907074249813-f135370i5o54jsq44s7mf65it2vavvva"
+            ]
+          }
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.myrootin.app",
@@ -23,10 +54,24 @@
         "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.CAMERA",
         "android.permission.POST_NOTIFICATIONS",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "L'application a besoin d'accéder à votre position pour afficher la météo locale et adapter vos conseils capillaires."
+        }
+      ],
       [
         "expo-image-picker",
         {
@@ -48,7 +93,9 @@
           "cameraPermission": "L'application a besoin d'accéder à l'appareil photo pour scanner les codes-barres.",
           "barcodeScannerEnabled": true
         }
-      ]
+      ],
+      "expo-web-browser",
+      "expo-apple-authentication"
     ],
     "web": {
       "favicon": "./assets/favicon.png"
@@ -58,6 +105,12 @@
         "projectId": "64ccbbe6-2d8e-49b0-a6e9-7ee02996e327"
       }
     },
-    "owner": "eustachedesign"
+    "owner": "eustachedesign",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/64ccbbe6-2d8e-49b0-a6e9-7ee02996e327"
+    }
   }
 }

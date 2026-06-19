@@ -11,6 +11,7 @@ export interface RoutineItem {
   completed: boolean;
   reminderTime?: string;
   isCustom?: boolean;
+  selectedProductId?: string;
 }
 
 export const NotificationService = {

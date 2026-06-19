@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, Modal, TouchableOpacity, ScrollView, Animated, ActivityIndicator, Image, TextInput, Platform, Alert, PanResponder } from 'react-native';
 import { colors, borderRadius, spacing } from '../../theme/colors';
-import { useAppState } from '../../store/AppStateContext';
+import { useAppState, evaluateProductCompatibility } from '../../store/AppStateContext';
+import { PremiumPaywallModal } from './PremiumPaywallModal';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { CameraView, Camera } from 'expo-camera';
@@ -10,6 +11,7 @@ interface ProductScannerModalProps {
   visible: boolean;
   onClose: () => void;
   directPlacardMode?: boolean;
+  initialStep?: 'idle' | 'manual_free';
 }
 
 interface MockProduct {
@@ -124,7 +126,7 @@ export const matchesCategory = (prodCat: string, agendaCat: string, prodName?: s
   if (pc === 'autre' || pc === '') return false;
 
   // Détecteur gel/cire (utilisé pour protéger masque et bain d’huile uniquement)
-  const isHeavyGel = name.includes('cire') || name.includes('wax') || name.includes('petrolatum') || name.includes('pétrolatum');
+  const isHeavyGel = name.includes('cire') || name.includes('wax') || name.includes('petrolatum') || name.includes('pétrolatum') || name.includes('gel') || name.includes('gelée') || name.includes('jelly');
 
   if (ac.includes('bain') || ac.includes('huile')) {
     if (isHeavyGel) return false;
@@ -385,7 +387,7 @@ const compressImageWeb = (base64Str: string, maxWidth = 1024, maxHeight = 1024, 
   });
 };
 
-export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visible, onClose, directPlacardMode }) => {
+export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visible, onClose, directPlacardMode, initialStep }) => {
   const { 
     activeProfile, 
     themeMode, 
@@ -395,9 +397,27 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     activeProfileId,
     scanHistory,
     addScanHistoryItem,
-    deleteScanHistoryItem
+    deleteScanHistoryItem,
+    isPremium,
+    freeScansLeft,
+    consumeScanCredit
   } = useAppState();
   const isDark = themeMode === 'dark';
+  const customText = isDark ? colors.textPrimary : '#1C1E26';
+  const customBorder = isDark ? colors.cardBorder : 'rgba(0, 0, 0, 0.08)';
+
+  // Free manual add states
+  const [manualFreeName, setManualFreeName] = useState('');
+  const [manualFreeBrand, setManualFreeBrand] = useState('');
+  const [manualFreeCategory, setManualFreeCategory] = useState('Lavage');
+  const [manualFreePrice, setManualFreePrice] = useState('');
+  const [manualFreePhoto, setManualFreePhoto] = useState<string | null>(null);
+  const [showManualFreeDropdown, setShowManualFreeDropdown] = useState(false);
+
+  const [isAnalyzingCompatibility, setIsAnalyzingCompatibility] = useState(false);
+  const [compatibilityResult, setCompatibilityResult] = useState<{ isCompatible: boolean; status: string; explanation: string } | null>(null);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [hasPrefilledPrice, setHasPrefilledPrice] = useState(false);
 
   const showAppAlert = (title: string, message: string) => {
     if (Platform.OS === 'web') {
@@ -437,7 +457,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     }
   };
 
-  const [scanStep, setScanStep] = useState<'idle' | 'scanning' | 'result' | 'scan_error' | 'not_recognized' | 'manual_express'>('idle');
+  const [scanStep, setScanStep] = useState<'idle' | 'scanning' | 'result' | 'scan_error' | 'not_recognized' | 'manual_express' | 'manual_free'>('idle');
   const [activeFeatureTab, setActiveFeatureTab] = useState<'inci' | 'add' | 'compare' | 'diy'>('inci');
   const [selectedProduct, setSelectedProduct] = useState<MockProduct | null>(null);
   const [showFullHistory, setShowFullHistory] = useState(false);
@@ -475,6 +495,9 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   const [manualType, setManualType] = useState('Shampoing');
   const [isSubmittingManual, setIsSubmittingManual] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [priceStr, setPriceStr] = useState('');
+  const [justAdded, setJustAdded] = useState(false); // true = added in THIS session
+  const [manualExpressPhoto, setManualExpressPhoto] = useState<string | null>(null);
 
   // Animation laser
   const laserAnim = useRef(new Animated.Value(0)).current;
@@ -483,7 +506,10 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   // Reset scanner mode when the modal is closed
   useEffect(() => {
     if (visible) {
-      if (directPlacardMode) {
+      if (initialStep === 'manual_free') {
+        setScanStep('manual_free');
+        setActiveFeatureTab('add');
+      } else if (directPlacardMode) {
         setActiveFeatureTab('add');
         // In bathroom mode: show method choice (photo OR barcode) — don’t force photo only
         setScannerMode('select_method');
@@ -494,7 +520,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     } else {
       handleReset();
     }
-  }, [visible, directPlacardMode]);
+  }, [visible, directPlacardMode, initialStep]);
 
   // GARDE SALLE DE BAIN : intercepte tout setScannerMode(null) en directPlacardMode
   // → redirige vers select_method (choix photo/barcode) au lieu du menu 4 fonctions
@@ -504,6 +530,27 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     }
   }, [scannerMode, directPlacardMode, visible]);
 
+  // Pre-fill price for Premium users
+  useEffect(() => {
+    if (visible && isPremium && activeFeatureTab === 'add' && scanStep === 'result' && !hasPrefilledPrice) {
+      const displayBrand = realProductAnalysis?.brand || selectedProduct?.brand || '';
+      const getEstimatedPrice = () => {
+        if (realProductAnalysis?.estimatedPrice != null) {
+          return realProductAnalysis.estimatedPrice;
+        }
+        const b = displayBrand.toLowerCase();
+        if (b.includes('shea moisture')) return 14.99;
+        if (b.includes('cantu')) return 9.99;
+        if (b.includes('activilong')) return 11.99;
+        if (b.includes('jamaican') || b.includes('mango') || b.includes('lime')) return 10.99;
+        return 12.50;
+      };
+      const est = getEstimatedPrice();
+      setPriceStr(est.toString());
+      setHasPrefilledPrice(true);
+    }
+  }, [visible, isPremium, activeFeatureTab, scanStep, realProductAnalysis, selectedProduct, hasPrefilledPrice]);
+
   const html5QrCodeRef = useRef<any>(null);
 
   useEffect(() => {
@@ -512,13 +559,13 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
       Animated.loop(
         Animated.sequence([
           Animated.timing(laserAnim, {
-            toValue: 200,
-            duration: 1200,
+            toValue: 300,
+            duration: 1500,
             useNativeDriver: true,
           }),
           Animated.timing(laserAnim, {
             toValue: 0,
-            duration: 1200,
+            duration: 1500,
             useNativeDriver: true,
           }),
         ])
@@ -820,6 +867,66 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     }
   };
 
+  const takePhotoWithNativeApp = async (step: 'front' | 'back') => {
+    setSelectedProduct(null);
+    setRealProductAnalysis(null);
+    setRealProductError(null);
+
+    try {
+      setIsCameraLoading(true);
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        showAppAlert("Permissions requises", "Nous avons besoin d'accéder à l'appareil photo du téléphone pour analyser ton produit.");
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.6,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const asset = result.assets[0];
+        
+        let base64Str = asset.base64;
+        try {
+          const manipResult = await ImageManipulator.manipulateAsync(
+            asset.uri,
+            [{ resize: { width: 1024 } }],
+            { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+          );
+          base64Str = manipResult.base64 || base64Str;
+        } catch (manipErr) {
+          console.warn("Native Image manipulation failed:", manipErr);
+        }
+
+        if (!base64Str) {
+          throw new Error("Impossible de récupérer la photo.");
+        }
+
+        const base64Data = `data:image/jpeg;base64,${base64Str}`;
+        
+        if (step === 'front') {
+          setFrontPhoto(base64Data);
+          frontPhotoRef.current = base64Data;
+          setCaptureStep('back');
+        } else {
+          setBackPhoto(base64Data);
+          setIsAnalyzingReal(true);
+          setScanStep('scanning');
+          await uploadAndAnalyzeDouble(frontPhotoRef.current || frontPhoto || base64Data, base64Data);
+        }
+      }
+    } catch (err: any) {
+      console.error("Native camera error:", err);
+      showAppAlert("Erreur", err.message || "Impossible d'utiliser l'appareil photo natif.");
+    } finally {
+      setIsCameraLoading(false);
+    }
+  };
+
   const handleRetryScan = () => {
     setFrontPhoto(null);
     setBackPhoto(null);
@@ -828,6 +935,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     setScanned(false);
     cameraKey.current += 1;
     scanAllowedTime.current = Date.now() + 1000;
+    setRealProductError(null);
     setScanStep('idle');
     
     if (scannerMode === 'photo' && Platform.OS === 'web') {
@@ -900,6 +1008,9 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
       // Toujours utiliser l'URL absolue de Vercel car les URLs relatives échouent sur l'APK natif !
       const apiUrl = 'https://my-root-in-nine.vercel.app/api/scan';
       
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 40000); // 40s timeout
+
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -910,8 +1021,11 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
           backImage: back,
           texture: activeProfile?.diagnostic?.texture || 'Crépus',
           porosity: activeProfile?.diagnostic?.porosity || 'Moyenne'
-        })
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errData = await response.json();
@@ -921,13 +1035,22 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
       const result = await response.json();
       // Produit non reconnu par l'IA — ne jamais afficher une analyse inventée
       if (result.recognized === false) {
-        setScanStep('not_recognized');
+        if (result.reason === 'blurry') {
+          setRealProductError("La photo de la composition (au dos) est trop floue ou illisible. Essaie de reculer un peu (15-20 cm) et d'assurer une bonne lumière, ou utilise l'appareil photo du téléphone.");
+          setScanStep('scan_error');
+        } else if (result.reason === 'not_hair') {
+          setRealProductError("Ce produit n'a pas été identifié comme un produit capillaire. Pour rappel, My Root'In ne décrypte que les shampoings, soins, huiles ou gels pour cheveux.");
+          setScanStep('scan_error');
+        } else {
+          setScanStep('not_recognized');
+        }
         return;
       }
 
       const displayImage = front || 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop';
       result.image = displayImage;
       setRealProductAnalysis(result);
+      consumeScanCredit();
       addScanHistoryItem({
         brand: result.brand || 'Marque Inconnue',
         name: result.name || 'Produit Inconnu',
@@ -942,7 +1065,10 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
       setScanStep('result');
     } catch (err: any) {
       console.error('Scan failed:', err);
-      const errMsg = err.message || 'Impossible d\'analyser ces photos. Vérifie ta connexion ou ta clé d\'API Gemini.';
+      const isAbort = err.name === 'AbortError' || err.message?.includes('aborted');
+      const errMsg = isAbort
+        ? "Délai d'attente dépassé (connexion trop lente). Réessaie dans quelques instants."
+        : (err.message || 'Impossible d\'analyser ces photos. Vérifie ta connexion ou ta clé d\'API Gemini.');
       setRealProductError(errMsg);
       setScanStep('scan_error');
     } finally {
@@ -953,12 +1079,17 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
   // ─── Shared API call helper with timeout + quota error handling ─────────
   const callScanAPI = async (payload: Record<string, any>): Promise<any> => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 40000); // 40s timeout
 
     try {
-      const response = await fetch('https://my-root-in-nine.vercel.app/api/scan', {
+      const cacheBust = Date.now();
+      const response = await fetch(`https://my-root-in-nine.vercel.app/api/scan?v=${cacheBust}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache',
+        },
         body: JSON.stringify(payload),
         signal: controller.signal,
       });
@@ -972,7 +1103,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
       }
 
       if (!response.ok) {
-        throw new Error(data?.details || data?.error || `Erreur serveur ${response.status}`);
+        throw new Error(data?.error || data?.details || `Erreur serveur ${response.status}`);
       }
 
       return data;
@@ -1115,6 +1246,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
       analysisResult.image = displayImage;
 
       setRealProductAnalysis(analysisResult);
+      consumeScanCredit();
       addScanHistoryItem({
         brand: analysisResult.brand || 'Marque Inconnue',
         name: analysisResult.name || 'Produit Inconnu',
@@ -1165,9 +1297,11 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
         porosity: activeProfile?.diagnostic?.porosity || 'Moyenne'
       });
 
-      const displayImage = 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop';
+      const defaultImage = 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop';
+      const displayImage = manualExpressPhoto || defaultImage;
       result.image = displayImage;
       setRealProductAnalysis(result);
+      consumeScanCredit();
       addScanHistoryItem({
         brand: result.brand || manualBrand.trim() || 'Marque Inconnue',
         name: result.name || manualName.trim() || 'Produit Inconnu',
@@ -1202,6 +1336,231 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     }
   };
 
+  const captureManualFreePhoto = async (useGallery: boolean) => {
+    try {
+      if (Platform.OS === 'web') {
+        if (typeof document === 'undefined') return;
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        if (!useGallery) {
+          input.capture = 'environment';
+        }
+        input.onchange = async (e: any) => {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = async () => {
+              const rawBase64 = reader.result as string;
+              const base64Data = await compressImageWeb(rawBase64);
+              setManualFreePhoto(base64Data);
+            };
+            reader.readAsDataURL(file);
+          }
+        };
+        input.click();
+      } else {
+        const { status } = useGallery 
+          ? await ImagePicker.requestMediaLibraryPermissionsAsync()
+          : await ImagePicker.requestCameraPermissionsAsync();
+          
+        if (status !== 'granted') {
+          showAppAlert(
+            "Permissions requises", 
+            useGallery 
+              ? "Désolé, nous avons besoin de l'accès à ta galerie photo pour importer une image."
+              : "Désolé, nous avons besoin des permissions d'appareil photo pour prendre une photo."
+          );
+          return;
+        }
+
+        const result = useGallery
+          ? await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.5,
+              base64: true,
+            })
+          : await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.5,
+              base64: true,
+            });
+
+        if (!result.canceled && result.assets && result.assets[0]) {
+          const asset = result.assets[0];
+          const manipResult = await ImageManipulator.manipulateAsync(
+            asset.uri,
+            [{ resize: { width: 400, height: 400 } }],
+            { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+          );
+          const base64Str = manipResult.base64 || asset.base64;
+          if (base64Str) {
+            setManualFreePhoto(`data:image/jpeg;base64,${base64Str}`);
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error("Error capturing manual free photo:", err);
+      showAppAlert("Erreur", "Une erreur est survenue lors de la récupération de la photo.");
+    }
+  };
+
+  const captureManualExpressPhoto = async (useGallery: boolean) => {
+    try {
+      if (Platform.OS === 'web') {
+        if (typeof document === 'undefined') return;
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        if (!useGallery) {
+          input.capture = 'environment';
+        }
+        input.onchange = async (e: any) => {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = async () => {
+              const rawBase64 = reader.result as string;
+              const base64Data = await compressImageWeb(rawBase64);
+              setManualExpressPhoto(base64Data);
+            };
+            reader.readAsDataURL(file);
+          }
+        };
+        input.click();
+      } else {
+        const { status } = useGallery 
+          ? await ImagePicker.requestMediaLibraryPermissionsAsync()
+          : await ImagePicker.requestCameraPermissionsAsync();
+          
+        if (status !== 'granted') {
+          showAppAlert(
+            "Permissions requises", 
+            useGallery 
+              ? "Désolé, nous avons besoin de l'accès à ta galerie photo pour importer une image."
+              : "Désolé, nous avons besoin des permissions d'appareil photo pour prendre une photo."
+          );
+          return;
+        }
+
+        const result = useGallery
+          ? await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.5,
+              base64: true,
+            })
+          : await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.5,
+              base64: true,
+            });
+
+        if (!result.canceled && result.assets && result.assets[0]) {
+          const asset = result.assets[0];
+          const manipResult = await ImageManipulator.manipulateAsync(
+            asset.uri,
+            [{ resize: { width: 400, height: 400 } }],
+            { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+          );
+          const base64Str = manipResult.base64 || asset.base64;
+          if (base64Str) {
+            setManualExpressPhoto(`data:image/jpeg;base64,${base64Str}`);
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error("Error capturing manual express photo:", err);
+      showAppAlert("Erreur", "Une erreur est survenue lors de la récupération de la photo.");
+    }
+  };
+
+  const handleCompatibilityAnalysis = async () => {
+    if (!manualFreeBrand.trim() || !manualFreeName.trim()) {
+      showAppAlert("Saisie incomplète", "Veuillez renseigner la marque et le nom du produit pour lancer l'analyse de compatibilité.");
+      return;
+    }
+
+    setIsAnalyzingCompatibility(true);
+    setCompatibilityResult(null);
+
+    try {
+      const result = await callScanAPI({
+        manualBrand: manualFreeBrand.trim(),
+        manualName: manualFreeName.trim(),
+        manualType: manualFreeCategory,
+        texture: activeProfile?.diagnostic?.texture || 'Crépus',
+        porosity: activeProfile?.diagnostic?.porosity || 'Moyenne',
+        thickness: activeProfile?.diagnostic?.thickness || 'Moyens',
+        checkCompatibilityOnly: true,
+      });
+
+      if (result && result.explanation) {
+        setCompatibilityResult({
+          isCompatible: result.isCompatible === true || result.isCompatible === 'true',
+          status: result.status || (result.isCompatible ? 'Compatible' : 'Attention'),
+          explanation: result.explanation,
+        });
+      } else {
+        showAppAlert("Erreur d'analyse", "L'IA n'a pas pu analyser la compatibilité de ce produit. Veuillez réessayer.");
+      }
+    } catch (err: any) {
+      console.error("Error analyzing manual compatibility:", err);
+      showAppAlert("Erreur d'analyse", err.message || "Une erreur est survenue lors de l'analyse.");
+    } finally {
+      setIsAnalyzingCompatibility(false);
+    }
+  };
+
+  const handleManualFreeSubmit = () => {
+    if (!manualFreeBrand.trim() || !manualFreeName.trim()) {
+      showAppAlert("Saisie incomplète", "Veuillez renseigner la marque et le nom du produit.");
+      return;
+    }
+
+    const priceVal = manualFreePrice.trim() ? parseFloat(manualFreePrice.trim().replace(',', '.')) : undefined;
+    if (priceVal !== undefined && isNaN(priceVal)) {
+      showAppAlert("Prix invalide", "Veuillez renseigner un prix valide (ex: 12.99).");
+      return;
+    }
+
+    const defaultImage = 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop';
+    
+    const isComp = compatibilityResult ? compatibilityResult.isCompatible : true;
+    const compatStatus = compatibilityResult ? (compatibilityResult.status === 'Compatible' ? 'Compatible' : 'Attention') : 'Compatible';
+    const explanation = compatibilityResult?.explanation || undefined;
+
+    // Add product to the user's placard/bathroom
+    addBathroomProduct({
+      brand: manualFreeBrand.trim(),
+      name: manualFreeName.trim(),
+      category: manualFreeCategory,
+      price: priceVal,
+      image: manualFreePhoto || defaultImage,
+      ingredients: [],
+      score: 100,
+      compatibility: compatStatus,
+      compatibilityExplanation: explanation,
+      aiAnalyzed: !!compatibilityResult,
+      inciReport: {
+        good: [],
+        neutral: [],
+        avoid: []
+      }
+    }, true);
+
+    showAppAlert("Produit ajouté", `${manualFreeBrand.trim()} - ${manualFreeName.trim()} a bien été ajouté à ton placard.`);
+    handleReset();
+    onClose();
+  };
+
   const handleReset = () => {
     setSelectedProduct(null);
     setRealProductAnalysis(null);
@@ -1221,10 +1580,23 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     setManualType('Shampoing');
     setIsSubmittingManual(false);
     setShowDropdown(false);
+    setPriceStr('');
+    setJustAdded(false);
+    setManualExpressPhoto(null);
     setFrontPhoto(null);
     setBackPhoto(null);
     setCaptureStep('front');
     frontPhotoRef.current = null;
+    setManualFreeBrand('');
+    setManualFreeName('');
+    setManualFreeCategory('Lavage');
+    setManualFreePrice('');
+    setManualFreePhoto(null);
+    setShowManualFreeDropdown(false);
+    setIsAnalyzingCompatibility(false);
+    setCompatibilityResult(null);
+    setShowPaywall(false);
+    setHasPrefilledPrice(false);
     // Increment key to force a full CameraView remount (resets native engine)
     cameraKey.current += 1;
     setScanned(false);
@@ -1273,69 +1645,22 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
 
   // Generate Personalized Capillary Diagnostic Report
   const getCompatibilityAnalysis = (product: MockProduct) => {
-    const texture = activeProfile?.diagnostic?.texture || 'Crépus';
-    const porosity = activeProfile?.diagnostic?.porosity || 'Moyenne';
-
-    let score = 80;
-    let title = 'Très Compatible 🌿';
-    let color = colors.success;
-    let description = '';
-
-    if (product.id === 'jamaican_mango_lime') {
-      if (texture === 'Locksés') {
-        score = 92;
-        title = 'Excellent pour tes locks ! 🔒';
-        color = colors.success;
-        description = 'Ce gel de locking est formulé sans cire lourde ni vaseline occlusive. Il est soluble dans l\'eau, ce qui évite les accumulations blanches résiduelles (build-ups) à l\'intérieur de tes locks. Un excellent choix pour former tes départs ou resserrer tes racines ! Attention tout de même aux conservateurs synthétiques si ton cuir chevelu est très sensible.';
-      } else {
-        score = 55;
-        title = 'Hold trop rigide pour cheveux libres ⚠️';
-        color = colors.warning;
-        description = 'Bien que très propre et soluble pour les locks, ce gel a un effet carton extrêmement rigide sur cheveux libres (crépus, bouclés). Il risque d\'assécher tes boucles libres à cause des agents fixateurs forts. Privilégie un lait ou une crème hydratante douce.';
-      }
-    } 
-    
-    else if (product.id === 'cantu_styling_wax') {
-      if (texture === 'Locksés') {
-        score = 15;
-        title = 'DANGEREUX / RÉSIDUS SOLIDES 🚨';
-        color = colors.danger;
-        description = 'AVERTISSEMENT : Ce produit contient de la cire microcristalline et de l\'huile minérale (paraffine). Ces cires occlusives lourdes sont insolubles à l\'eau et s\'accumulent au cœur des locks sans jamais s\'en aller au lavage. Cela crée des résidus blancs disgracieux et peut emprisonner l\'humidité, causant de la moisissure interne (dread rot). À fuir absolument pour ton profil Locks !';
-      } else {
-        score = 45;
-        title = 'Lourd & Occlusif ⚠️';
-        color = colors.warning;
-        description = 'Ce produit contient beaucoup d\'huiles minérales lourdes. Sur cheveux libres, il étouffe les cuticules et empêche l\'eau d\'y entrer. Idéal uniquement pour des tresses très temporaires mais nécessite une clarification forte immédiatement après.';
-      }
-    } 
-    
-    else if (product.id === 'shea_coconut_smoothie') {
-      if (porosity === 'Faible') {
-        score = 48;
-        title = 'Risque de saturation (Porosité Faible) ⚠️';
-        color = colors.warning;
-        description = 'Ton profil indique une porosité faible. Les huiles lourdes de coco et le beurre de karité de ce smoothie possèdent de très grosses molécules lipidiques. Sur tes écailles fermées, ils vont simplement stagner en surface, saturer ta fibre et poisser tes cheveux sans les hydrater. Privilégie des laits fluides légers à base d\'huile de jojoba ou d\'argan.';
-      } else if (porosity === 'Forte') {
-        score = 94;
-        title = 'Soin Scellant Parfait (Porosité Forte) 🏆';
-        color = colors.success;
-        description = 'Génial ! Tes cuticules étant très ouvertes (porosité forte), ce smoothie ultra-riche en protéines de soie et en beurre de karité est idéal pour colmater les brèches, nourrir tes cheveux en profondeur et sceller l\'hydratation durablement.';
-      } else {
-        score = 80;
-        title = 'Soin Riche Hydratant 🌿';
-        color = colors.success;
-        description = 'Ce produit riche en nutriments est très adapté à ton cheveu. Utilise-le avec parcimonie pour éviter d\'alourdir tes boucles, de préférence après ton leave-in liquide.';
-      }
-    } 
-    
-    else if (product.id === 'activilong_shampoing') {
-      score = 96;
-      title = 'Compatible à 100% avec ta routine ! 🌿';
-      color = colors.success;
-      description = 'Ce shampoing doux d\'Activilong est un sans-faute absolu. Formulé avec du jus d\'aloe vera et de l\'huile de carapate (castor oil) ultra-nourrissante, il nettoie sans décaper ton cuir chevelu. Il convient aussi bien aux locksés (aucun résidu solide) qu\'aux cheveux crépus libres, préservant le sébum naturel.';
+    if (!activeProfile) {
+      return { score: 80, title: 'Très Compatible 🌿', color: colors.success, description: '' };
     }
-
-    return { score, title, color, description };
+    const evalResult = evaluateProductCompatibility(
+      product.brand,
+      product.name,
+      detectCategory(product.name, product.brand),
+      product.ingredients || [],
+      activeProfile.diagnostic
+    );
+    return {
+      score: evalResult.score,
+      title: evalResult.title,
+      color: evalResult.color,
+      description: evalResult.description
+    };
   };
 
   return (
@@ -1357,6 +1682,24 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
               <TouchableOpacity onPress={handleReset} style={styles.headerLeftButton}>
                 <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 13 }}>⬅️ Nouveau Scan</Text>
               </TouchableOpacity>
+            ) : (scanStep === 'manual_free' || scanStep === 'manual_express') ? (
+              <TouchableOpacity 
+                onPress={() => {
+                  if (scanStep === 'manual_express') {
+                    setScanStep('idle');
+                    if (activeFeatureTab === 'diy') {
+                      setScannerMode('diy_select');
+                    } else {
+                      setScannerMode('select_method');
+                    }
+                  } else {
+                    handleReset();
+                  }
+                }} 
+                style={styles.headerLeftButton}
+              >
+                <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 13 }}>⬅️ Retour</Text>
+              </TouchableOpacity>
             ) : scanStep === 'idle' && scannerMode !== null && !directPlacardMode ? (
               <TouchableOpacity 
                 onPress={() => {
@@ -1373,7 +1716,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
             ) : (
               <Text style={[styles.headerTitle, isDark ? styles.textLight : styles.textDark]}>
                 {scanStep === 'idle' 
-                  ? (directPlacardMode ? 'Scanner ma Salle de Bain 📷' : 'Root\'in IA Scanner 🔬')
+                  ? (directPlacardMode ? 'Scanner ma Salle de Bain 📷' : 'Scanner Capillaire 🔬')
                   : 'Analyse en cours...'}
               </Text>
             )}
@@ -1381,6 +1724,12 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
             {scanStep === 'result' && (
               <Text style={[styles.headerTitle, isDark ? styles.textLight : styles.textDark, { fontSize: 14 }]}>
                 Rapport INCI
+              </Text>
+            )}
+
+            {(scanStep === 'manual_free' || scanStep === 'manual_express') && (
+              <Text style={[styles.headerTitle, isDark ? styles.textLight : styles.textDark, { fontSize: 14 }]}>
+                Remplissage Manuel ✍️
               </Text>
             )}
 
@@ -1399,6 +1748,18 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                   <Text style={[styles.dashboardPrompt, isDark ? styles.textLight : styles.textDark]}>
                     Choisis l'une de nos 4 fonctions intelligentes : 🔬
                   </Text>
+                  {!isPremium && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+                      <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '700' }}>
+                        ⚡ Crédits d'analyse IA restants : {freeScansLeft} / 5
+                      </Text>
+                      <TouchableOpacity onPress={() => setShowPaywall(true)} activeOpacity={0.7}>
+                        <Text style={{ fontSize: 13, color: colors.secondary, fontWeight: 'bold', textDecorationLine: 'underline' }}>
+                          (Passer à l'illimité ✨)
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                   
                   {/* Card 1: Analyse Totale & Profil Capillaire */}
                   <TouchableOpacity
@@ -1467,14 +1828,20 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
                     activeOpacity={0.9}
                     onPress={() => {
-                      setActiveFeatureTab('compare');
-                      setScannerMode('select_method');
+                      if (isPremium) {
+                        setActiveFeatureTab('compare');
+                        setScannerMode('select_method');
+                      } else {
+                        setShowPaywall(true);
+                      }
                     }}
                   >
                     <Text style={styles.modeCardIcon}>🗄️</Text>
                     <View style={styles.modeCardTextContainer}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Est-ce que j'ai un équivalent chez moi ?</Text>
+                        <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>
+                          Est-ce que j'ai un équivalent chez moi ?{!isPremium ? ' 🔒' : ''}
+                        </Text>
                         <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#5C8AA7', backgroundColor: 'rgba(92, 138, 167, 0.15)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3 }}>ANTI-GASPI</Text>
                       </View>
                       <Text style={[styles.modeCardSubtitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
@@ -1559,23 +1926,50 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                   </Text>
 
                   {/* Actions to scan new */}
-                  <View style={{ flexDirection: 'row', gap: 12, marginBottom: spacing.lg }}>
+                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: spacing.lg }}>
                     <TouchableOpacity
-                      style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight, { flex: 1, flexDirection: 'column', padding: 16, alignItems: 'center' }]}
+                      style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight, { flex: 1, flexDirection: 'column', padding: 12, alignItems: 'center' }]}
                       activeOpacity={0.9}
-                      onPress={() => setScannerMode('photo')}
+                      onPress={() => {
+                        if (!isPremium && freeScansLeft === 0) {
+                          setShowPaywall(true);
+                        } else {
+                          setScannerMode('photo');
+                        }
+                      }}
                     >
-                      <Text style={[styles.modeCardIcon, { marginBottom: 8, fontSize: 24 }]}>📷</Text>
-                      <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark, { fontSize: 13, textAlign: 'center' }]}>Prendre en photo</Text>
+                      <Text style={[styles.modeCardIcon, { marginBottom: 8, fontSize: 22 }]}>📷</Text>
+                      <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark, { fontSize: 11, textAlign: 'center' }]} numberOfLines={2}>Prendre en photo</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight, { flex: 1, flexDirection: 'column', padding: 16, alignItems: 'center' }]}
+                      style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight, { flex: 1, flexDirection: 'column', padding: 12, alignItems: 'center' }]}
                       activeOpacity={0.9}
-                      onPress={() => setScannerMode('barcode')}
+                      onPress={() => {
+                        if (!isPremium && freeScansLeft === 0) {
+                          setShowPaywall(true);
+                        } else {
+                          setScannerMode('barcode');
+                        }
+                      }}
                     >
-                      <Text style={[styles.modeCardIcon, { marginBottom: 8, fontSize: 24 }]}>🏷️</Text>
-                      <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark, { fontSize: 13, textAlign: 'center' }]}>Flasher Code-barres</Text>
+                      <Text style={[styles.modeCardIcon, { marginBottom: 8, fontSize: 22 }]}>🏷️</Text>
+                      <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark, { fontSize: 11, textAlign: 'center' }]} numberOfLines={2}>Flasher Code-barres</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight, { flex: 1, flexDirection: 'column', padding: 12, alignItems: 'center' }]}
+                      activeOpacity={0.9}
+                      onPress={() => {
+                        if (!isPremium && freeScansLeft === 0) {
+                          setShowPaywall(true);
+                        } else {
+                          setScanStep('manual_express');
+                        }
+                      }}
+                    >
+                      <Text style={[styles.modeCardIcon, { marginBottom: 8, fontSize: 22 }]}>✍️</Text>
+                      <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark, { fontSize: 11, textAlign: 'center' }]} numberOfLines={2}>Saisie Manuelle</Text>
                     </TouchableOpacity>
                   </View>
 
@@ -1657,7 +2051,13 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                   <TouchableOpacity
                     style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
                     activeOpacity={0.9}
-                    onPress={() => setScannerMode('photo')}
+                    onPress={() => {
+                      if (!isPremium && freeScansLeft === 0) {
+                        setShowPaywall(true);
+                      } else {
+                        setScannerMode('photo');
+                      }
+                    }}
                   >
                     <Text style={styles.modeCardIcon}>📷</Text>
                     <View style={styles.modeCardTextContainer}>
@@ -1672,13 +2072,48 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                   <TouchableOpacity
                     style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
                     activeOpacity={0.9}
-                    onPress={() => setScannerMode('barcode')}
+                    onPress={() => {
+                      if (!isPremium && freeScansLeft === 0) {
+                        setShowPaywall(true);
+                      } else {
+                        setScannerMode('barcode');
+                      }
+                    }}
                   >
                     <Text style={styles.modeCardIcon}>🏷️</Text>
                     <View style={styles.modeCardTextContainer}>
                       <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>Flasher le Code-barres du produit</Text>
                       <Text style={[styles.modeCardSubtitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
                         Flashe avec l'appareil photo ou saisis manuellement le code EAN du produit.
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Method 3: Remplissage Manuel */}
+                  <TouchableOpacity
+                    style={[styles.modeCard, isDark ? styles.modeCardDark : styles.modeCardLight]}
+                    activeOpacity={0.9}
+                    onPress={() => {
+                      if (activeFeatureTab === 'add') {
+                        setScanStep('manual_free');
+                      } else {
+                        if (!isPremium && freeScansLeft === 0) {
+                          setShowPaywall(true);
+                        } else {
+                          setScanStep('manual_express');
+                        }
+                      }
+                    }}
+                  >
+                    <Text style={styles.modeCardIcon}>✍️</Text>
+                    <View style={styles.modeCardTextContainer}>
+                      <Text style={[styles.modeCardTitle, isDark ? styles.textLight : styles.textDark]}>
+                        {activeFeatureTab === 'add' ? 'Remplissage manuel rapide' : 'Recherche par nom du produit'}
+                      </Text>
+                      <Text style={[styles.modeCardSubtitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                        {activeFeatureTab === 'add'
+                          ? "Saisis toi-même la marque, le nom et la catégorie (Gratuit & Illimité)."
+                          : "Saisis la marque et le nom de ton produit pour que l'IA My Root'in le recherche et l'analyse."}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -1788,10 +2223,17 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                             key={`cam-photo-${cameraKey.current}`}
                             style={StyleSheet.absoluteFillObject}
                             facing="back"
-                            autofocus="on"
+                            autofocus="off" // 'off' in expo-camera CameraView enables continuous autofocus (refocusses when phone moves)
                             ref={cameraRef}
                           />
                         )}
+                      </View>
+
+                      {/* Autofocus Tip Helper */}
+                      <View style={{ backgroundColor: 'rgba(229, 169, 130, 0.08)', padding: 12, borderRadius: 10, marginTop: 12, width: '100%' }}>
+                        <Text style={{ fontSize: 11, color: isDark ? colors.textSecondary : '#4F566B', textAlign: 'center', lineHeight: 16 }}>
+                          💡 <Text style={{ fontWeight: 'bold', color: colors.primary }}>Conseil netteté :</Text> Éloigne ton flacon d'environ 15-20 cm. L'appareil photo ne peut pas faire la mise au point automatique s'il est trop près !
+                        </Text>
                       </View>
 
                       {/* Capture Trigger */}
@@ -1818,6 +2260,29 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                               : '📸 Prendre en photo la composition'}
                           </Text>
                         )}
+                      </TouchableOpacity>
+
+                      {/* Alternative Option: Use phone's native camera app */}
+                      <TouchableOpacity
+                        style={[
+                          styles.launchNativeScannerButton, 
+                          { 
+                            marginTop: 12, 
+                            width: '100%', 
+                            backgroundColor: 'transparent',
+                            borderWidth: 1.5,
+                            borderColor: captureStep === 'front' ? colors.primary : colors.secondary,
+                            shadowOpacity: 0,
+                            elevation: 0
+                          }
+                        ]}
+                        activeOpacity={0.8}
+                        onPress={() => takePhotoWithNativeApp(captureStep)}
+                        disabled={isCameraLoading}
+                      >
+                        <Text style={[styles.launchNativeScannerButtonText, { color: captureStep === 'front' ? colors.primary : colors.secondary }]}>
+                          📸 Utiliser l'appareil photo du téléphone
+                        </Text>
                       </TouchableOpacity>
 
                       {captureStep === 'back' && (
@@ -1927,7 +2392,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                                 key={`cam-${cameraKey.current}`}
                                 style={StyleSheet.absoluteFillObject}
                                 facing="back"
-                                autofocus="on"
+                                autofocus="off" // 'off' in expo-camera CameraView enables continuous autofocus (refocusses when phone moves)
                                 barcodeScannerSettings={{
                                   barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'code39'],
                                 }}
@@ -2153,8 +2618,11 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                 <Text style={[styles.errorTitle, isDark ? styles.textLight : styles.textDark]}>
                   L'analyse automatique a échoué
                 </Text>
-                <Text style={[styles.errorDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                  Désolé, nous n'avons pas réussi à lire ou à identifier la formule. Pas d'inquiétude, tu peux contourner cet obstacle très facilement !
+                <Text style={[styles.errorDesc, isDark ? styles.textMutedDark : styles.textMutedLight, { marginBottom: spacing.md }]}>
+                  {realProductError || "Désolé, nous n'avons pas réussi à lire ou à identifier la formule."}
+                </Text>
+                <Text style={[styles.errorDesc, isDark ? styles.textMutedDark : styles.textMutedLight, { fontSize: 12, fontStyle: 'italic', marginBottom: spacing.xl }]}>
+                  Pas d'inquiétude, tu peux contourner cet obstacle très facilement !
                 </Text>
 
                 <View style={styles.errorDivider} />
@@ -2201,8 +2669,42 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                   ✍️ Saisie Express à la main
                 </Text>
                 <Text style={[styles.formHeaderDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                  Renseigne uniquement ces 3 informations. Notre IA Root'in va interroger sa propre base de connaissances pour reconstituer la formule moléculaire exacte de ton produit capillaire !
+                  Renseigne uniquement ces informations. Notre IA Root'in va interroger sa propre base de connaissances pour reconstituer la formule moléculaire exacte de ton produit capillaire !
                 </Text>
+
+                {/* Field 0: Photo */}
+                <View style={styles.formField}>
+                  <Text style={[styles.formLabel, isDark ? styles.textLight : styles.textDark]}>Photo du produit (optionnel) :</Text>
+                  {manualExpressPhoto ? (
+                    <View style={styles.photoPreviewContainer}>
+                      <Image source={{ uri: manualExpressPhoto }} style={styles.photoPreviewImage} />
+                      <TouchableOpacity 
+                        style={styles.photoDeleteButton} 
+                        activeOpacity={0.8}
+                        onPress={() => setManualExpressPhoto(null)}
+                      >
+                        <Text style={styles.photoDeleteText}>❌ Retirer la photo</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                      <TouchableOpacity 
+                        style={[styles.photoButton, isDark ? styles.photoButtonDark : styles.photoButtonLight]}
+                        activeOpacity={0.8}
+                        onPress={() => captureManualExpressPhoto(false)}
+                      >
+                        <Text style={styles.photoButtonText}>📸 Appareil photo</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.photoButton, isDark ? styles.photoButtonDark : styles.photoButtonLight]}
+                        activeOpacity={0.8}
+                        onPress={() => captureManualExpressPhoto(true)}
+                      >
+                        <Text style={styles.photoButtonText}>🖼️ Galerie</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
 
                 {/* Field 1: Brand */}
                 <View style={styles.formField}>
@@ -2290,9 +2792,219 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                 <TouchableOpacity
                   style={styles.formCancelButton}
                   activeOpacity={0.8}
-                  onPress={() => setScanStep('scan_error')}
+                  onPress={() => {
+                    setScanStep('idle');
+                    if (activeFeatureTab === 'diy') {
+                      setScannerMode('diy_select');
+                    } else {
+                      setScannerMode('select_method');
+                    }
+                  }}
                 >
                   <Text style={styles.formCancelButtonText}>⬅️ Retour aux choix</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          )}
+
+          {/* MANUAL FREE FORM STEP */}
+          {scanStep === 'manual_free' && (
+            <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+              <View style={styles.formContainer}>
+                <Text style={[styles.formHeaderTitle, isDark ? styles.textLight : styles.textDark]}>
+                  ✍️ Ajout Manuel dans le Placard
+                </Text>
+                <Text style={[styles.formHeaderDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                  Ajoute directement ton produit à ta salle de bain sans passer par le scan ou l'analyse IA.
+                </Text>
+
+                {/* Field 1: Brand */}
+                <View style={styles.formField}>
+                  <Text style={[styles.formLabel, isDark ? styles.textLight : styles.textDark]}>Marque :</Text>
+                  <View style={[styles.formInputWrapper, isDark ? styles.formInputWrapperDark : styles.formInputWrapperLight]}>
+                    <TextInput
+                      style={[styles.formInput, isDark ? styles.formInputDark : styles.formInputLight]}
+                      placeholder="Ex: Shea Moisture, Cantu, Activilong..."
+                      placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
+                      value={manualFreeBrand}
+                      onChangeText={setManualFreeBrand}
+                    />
+                  </View>
+                </View>
+
+                {/* Field 2: Product Name */}
+                <View style={styles.formField}>
+                  <Text style={[styles.formLabel, isDark ? styles.textLight : styles.textDark]}>Nom du produit :</Text>
+                  <View style={[styles.formInputWrapper, isDark ? styles.formInputWrapperDark : styles.formInputWrapperLight]}>
+                    <TextInput
+                      style={[styles.formInput, isDark ? styles.formInputDark : styles.formInputLight]}
+                      placeholder="Ex: Soin Hydratant, Shampoing Doux..."
+                      placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
+                      value={manualFreeName}
+                      onChangeText={setManualFreeName}
+                    />
+                  </View>
+                </View>
+
+                {/* Field 3: Product Category (Dropdown) */}
+                <View style={styles.formField}>
+                  <Text style={[styles.formLabel, isDark ? styles.textLight : styles.textDark]}>Catégorie :</Text>
+                  
+                  <TouchableOpacity
+                    style={[styles.dropdownTrigger, isDark ? styles.dropdownTriggerDark : styles.dropdownTriggerLight]}
+                    activeOpacity={0.8}
+                    onPress={() => setShowManualFreeDropdown(!showManualFreeDropdown)}
+                  >
+                    <Text style={[styles.dropdownTriggerText, isDark ? styles.textLight : styles.textDark]}>
+                      {manualFreeCategory} {getCategoryEmoji(manualFreeCategory)}
+                    </Text>
+                    <Text style={{ color: colors.primary, fontWeight: 'bold' }}>
+                      {showManualFreeDropdown ? '▲' : '▼'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {showManualFreeDropdown && (
+                    <View style={[styles.dropdownMenu, isDark ? styles.dropdownMenuDark : styles.dropdownMenuLight]}>
+                      {['Lavage', 'Bain d\'huile', 'Masque hydratant', 'Soin sans rinçage', 'Retwist', 'Clarification', 'Autre'].map((type) => (
+                        <TouchableOpacity
+                          key={type}
+                          style={[
+                            styles.dropdownMenuItem,
+                            manualFreeCategory === type && styles.dropdownMenuItemActive
+                          ]}
+                          onPress={() => {
+                            setManualFreeCategory(type);
+                            setShowManualFreeDropdown(false);
+                          }}
+                        >
+                          <Text style={[
+                            styles.dropdownMenuItemText, 
+                            manualFreeCategory === type ? styles.dropdownMenuItemTextActive : (isDark ? styles.textLight : styles.textDark)
+                          ]}>
+                            {type} {getCategoryEmoji(type)}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+
+                {/* Field 4: Price */}
+                <View style={styles.formField}>
+                  <Text style={[styles.formLabel, isDark ? styles.textLight : styles.textDark]}>Prix (optionnel) :</Text>
+                  <View style={[styles.formInputWrapper, isDark ? styles.formInputWrapperDark : styles.formInputWrapperLight, { flexDirection: 'row', alignItems: 'center' }]}>
+                    <TextInput
+                      style={[styles.formInput, isDark ? styles.formInputDark : styles.formInputLight, { flex: 1 }]}
+                      placeholder="Ex: 12.99"
+                      placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
+                      keyboardType="decimal-pad"
+                      value={manualFreePrice}
+                      onChangeText={setManualFreePrice}
+                    />
+                    <Text style={{ marginRight: spacing.md, color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)', fontWeight: 'bold' }}>€</Text>
+                  </View>
+                </View>
+
+                {/* Field 5: Photo */}
+                <View style={styles.formField}>
+                  <Text style={[styles.formLabel, isDark ? styles.textLight : styles.textDark]}>Photo du produit (optionnel) :</Text>
+                  {manualFreePhoto ? (
+                    <View style={styles.photoPreviewContainer}>
+                      <Image source={{ uri: manualFreePhoto }} style={styles.photoPreviewImage} />
+                      <TouchableOpacity 
+                        style={styles.photoDeleteButton} 
+                        activeOpacity={0.8}
+                        onPress={() => setManualFreePhoto(null)}
+                      >
+                        <Text style={styles.photoDeleteText}>❌ Retirer la photo</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                      <TouchableOpacity 
+                        style={[styles.photoButton, isDark ? styles.photoButtonDark : styles.photoButtonLight]}
+                        activeOpacity={0.8}
+                        onPress={() => captureManualFreePhoto(false)}
+                      >
+                        <Text style={styles.photoButtonText}>📸 Appareil photo</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.photoButton, isDark ? styles.photoButtonDark : styles.photoButtonLight]}
+                        activeOpacity={0.8}
+                        onPress={() => captureManualFreePhoto(true)}
+                      >
+                        <Text style={styles.photoButtonText}>🖼️ Galerie</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+
+                {/* 🧪 Bouton de compatibilité IA */}
+                {!isPremium ? (
+                  <TouchableOpacity
+                    style={styles.compatibilityCheckBtnFree}
+                    activeOpacity={0.8}
+                    onPress={() => setShowPaywall(true)}
+                  >
+                    <Text style={styles.compatibilityCheckBtnFreeText}>
+                      ❓ Ce produit est-il compatible avec moi ? (PRO)
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.compatibilityCheckBtnPremium}
+                    activeOpacity={0.8}
+                    onPress={handleCompatibilityAnalysis}
+                    disabled={isAnalyzingCompatibility}
+                  >
+                    {isAnalyzingCompatibility ? (
+                      <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                      <Text style={styles.compatibilityCheckBtnPremiumText}>
+                        🔬 Analyser la compatibilité avec mon profil (IA)
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+
+                {/* Affichage de la synthèse d'analyse */}
+                {compatibilityResult && (
+                  <View style={[
+                    styles.compatibilityResultCard,
+                    isDark ? styles.compatibilityResultCardDark : styles.compatibilityResultCardLight
+                  ]}>
+                    <View style={styles.compatibilityResultHeader}>
+                      <Text style={[
+                        styles.compatibilityResultStatus,
+                        { color: compatibilityResult.isCompatible ? colors.success : colors.warning }
+                      ]}>
+                        {compatibilityResult.isCompatible ? '✅ Compatible' : '⚠️ Attention'} ({compatibilityResult.status})
+                      </Text>
+                    </View>
+                    <Text style={[styles.compatibilityResultDesc, isDark ? styles.textLight : styles.textDark]}>
+                      {compatibilityResult.explanation}
+                    </Text>
+                  </View>
+                )}
+
+                <View style={styles.formDivider} />
+
+                {/* Save button */}
+                <TouchableOpacity
+                  style={styles.formSubmitButton}
+                  activeOpacity={0.8}
+                  onPress={handleManualFreeSubmit}
+                >
+                  <Text style={styles.formSubmitButtonText}>💾 Enregistrer dans mon placard ➔</Text>
+                </TouchableOpacity>
+
+                {/* Cancel/Reset button */}
+                <TouchableOpacity
+                  style={styles.formCancelButton}
+                  activeOpacity={0.8}
+                  onPress={handleReset}
+                >
+                  <Text style={styles.formCancelButtonText}>⬅️ Annuler</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -2301,12 +3013,33 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
           {/* RESULT STEP - IA REPORT COMPATIBILITY */}
           {scanStep === 'result' && (selectedProduct || realProductAnalysis) && (() => {
             const isReal = !!realProductAnalysis;
-            const report = isReal ? realProductAnalysis : getCompatibilityAnalysis(selectedProduct!);
             const displayBrand = isReal ? realProductAnalysis.brand : selectedProduct?.brand;
             const displayName = isReal ? realProductAnalysis.name : selectedProduct?.name;
             const displayImage = isReal 
               ? (realProductAnalysis.image || 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=200&auto=format&fit=crop') 
               : selectedProduct?.image;
+
+            const category = isReal ? (realProductAnalysis.category || 'Autre') : detectCategory(selectedProduct!.name, selectedProduct!.brand);
+            const ingredients = isReal ? (realProductAnalysis.ingredients || []) : (selectedProduct?.ingredients || []);
+
+            // When we have a real API result, trust the server score entirely.
+            // The API scoring engine already applied all the ingredient rules.
+            // Only fall back to local evaluation for catalog products (selectedProduct).
+            const report: any = isReal
+              ? {
+                  score: realProductAnalysis.score ?? realProductAnalysis.compatibilityScore ?? 70,
+                  title: realProductAnalysis.title || '',
+                  description: realProductAnalysis.coachAdvice || realProductAnalysis.description || '',
+                  color: undefined,
+                  compatibility: realProductAnalysis.status || 'Compatible',
+                  inciReport: realProductAnalysis.inciReport || { good: [], neutral: [], avoid: [] },
+                  mainIngredients: realProductAnalysis.mainIngredients || [],
+                  coachAdvice: realProductAnalysis.coachAdvice || '',
+                  pointsOfVigilance: realProductAnalysis.pointsOfVigilance || '',
+                }
+              : (activeProfile
+                  ? evaluateProductCompatibility(displayBrand, displayName, category, ingredients, activeProfile.diagnostic)
+                  : getCompatibilityAnalysis(selectedProduct!));
 
             const scoreColor = report.color || (
               report.score >= 80 ? colors.success :
@@ -2381,13 +3114,36 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                       </View>
                     </View>
 
-                    {/* Customized AI Explanation */}
+                    {/* ── PREMIUM SECTION: Ingrédients Clés (only from manual express API) ── */}
+                    {isReal && realProductAnalysis?.mainIngredients?.length > 0 && (
+                      <View style={[styles.explanationCard, isDark ? styles.explanationCardDark : styles.explanationCardLight, { borderLeftWidth: 4, borderLeftColor: colors.success }]}>
+                        <Text style={styles.explanationTitle}>🌿 Ingrédients clés du produit :</Text>
+                        {(realProductAnalysis.mainIngredients as string[]).map((ing: string, idx: number) => (
+                          <View key={idx} style={[styles.ingredientItem, { marginTop: 6 }]}>
+                            <Text style={[styles.bulletPoint, { color: colors.success }]}>✓</Text>
+                            <Text style={[styles.ingredientName, isDark ? styles.textLight : styles.textDark]}>{ing}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
+                    {/* Customized AI Explanation — coachAdvice (premium) or description (fallback) */}
                     <View style={[styles.explanationCard, isDark ? styles.explanationCardDark : styles.explanationCardLight]}>
                       <Text style={styles.explanationTitle}>🤖 L'avis de ton Coach IA :</Text>
                       <Text style={[styles.explanationText, isDark ? styles.textLight : styles.textDark]}>
-                        {report.description}
+                        {(isReal && realProductAnalysis?.coachAdvice) ? realProductAnalysis.coachAdvice : report.description}
                       </Text>
                     </View>
+
+                    {/* ── PREMIUM SECTION: Points de Vigilance (only from manual express API) ── */}
+                    {isReal && realProductAnalysis?.pointsOfVigilance && (
+                      <View style={[styles.explanationCard, isDark ? styles.explanationCardDark : styles.explanationCardLight, { borderLeftWidth: 4, borderLeftColor: colors.warning || '#F59E0B' }]}>
+                        <Text style={[styles.explanationTitle, { color: colors.warning || '#F59E0B' }]}>⚡ Points de vigilance :</Text>
+                        <Text style={[styles.explanationText, isDark ? styles.textLight : styles.textDark]}>
+                          {realProductAnalysis.pointsOfVigilance}
+                        </Text>
+                      </View>
+                    )}
 
                     {/* INCI Ingredients Breakdown */}
                     <View style={styles.ingredientsSection}>
@@ -2462,32 +3218,98 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                     <View style={styles.tabContentBlock}>
                       {isAlreadyInBathroom ? (
                         <View style={[styles.successStateCard, isDark ? styles.successStateCardDark : styles.successStateCardLight]}>
-                          <Text style={styles.successStateIcon}>✅</Text>
-                          <Text style={[styles.successStateTitle, isDark ? styles.textLight : styles.textDark]}>Produit déjà rangé</Text>
-                          <Text style={[styles.successStateDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                            Ce produit capillaire est stocké dans ton placard virtuel "{getCategoryEmoji(category)} {category}".
-                          </Text>
+                          {justAdded ? (
+                            // ── Produit VIENT D'ÊTRE ajouté à l'instant ──
+                            <>
+                              <Text style={styles.successStateIcon}>🎉</Text>
+                              <Text style={[styles.successStateTitle, isDark ? styles.textLight : styles.textDark]}>Super ! Produit ajouté !</Text>
+                              <Text style={[styles.successStateDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                                {displayBrand} - {displayName} a bien été rangé dans ta Salle de Bain virtuelle "{getCategoryEmoji(category)} {category}".
+                              </Text>
+                            </>
+                          ) : (
+                            // ── Produit était DÉJÀ dans la salle de bain avant ce scan ──
+                            <>
+                              <Text style={styles.successStateIcon}>✅</Text>
+                              <Text style={[styles.successStateTitle, isDark ? styles.textLight : styles.textDark]}>Produit déjà rangé</Text>
+                              <Text style={[styles.successStateDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+                                Ce produit capillaire est stocké dans ton placard virtuel "{getCategoryEmoji(category)} {category}".
+                              </Text>
+                            </>
+                          )}
                         </View>
                       ) : (
-                        <TouchableOpacity
-                          style={styles.premiumActionButton}
-                          activeOpacity={0.8}
-                          onPress={() => {
-                            const compatibility = report.score >= 80 ? 'Compatible' : 'Attention';
-                            addBathroomProduct({
-                              name: displayName,
-                              brand: displayBrand,
-                              category,
-                              ingredients,
-                              compatibility,
-                              score: report.score,
-                              image: displayImage,
-                              inciReport: report.inciReport
-                            });
-                          }}
-                        >
-                          <Text style={styles.premiumActionButtonText}>➕ Ajouter à ma Salle de Bain</Text>
-                        </TouchableOpacity>
+                        <View style={{ marginBottom: spacing.md }}>
+                          <Text style={[styles.formLabel, isDark ? styles.textLight : styles.textDark]}>
+                            🏷️ Prix d'achat du produit (€) :
+                          </Text>
+                          <View style={[styles.formInputWrapper, isDark ? styles.formInputWrapperDark : styles.formInputWrapperLight, { marginBottom: spacing.md, borderColor: colors.primary }]}>
+                            <TextInput
+                              style={[styles.formInput, isDark ? styles.formInputDark : styles.formInputLight]}
+                              placeholder="Ex: 9.99 (facultatif)"
+                              placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
+                              keyboardType="decimal-pad"
+                              value={priceStr}
+                              onChangeText={setPriceStr}
+                            />
+                          </View>
+                          {isPremium ? (
+                            <Text style={{ fontSize: 11, color: colors.secondary, marginTop: -8, marginBottom: spacing.md, fontStyle: 'italic' }}>
+                              « Prix estimé automatiquement via votre accès Premium »
+                            </Text>
+                          ) : (
+                            (() => {
+                              const getEstimatedPrice = () => {
+                                if (realProductAnalysis?.estimatedPrice != null) {
+                                  return realProductAnalysis.estimatedPrice;
+                                }
+                                const b = displayBrand.toLowerCase();
+                                if (b.includes('shea moisture')) return 14.99;
+                                if (b.includes('cantu')) return 9.99;
+                                if (b.includes('activilong')) return 11.99;
+                                if (b.includes('jamaican') || b.includes('mango') || b.includes('lime')) return 10.99;
+                                return 12.50;
+                              };
+                              const est = getEstimatedPrice();
+                              return (
+                                <TouchableOpacity
+                                  style={[
+                                    styles.estimatePriceButton,
+                                    isDark ? styles.estimatePriceButtonDark : styles.estimatePriceButtonLight
+                                  ]}
+                                  activeOpacity={0.8}
+                                  onPress={() => setShowPaywall(true)}
+                                >
+                                  <Text style={styles.estimatePriceButtonText}>
+                                    🔒 Estimer le prix par l'IA : {est} €
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })()
+                          )}
+                          <TouchableOpacity
+                            style={styles.premiumActionButton}
+                            activeOpacity={0.8}
+                            onPress={() => {
+                              const compatibility = report.score >= 80 ? 'Compatible' : 'Attention';
+                              const parsedPrice = parseFloat(priceStr.replace(',', '.').replace(/[^0-9.]/g, ''));
+                              setJustAdded(true); // Mark as just added so UX shows success, not "déjà rangé"
+                              addBathroomProduct({
+                                name: displayName,
+                                brand: displayBrand,
+                                category,
+                                ingredients,
+                                compatibility,
+                                score: report.score,
+                                image: displayImage,
+                                inciReport: report.inciReport,
+                                price: isNaN(parsedPrice) ? undefined : parsedPrice
+                              }, true);
+                            }}
+                          >
+                            <Text style={styles.premiumActionButtonText}>➕ Ajouter à ma Salle de Bain</Text>
+                          </TouchableOpacity>
+                        </View>
                       )}
 
                       {isOcclusive && isLowPoro && (
@@ -2778,6 +3600,10 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
           })()}
         </View>
       </View>
+      <PremiumPaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+      />
     </Modal>
   );
 };
@@ -2908,8 +3734,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   viewfinder: {
-    width: 250,
-    height: 250,
+    width: '100%',
+    height: 350,
     backgroundColor: 'rgba(0,0,0,0.4)',
     borderRadius: borderRadius.md,
     borderWidth: 1,
@@ -3365,8 +4191,8 @@ const styles = StyleSheet.create({
   cameraViewfinderWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 250,
-    height: 250,
+    width: '100%',
+    height: 350,
     borderRadius: borderRadius.md,
     overflow: 'hidden',
     position: 'relative',
@@ -4270,5 +5096,137 @@ const styles = StyleSheet.create({
   },
   historyDeleteBtnText: {
     fontSize: 16,
+  },
+  // Photo preview styles for manual free add
+  photoPreviewContainer: {
+    marginTop: spacing.xs,
+    alignItems: 'center',
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  photoPreviewImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: borderRadius.md,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+  },
+  photoDeleteButton: {
+    marginTop: spacing.sm,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    backgroundColor: 'rgba(235, 94, 85, 0.15)',
+    borderRadius: borderRadius.sm,
+  },
+  photoDeleteText: {
+    color: '#EB5E55',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  photoButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+  },
+  photoButtonDark: {
+    backgroundColor: '#16192A',
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  photoButtonLight: {
+    backgroundColor: '#F8F9FA',
+    borderColor: 'rgba(0,0,0,0.08)',
+  },
+  photoButtonText: {
+    fontWeight: 'bold',
+    fontSize: 12,
+    color: colors.primary,
+  },
+  // 🧪 New compatibility buttons & results card styles
+  compatibilityCheckBtnFree: {
+    backgroundColor: '#1E2235',
+    borderWidth: 1.5,
+    borderColor: '#E6C687', // colors.accent (soft gold)
+    borderRadius: borderRadius.md,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: spacing.md,
+  },
+  compatibilityCheckBtnFreeText: {
+    color: '#E6C687',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  compatibilityCheckBtnPremium: {
+    backgroundColor: colors.secondary,
+    borderRadius: borderRadius.md,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: spacing.md,
+    shadowColor: colors.secondary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  compatibilityCheckBtnPremiumText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  compatibilityResultCard: {
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    padding: spacing.md,
+    marginVertical: spacing.sm,
+  },
+  compatibilityResultCardDark: {
+    backgroundColor: 'rgba(22, 25, 42, 0.6)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  compatibilityResultCardLight: {
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  compatibilityResultHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  compatibilityResultStatus: {
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+  compatibilityResultDesc: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  estimatePriceButton: {
+    borderWidth: 1,
+    borderRadius: borderRadius.md,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  estimatePriceButtonDark: {
+    backgroundColor: 'rgba(229, 169, 130, 0.12)',
+    borderColor: 'rgba(229, 169, 130, 0.3)',
+  },
+  estimatePriceButtonLight: {
+    backgroundColor: 'rgba(229, 169, 130, 0.06)',
+    borderColor: 'rgba(229, 169, 130, 0.2)',
+  },
+  estimatePriceButtonText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });

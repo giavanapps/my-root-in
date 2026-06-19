@@ -1,0 +1,9 @@
+﻿env: load .env.local
+env: export VERCEL_OIDC_TOKEN
+node.exe : CommandError: Could not find device with name: emulator-5554
+Au caractère C:\Program Files\nodejs\npx.ps1:29 : 3
++   & $NODE_EXE $NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (CommandError: C...: emulator-5554:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

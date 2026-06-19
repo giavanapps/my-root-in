@@ -9,6 +9,8 @@ interface CircularGaugeProps {
   size?: number;
   strokeWidth?: number;
   onPress?: () => void;
+  locked?: boolean;
+  label?: string;
 }
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -18,6 +20,8 @@ export const CircularGauge: React.FC<CircularGaugeProps> = ({
   size = 180,
   strokeWidth = 14,
   onPress,
+  locked = false,
+  label = "Jauge Santé",
 }) => {
   const animatedValue = useRef(new Animated.Value(0)).current;
   const { themeMode } = useAppState();
@@ -105,13 +109,19 @@ export const CircularGauge: React.FC<CircularGaugeProps> = ({
 
         {/* Floating Percentage Text */}
         <View style={styles.textContainer}>
-          <Text style={[styles.label, { color: customTextSec }]}>Jauge Santé</Text>
-          <Text style={[styles.percentageText, { color: customText }]}>
-            {Math.round(percentage)}%
-          </Text>
-          <Text style={[styles.statusText, { color: currentColors.start }]}>
-            {percentage < 40 ? 'Critique' : percentage < 70 ? 'À hydrater' : 'Équilibré'}
-          </Text>
+          <Text style={[styles.label, { color: customTextSec }]}>{label}</Text>
+          {!locked ? (
+            <>
+              <Text style={[styles.percentageText, { color: customText }]}>
+                {Math.round(percentage)}%
+              </Text>
+              <Text style={[styles.statusText, { color: currentColors.start }]}>
+                {percentage < 40 ? 'Critique' : percentage < 70 ? 'À hydrater' : 'Équilibré'}
+              </Text>
+            </>
+          ) : (
+            <Text style={{ fontSize: 34, marginTop: 10 }}>🔒</Text>
+          )}
         </View>
       </View>
     </TouchableOpacity>

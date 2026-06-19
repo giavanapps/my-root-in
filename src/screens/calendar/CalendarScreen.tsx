@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Modal, TextInput, Platform, Switch, Animated, PanResponder } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Modal, TextInput, Platform, Switch, Animated, PanResponder, Image } from 'react-native';
 import { colors, borderRadius } from '../../theme/colors';
 import { useAppState, RoutineItem, getCareOrderWeight } from '../../store/AppStateContext';
 import { Button } from '../../components/common/Button';
 import { TimePickerModal } from '../../components/common/TimePickerModal';
 import { DatePickerModal } from '../../components/common/DatePickerModal';
+import { matchesCategory } from '../../components/premium/ProductScannerModal';
+import * as ImagePicker from 'expo-image-picker';
 
 const getLocalDateString = (d: Date = new Date()) => {
   const year = d.getFullYear();
@@ -319,12 +321,133 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
     addCustomRoutineItem,
     toggleRoutineCompleted,
     updateRoutineItemTime,
-    deleteRoutineItem
+    deleteRoutineItem,
+    bathroomProducts,
+    addBathroomProduct,
+    updateRoutineItemProduct
   } = useAppState();
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(getLocalDateString());
   const [viewMode, setViewMode] = useState<'monthly' | 'weekly'>('monthly');
+
+  // Product selection modal states
+  const [showProductSelectModal, setShowProductSelectModal] = useState(false);
+  const [productSelectTargetCare, setProductSelectTargetCare] = useState<any>(null);
+  const [productSelectOnConfirm, setProductSelectOnConfirm] = useState<((usedProduct?: { id: string; name: string; price: number }) => void) | null>(null);
+  const [modalSelectedProductIds, setModalSelectedProductIds] = useState<string[]>([]);
+  const [showQuickAddForm, setShowQuickAddForm] = useState(false);
+  const [showNonListedOptions, setShowNonListedOptions] = useState(false);
+  const [quickAddName, setQuickAddName] = useState('');
+  const [quickAddBrand, setQuickAddBrand] = useState('');
+  const [quickAddPrice, setQuickAddPrice] = useState('');
+  const [quickAddPriceNR, setQuickAddPriceNR] = useState(false);
+  const [quickAddCategory, setQuickAddCategory] = useState('');
+  const [quickAddImage, setQuickAddImage] = useState<string | undefined>(undefined);
+
+  // Upcoming Care Product Assign States
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assignTargetCareId, setAssignTargetCareId] = useState('');
+  const [assignTargetCategory, setAssignTargetCategory] = useState('');
+  const [assignAddCategory, setAssignAddCategory] = useState('');
+  const [showAssignAddForm, setShowAssignAddForm] = useState(false);
+  const [assignAddName, setAssignAddName] = useState('');
+  const [assignAddBrand, setAssignAddBrand] = useState('');
+  const [assignAddPrice, setAssignAddPrice] = useState('');
+  const [assignAddPriceNR, setAssignAddPriceNR] = useState(false);
+  const [assignAddImage, setAssignAddImage] = useState<string | undefined>(undefined);
+  const [isSimulatingPhoto, setIsSimulatingPhoto] = useState(false);
+  const [photoSimulationStep, setPhotoSimulationStep] = useState('');
+
+  const launchAssignPicker = async (useGallery: boolean) => {
+    try {
+      const { status } = useGallery 
+        ? await ImagePicker.requestMediaLibraryPermissionsAsync()
+        : await ImagePicker.requestCameraPermissionsAsync();
+        
+      if (status !== 'granted') {
+        alert(
+          useGallery 
+            ? "Désolé, nous avons besoin de l'accès à la galerie photo."
+            : "Désolé, nous avons besoin des permissions d'appareil photo."
+        );
+        return;
+      }
+
+      setIsSimulatingPhoto(true);
+      setPhotoSimulationStep(useGallery ? "Chargement de la galerie..." : "Démarrage de l'appareil photo...");
+
+      const result = useGallery
+        ? await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.7,
+          })
+        : await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.7,
+          });
+
+      setIsSimulatingPhoto(false);
+      setPhotoSimulationStep('');
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        setAssignAddImage(result.assets[0].uri);
+      }
+    } catch (err: any) {
+      setIsSimulatingPhoto(false);
+      setPhotoSimulationStep('');
+      console.error("Error launching picker:", err);
+    }
+  };
+
+  const launchQuickAddPicker = async (useGallery: boolean) => {
+    try {
+      const { status } = useGallery 
+        ? await ImagePicker.requestMediaLibraryPermissionsAsync()
+        : await ImagePicker.requestCameraPermissionsAsync();
+        
+      if (status !== 'granted') {
+        alert(
+          useGallery 
+            ? "Désolé, nous avons besoin de l'accès à la galerie photo."
+            : "Désolé, nous avons besoin des permissions d'appareil photo."
+        );
+        return;
+      }
+      
+      const result = useGallery 
+        ? await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+          })
+        : await ImagePicker.launchCameraAsync({
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+          });
+          
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setQuickAddImage(result.assets[0].uri);
+      }
+    } catch (err) {
+      console.error("Error launching quick add picker:", err);
+    }
+  };
+
+  const getSelectedProductForCare = (careItem: any) => {
+    if (careItem.selectedProductId === 'none') return null;
+    if (careItem.selectedProductId) {
+      const prod = bathroomProducts.find(bp => bp.id === careItem.selectedProductId);
+      if (prod) return prod;
+    }
+    return bathroomProducts.find(bp => matchesCategory(bp.category, careItem.category, bp.name)) || null;
+  };
 
   // Manual care addition modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -443,6 +566,911 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
   const customBorder = isLight ? 'rgba(0, 0, 0, 0.08)' : colors.cardBorder;
   const customInputBg = isLight ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.04)';
   const customInputBorder = isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.08)';
+
+  const compatibleProducts = productSelectTargetCare
+    ? bathroomProducts.filter(bp => matchesCategory(bp.category, productSelectTargetCare.category, bp.name))
+    : [];
+
+  const renderAssignModalContent = () => {
+    return showAssignAddForm ? (
+      <View style={[styles.detailCard, { backgroundColor: customCard, borderColor: customBorder, maxWidth: 380, width: '90%' }]}>
+        <View style={[styles.detailHeader, { marginBottom: 16 }]}>
+          <Text style={[styles.detailTitle, { color: colors.primary, fontSize: 16 }]}>
+            ➕ Nouveau produit pour ce soin
+          </Text>
+          <TouchableOpacity 
+            style={[styles.closeDetailIcon, { backgroundColor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)' }]} 
+            onPress={() => setShowAssignAddForm(false)}
+          >
+            <Text style={[styles.closeDetailIconText, { color: customTextSec }]}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Photo Upload Section */}
+        <View style={{ alignItems: 'center', marginBottom: 16 }}>
+          {assignAddImage ? (
+            <Image source={{ uri: assignAddImage }} style={{ width: 100, height: 100, borderRadius: 50, marginBottom: 8 }} />
+          ) : (
+            <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: isLight ? '#F0F0F0' : '#303030', justifyContent: 'center', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={{ fontSize: 24 }}>🧴</Text>
+            </View>
+          )}
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity 
+              style={{ backgroundColor: 'rgba(229,169,130,0.1)', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8 }}
+              onPress={() => launchAssignPicker(false)}
+            >
+              <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700' }}>Appareil Photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={{ backgroundColor: 'rgba(229,169,130,0.1)', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8 }}
+              onPress={() => launchAssignPicker(true)}
+            >
+              <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700' }}>Galerie</Text>
+            </TouchableOpacity>
+          </View>
+          {isSimulatingPhoto && (
+            <Text style={{ fontSize: 10, color: colors.primary, marginTop: 4 }}>{photoSimulationStep}</Text>
+          )}
+        </View>
+
+        {/* Input Nom */}
+        <View style={{ marginBottom: 12 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: customText, marginBottom: 6 }}>Nom du produit *</Text>
+          <TextInput
+            style={{
+              backgroundColor: customInputBg,
+              borderColor: customInputBorder,
+              borderWidth: 1,
+              borderRadius: 10,
+              padding: 10,
+              color: customText,
+              fontSize: 12,
+            }}
+            placeholder="Ex: Huile de Jojoba Pure"
+            placeholderTextColor={isLight ? '#999999' : '#666666'}
+            value={assignAddName}
+            onChangeText={setAssignAddName}
+          />
+        </View>
+
+        {/* Input Marque */}
+        <View style={{ marginBottom: 12 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: customText, marginBottom: 6 }}>Marque *</Text>
+          <TextInput
+            style={{
+              backgroundColor: customInputBg,
+              borderColor: customInputBorder,
+              borderWidth: 1,
+              borderRadius: 10,
+              padding: 10,
+              color: customText,
+              fontSize: 12,
+            }}
+            placeholder="Ex: Aroma-Zone"
+            placeholderTextColor={isLight ? '#999999' : '#666666'}
+            value={assignAddBrand}
+            onChangeText={setAssignAddBrand}
+          />
+        </View>
+
+        {/* Prix & Checkbox */}
+        <View style={{ marginBottom: 20 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: customText, marginBottom: 6 }}>Prix (€)</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <TextInput
+              style={{
+                flex: 1,
+                backgroundColor: assignAddPriceNR ? 'rgba(0,0,0,0.03)' : customInputBg,
+                borderColor: customInputBorder,
+                borderWidth: 1,
+                borderRadius: 10,
+                padding: 10,
+                color: assignAddPriceNR ? customTextSec : customText,
+                fontSize: 12,
+              }}
+              keyboardType="numeric"
+              placeholder="Ex: 5.99"
+              placeholderTextColor={isLight ? '#999999' : '#666666'}
+              value={assignAddPrice}
+              onChangeText={setAssignAddPrice}
+              editable={!assignAddPriceNR}
+            />
+            
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+              activeOpacity={0.8}
+              onPress={() => setAssignAddPriceNR(!assignAddPriceNR)}
+            >
+              <View style={{
+                width: 16,
+                height: 16,
+                borderRadius: 4,
+                borderWidth: 1.5,
+                borderColor: assignAddPriceNR ? colors.primary : (isLight ? '#CCCCCC' : '#555555'),
+                backgroundColor: assignAddPriceNR ? colors.primary : 'transparent',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                {assignAddPriceNR && <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' }}>✓</Text>}
+              </View>
+              <Text style={{ fontSize: 11, color: customTextSec }}>Renseigner plus tard</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Fonction / Étape du soin */}
+        <View style={{ marginBottom: 16 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: customText, marginBottom: 6 }}>Fonction / Étape du soin *</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {[
+              { name: 'Lavage', emoji: '🧴' },
+              { name: "Bain d'huile", emoji: '🌿' },
+              { name: 'Masque hydratant', emoji: '🍯' },
+              { name: 'Soin sans rinçage', emoji: '💧' },
+              { name: 'Clarification', emoji: '🔬' },
+              { name: 'Retwist', emoji: '👑' }
+            ].map((cat) => {
+              const isSelected = assignAddCategory === cat.name;
+              return (
+                <TouchableOpacity
+                  key={cat.name}
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 16,
+                    borderWidth: 1.5,
+                    borderColor: isSelected ? colors.primary : customBorder,
+                    backgroundColor: isSelected ? 'rgba(229,169,130,0.15)' : 'transparent',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onPress={() => setAssignAddCategory(cat.name)}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: isSelected ? colors.primary : customText }}>
+                    {cat.emoji} {cat.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Buttons */}
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <TouchableOpacity
+            style={{ 
+              flex: 1, 
+              backgroundColor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)', 
+              borderWidth: 1, 
+              borderColor: customBorder, 
+              paddingVertical: 12,
+              borderRadius: 14,
+              alignItems: 'center',
+            }}
+            onPress={() => setShowAssignAddForm(false)}
+          >
+            <Text style={{ color: customText, fontWeight: '700', fontSize: 12 }}>Annuler</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{ 
+              flex: 1, 
+              backgroundColor: colors.primary, 
+              paddingVertical: 12,
+              borderRadius: 14,
+              alignItems: 'center',
+              opacity: (!assignAddName.trim() || !assignAddBrand.trim() || !assignAddCategory) ? 0.5 : 1,
+            }}
+            disabled={!assignAddName.trim() || !assignAddBrand.trim() || !assignAddCategory}
+            onPress={() => {
+              const newProd = addBathroomProduct({
+                name: assignAddName.trim(),
+                brand: assignAddBrand.trim(),
+                category: assignAddCategory,
+                ingredients: [],
+                compatibility: 'Compatible',
+                score: 100,
+                price: assignAddPriceNR ? undefined : parseFloat(assignAddPrice) || undefined,
+                image: assignAddImage,
+              });
+              // Associate this newly created product to the care!
+              updateRoutineItemProduct(assignTargetCareId, newProd.id);
+              setShowAssignModal(false);
+              setAssignTargetCareId('');
+              setAssignTargetCategory('');
+              setShowAssignAddForm(false);
+            }}
+          >
+            <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 12, textAlign: 'center' }}>Enregistrer & Associer</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    ) : (
+      <View style={[styles.detailCard, { backgroundColor: customCard, borderColor: customBorder, maxWidth: 380, width: '90%' }]}>
+        <View style={[styles.detailHeader, { marginBottom: 12 }]}>
+          <Text style={[styles.detailTitle, { color: colors.primary, fontSize: 16 }]}>
+            Associer un produit 🧴
+          </Text>
+          <TouchableOpacity 
+            style={[styles.closeDetailIcon, { backgroundColor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)' }]} 
+            onPress={() => {
+              setShowAssignModal(false);
+              setAssignTargetCareId('');
+              setAssignTargetCategory('');
+              setShowAssignAddForm(false);
+            }}
+          >
+            <Text style={[styles.closeDetailIconText, { color: customTextSec }]}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={{ fontSize: 12, color: customTextSec, marginBottom: 14 }}>
+          Sélectionnez le produit de votre Salle de Bain à utiliser pour le soin : <Text style={{ color: colors.primary, fontWeight: '700' }}>{assignTargetCategory}</Text>
+        </Text>
+
+        <ScrollView style={{ maxHeight: 220, marginBottom: 16 }} showsVerticalScrollIndicator={false}>
+          {(() => {
+            const compProducts = bathroomProducts.filter(bp => matchesCategory(bp.category, assignTargetCategory, bp.name));
+            
+            if (compProducts.length === 0) {
+              return (
+                <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 12, color: customTextSec, textAlign: 'center', fontStyle: 'italic' }}>
+                    ⚠️ Aucun produit compatible dans votre Salle de Bain.
+                  </Text>
+                </View>
+              );
+            }
+
+            return (
+              <View style={{ gap: 8 }}>
+                {compProducts.map((prod) => {
+                  const currentCare = routine.find(r => r.id === assignTargetCareId);
+                  const isCurrentlyAssigned = currentCare?.selectedProductId === prod.id || 
+                    (!currentCare?.selectedProductId && compProducts[0]?.id === prod.id); // Default match
+
+                  return (
+                    <TouchableOpacity
+                      key={prod.id}
+                      style={[
+                        styles.productSelectCard,
+                        { 
+                          borderColor: isCurrentlyAssigned ? colors.primary : customBorder,
+                          backgroundColor: isCurrentlyAssigned ? (isLight ? '#FFF9F4' : 'rgba(229,169,130,0.08)') : customCard,
+                          padding: 12,
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          marginVertical: 4,
+                        }
+                      ]}
+                      onPress={() => {
+                        updateRoutineItemProduct(assignTargetCareId, prod.id);
+                        setShowAssignModal(false);
+                        setAssignTargetCareId('');
+                        setAssignTargetCategory('');
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: customText }} numberOfLines={1}>
+                          {prod.name}
+                        </Text>
+                        <Text style={{ fontSize: 10, color: customTextSec }} numberOfLines={1}>
+                          {prod.brand}
+                        </Text>
+                      </View>
+                      {prod.price !== undefined && (
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
+                          {prod.price.toFixed(2)} €
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            );
+          })()}
+        </ScrollView>
+
+        {/* Ajouter un nouveau produit button */}
+        <TouchableOpacity
+          style={{ 
+            backgroundColor: isLight ? '#FFF3E8' : 'rgba(229,169,130,0.1)', 
+            borderWidth: 1.5, 
+            borderColor: colors.primary,
+            borderStyle: 'dashed',
+            marginBottom: 16,
+            paddingVertical: 12,
+            borderRadius: 14,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          activeOpacity={0.8}
+          onPress={() => {
+            setAssignAddName('');
+            setAssignAddBrand('');
+            setAssignAddPrice('');
+            setAssignAddPriceNR(false);
+            setAssignAddImage(undefined);
+            setAssignAddCategory(assignTargetCategory);
+            setShowAssignAddForm(true);
+          }}
+        >
+          <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 12 }}>
+            ➕ Ajouter & Associer un nouveau produit (Photo)
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={{ 
+            backgroundColor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)', 
+            borderWidth: 1, 
+            borderColor: customBorder, 
+            paddingVertical: 12,
+            borderRadius: 14,
+            alignItems: 'center',
+          }}
+          onPress={() => {
+            setShowAssignModal(false);
+            setAssignTargetCareId('');
+            setAssignTargetCategory('');
+            setShowAssignAddForm(false);
+          }}
+        >
+          <Text style={{ color: customText, fontWeight: '700', fontSize: 12 }}>Fermer</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderProductSelectionModalContent = () => {
+    if (!productSelectTargetCare) return null;
+
+    if (showNonListedOptions) {
+      return (
+        <View style={[styles.detailCard, { backgroundColor: customCard, borderColor: customBorder, maxWidth: 380, width: '90%' }]}>
+          <View style={[styles.detailHeader, { marginBottom: 16 }]}>
+            <Text style={[styles.detailTitle, { color: colors.primary, fontSize: 16 }]}>
+              🔍 Valider sans produit
+            </Text>
+            <TouchableOpacity 
+              style={[styles.closeDetailIcon, { backgroundColor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)' }]} 
+              onPress={() => setShowNonListedOptions(false)}
+            >
+              <Text style={[styles.closeDetailIconText, { color: customTextSec }]}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={{ fontSize: 13, fontWeight: '700', color: customText, marginBottom: 16, textAlign: 'center' }}>
+            Que souhaitez-vous faire ?
+          </Text>
+
+          {/* Option 1: Ajouter le produit */}
+          <TouchableOpacity
+            style={{
+              backgroundColor: colors.primary,
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+              borderRadius: 14,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 12,
+            }}
+            activeOpacity={0.8}
+            onPress={() => {
+              setQuickAddName('');
+              setQuickAddBrand('');
+              setQuickAddPrice('');
+              setQuickAddPriceNR(false);
+              setQuickAddImage(undefined);
+              setQuickAddCategory(productSelectTargetCare.category);
+              setShowQuickAddForm(true);
+              setShowNonListedOptions(false);
+            }}
+          >
+            <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
+              ➕ Renseigner un autre produit
+            </Text>
+          </TouchableOpacity>
+
+          {/* Option 2: Passer mon chemin */}
+          <TouchableOpacity
+            style={{
+              backgroundColor: 'rgba(217, 83, 79, 0.08)',
+              borderWidth: 1.5,
+              borderColor: colors.danger,
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+              borderRadius: 14,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 16,
+            }}
+            activeOpacity={0.8}
+            onPress={() => {
+              setModalSelectedProductIds([]);
+              if (productSelectOnConfirm) {
+                productSelectOnConfirm(undefined);
+              }
+              setShowProductSelectModal(false);
+              setProductSelectTargetCare(null);
+              setProductSelectOnConfirm(null);
+              setShowQuickAddForm(false);
+              setShowNonListedOptions(false);
+            }}
+          >
+            <Text style={{ color: colors.danger, fontWeight: '800', fontSize: 13 }}>
+              🚶 Valider sans produit (Passer mon chemin)
+            </Text>
+          </TouchableOpacity>
+
+          {/* Option 3: Retour */}
+          <TouchableOpacity
+            style={{
+              backgroundColor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)',
+              borderWidth: 1,
+              borderColor: customBorder,
+              paddingVertical: 12,
+              borderRadius: 14,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            activeOpacity={0.8}
+            onPress={() => setShowNonListedOptions(false)}
+          >
+            <Text style={{ color: customText, fontWeight: '700', fontSize: 12 }}>
+              Retour
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (showQuickAddForm) {
+      return (
+        <View style={[styles.detailCard, { backgroundColor: customCard, borderColor: customBorder, maxWidth: 380, width: '90%' }]}>
+          <View style={[styles.detailHeader, { marginBottom: 16 }]}>
+            <Text style={[styles.detailTitle, { color: colors.primary, fontSize: 16 }]}>
+              ➕ Nouveau produit
+            </Text>
+            <TouchableOpacity 
+              style={[styles.closeDetailIcon, { backgroundColor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)' }]} 
+              onPress={() => setShowQuickAddForm(false)}
+            >
+              <Text style={[styles.closeDetailIconText, { color: customTextSec }]}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Photo Upload Section */}
+          <View style={{ alignItems: 'center', marginBottom: 16 }}>
+            {quickAddImage ? (
+              <Image source={{ uri: quickAddImage }} style={{ width: 100, height: 100, borderRadius: 50, marginBottom: 8 }} />
+            ) : (
+              <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: isLight ? '#F0F0F0' : '#303030', justifyContent: 'center', alignItems: 'center', marginBottom: 8 }}>
+                <Text style={{ fontSize: 24 }}>🧴</Text>
+              </View>
+            )}
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity 
+                style={{ backgroundColor: 'rgba(229,169,130,0.1)', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8 }}
+                onPress={() => launchQuickAddPicker(false)}
+              >
+                <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700' }}>Appareil Photo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={{ backgroundColor: 'rgba(229,169,130,0.1)', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8 }}
+                onPress={() => launchQuickAddPicker(true)}
+              >
+                <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700' }}>Galerie</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Input Nom */}
+          <View style={{ marginBottom: 12 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: customText, marginBottom: 6 }}>Nom du produit *</Text>
+            <TextInput
+              style={{
+                backgroundColor: customInputBg,
+                borderColor: customInputBorder,
+                borderWidth: 1,
+                borderRadius: 10,
+                padding: 10,
+                color: customText,
+                fontSize: 12,
+              }}
+              placeholder="Ex: Huile de Jojoba Pure"
+              placeholderTextColor={isLight ? '#999999' : '#666666'}
+              value={quickAddName}
+              onChangeText={setQuickAddName}
+            />
+          </View>
+
+          {/* Input Marque */}
+          <View style={{ marginBottom: 12 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: customText, marginBottom: 6 }}>Marque *</Text>
+            <TextInput
+              style={{
+                backgroundColor: customInputBg,
+                borderColor: customInputBorder,
+                borderWidth: 1,
+                borderRadius: 10,
+                padding: 10,
+                color: customText,
+                fontSize: 12,
+              }}
+              placeholder="Ex: Aroma-Zone"
+              placeholderTextColor={isLight ? '#999999' : '#666666'}
+              value={quickAddBrand}
+              onChangeText={setQuickAddBrand}
+            />
+          </View>
+
+          {/* Prix & Checkbox */}
+          <View style={{ marginBottom: 20 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: customText, marginBottom: 6 }}>Prix (€)</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <TextInput
+                style={{
+                  flex: 1,
+                  backgroundColor: quickAddPriceNR ? 'rgba(0,0,0,0.03)' : customInputBg,
+                  borderColor: customInputBorder,
+                  borderWidth: 1,
+                  borderRadius: 10,
+                  padding: 10,
+                  color: quickAddPriceNR ? customTextSec : customText,
+                  fontSize: 12,
+                }}
+                keyboardType="numeric"
+                placeholder="Ex: 5.99"
+                placeholderTextColor={isLight ? '#999999' : '#666666'}
+                value={quickAddPrice}
+                onChangeText={setQuickAddPrice}
+                editable={!quickAddPriceNR}
+              />
+              
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                activeOpacity={0.8}
+                onPress={() => setQuickAddPriceNR(!quickAddPriceNR)}
+              >
+                <View style={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: 4,
+                  borderWidth: 1.5,
+                  borderColor: quickAddPriceNR ? colors.primary : (isLight ? '#CCCCCC' : '#555555'),
+                  backgroundColor: quickAddPriceNR ? colors.primary : 'transparent',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  {quickAddPriceNR && <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' }}>✓</Text>}
+                </View>
+                <Text style={{ fontSize: 11, color: customTextSec }}>Renseigner plus tard</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Fonction / Étape du soin */}
+          <View style={{ marginBottom: 16 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: customText, marginBottom: 6 }}>Fonction / Étape du soin *</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+              {[
+                { name: 'Lavage', emoji: '🧴' },
+                { name: "Bain d'huile", emoji: '🌿' },
+                { name: 'Masque hydratant', emoji: '🍯' },
+                { name: 'Soin sans rinçage', emoji: '💧' },
+                { name: 'Clarification', emoji: '🔬' },
+                { name: 'Retwist', emoji: '👑' }
+              ].map((cat) => {
+                const isSelected = quickAddCategory === cat.name;
+                return (
+                  <TouchableOpacity
+                    key={cat.name}
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      borderRadius: 16,
+                      borderWidth: 1.5,
+                      borderColor: isSelected ? colors.primary : customBorder,
+                      backgroundColor: isSelected ? 'rgba(229,169,130,0.15)' : 'transparent',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    onPress={() => setQuickAddCategory(cat.name)}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: isSelected ? colors.primary : customText }}>
+                      {cat.emoji} {cat.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Buttons */}
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity
+              style={{ 
+                flex: 1, 
+                backgroundColor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)', 
+                borderWidth: 1, 
+                borderColor: customBorder, 
+                paddingVertical: 12,
+                borderRadius: 14,
+                alignItems: 'center',
+              }}
+              onPress={() => setShowQuickAddForm(false)}
+            >
+              <Text style={{ color: customText, fontWeight: '700', fontSize: 12 }}>Annuler</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{ 
+                flex: 1, 
+                backgroundColor: colors.primary, 
+                paddingVertical: 12,
+                borderRadius: 14,
+                alignItems: 'center',
+                opacity: (!quickAddName.trim() || !quickAddBrand.trim() || !quickAddCategory) ? 0.5 : 1,
+              }}
+              disabled={!quickAddName.trim() || !quickAddBrand.trim() || !quickAddCategory}
+              onPress={() => {
+                const newProd = addBathroomProduct({
+                  name: quickAddName.trim(),
+                  brand: quickAddBrand.trim(),
+                  category: quickAddCategory,
+                  ingredients: [],
+                  compatibility: 'Compatible',
+                  score: 100,
+                  price: quickAddPriceNR ? undefined : parseFloat(quickAddPrice) || undefined,
+                  image: quickAddImage,
+                });
+                // Complete the care immediately with this new product!
+                if (productSelectOnConfirm) {
+                  productSelectOnConfirm({
+                    id: newProd.id,
+                    name: newProd.name,
+                    price: newProd.price || 0
+                  });
+                }
+                setShowProductSelectModal(false);
+                setProductSelectTargetCare(null);
+                setProductSelectOnConfirm(null);
+                setShowQuickAddForm(false);
+                setShowNonListedOptions(false);
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 12, textAlign: 'center' }}>Enregistrer & Utiliser</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={[styles.detailCard, { backgroundColor: customCard, borderColor: customBorder, maxWidth: 380, width: '90%' }]}>
+        
+        <View style={[styles.detailHeader, { marginBottom: 12 }]}>
+          <Text style={[styles.detailTitle, { color: colors.primary, fontSize: 16 }]}>
+            Choix du produit 🧴
+          </Text>
+          <TouchableOpacity 
+            style={[styles.closeDetailIcon, { backgroundColor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)' }]} 
+            onPress={() => {
+              setShowProductSelectModal(false);
+              setProductSelectTargetCare(null);
+              setProductSelectOnConfirm(null);
+              setShowQuickAddForm(false);
+              setShowNonListedOptions(false);
+            }}
+          >
+            <Text style={[styles.closeDetailIconText, { color: customTextSec }]}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={{ fontSize: 13, fontWeight: '700', color: customText, marginBottom: 14 }}>
+          Quel produit de votre Salle de Bain avez-vous utilisé pour ce soin : {"\n"}
+          <Text style={{ color: colors.primary }}>{productSelectTargetCare.category}</Text> ?
+        </Text>
+
+        <ScrollView style={{ maxHeight: 220, marginBottom: 16 }} showsVerticalScrollIndicator={false}>
+          {compatibleProducts.length > 0 ? (
+            <View style={{ gap: 8 }}>
+              {compatibleProducts.map((prod) => {
+                const isSelected = modalSelectedProductIds.includes(prod.id);
+                return (
+                  <TouchableOpacity
+                    key={prod.id}
+                    style={[
+                      styles.productSelectCard,
+                      { 
+                        borderColor: isSelected ? colors.primary : customBorder,
+                        backgroundColor: isSelected ? (isLight ? '#FFF9F4' : 'rgba(229,169,130,0.08)') : customCard,
+                        padding: 12,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginVertical: 4,
+                      }
+                    ]}
+                    onPress={() => {
+                      if (isSelected) {
+                        setModalSelectedProductIds(prev => prev.filter(id => id !== prod.id));
+                      } else {
+                        setModalSelectedProductIds(prev => [...prev, prod.id]);
+                      }
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                      <View style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: 9,
+                        borderWidth: 1.5,
+                        borderColor: isSelected ? colors.primary : (isLight ? '#CCCCCC' : '#555555'),
+                        backgroundColor: isSelected ? colors.primary : 'transparent',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: 10,
+                      }}>
+                        {isSelected && <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' }}>✓</Text>}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: customText }} numberOfLines={1}>
+                          {prod.name}
+                        </Text>
+                        <Text style={{ fontSize: 10, color: customTextSec }} numberOfLines={1}>
+                          {prod.brand}
+                        </Text>
+                      </View>
+                    </View>
+                    {prod.price !== undefined && prod.price !== null ? (
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
+                        {prod.price.toFixed(2)} €
+                      </Text>
+                    ) : (
+                      <Text style={{ fontSize: 9, fontWeight: '600', color: customTextSec, fontStyle: 'italic' }}>
+                        Prix : N/R
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+              <Text style={{ fontSize: 12, color: customTextSec, textAlign: 'center', fontStyle: 'italic' }}>
+                ⚠️ Aucun produit compatible trouvé dans votre Salle de Bain pour ce soin.
+              </Text>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Ajouter un produit Button */}
+        <TouchableOpacity
+          style={{ 
+            backgroundColor: isLight ? '#FFF3E8' : 'rgba(229,169,130,0.1)', 
+            borderWidth: 1.5, 
+            borderColor: colors.primary,
+            borderStyle: 'dashed',
+            marginBottom: 10,
+            paddingVertical: 12,
+            borderRadius: 14,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          activeOpacity={0.8}
+          onPress={() => {
+            setQuickAddName('');
+            setQuickAddBrand('');
+            setQuickAddPrice('');
+            setQuickAddPriceNR(false);
+            setQuickAddImage(undefined);
+            setQuickAddCategory(productSelectTargetCare.category);
+            setShowQuickAddForm(true);
+            setShowNonListedOptions(false);
+          }}
+        >
+          <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 12, textAlign: 'center' }}>
+            ➕ Renseigner un autre produit
+          </Text>
+        </TouchableOpacity>
+
+        {/* Produit non listé Button */}
+        <TouchableOpacity
+          style={{ 
+            backgroundColor: modalSelectedProductIds.length === 0 ? 'rgba(217, 83, 79, 0.08)' : 'transparent', 
+            borderWidth: 1.5, 
+            borderColor: modalSelectedProductIds.length === 0 ? colors.danger : customBorder,
+            marginBottom: 16,
+            paddingVertical: 12,
+            borderRadius: 14,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          activeOpacity={0.8}
+          onPress={() => {
+            setModalSelectedProductIds([]);
+            if (productSelectOnConfirm) {
+              productSelectOnConfirm(undefined);
+            }
+            setShowProductSelectModal(false);
+            setProductSelectTargetCare(null);
+            setProductSelectOnConfirm(null);
+            setShowQuickAddForm(false);
+            setShowNonListedOptions(false);
+          }}
+        >
+          <Text style={{ color: modalSelectedProductIds.length === 0 ? colors.danger : customTextSec, fontWeight: '800', fontSize: 12, textAlign: 'center' }}>
+            Valider sans produit ❌
+          </Text>
+        </TouchableOpacity>
+
+        {/* Confirm / Cancel Buttons */}
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <TouchableOpacity
+            style={{ 
+              flex: 1, 
+              backgroundColor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)', 
+              borderWidth: 1, 
+              borderColor: customBorder, 
+              paddingVertical: 12,
+              borderRadius: 14,
+              alignItems: 'center',
+            }}
+            onPress={() => {
+              setShowProductSelectModal(false);
+              setProductSelectTargetCare(null);
+              setProductSelectOnConfirm(null);
+              setShowQuickAddForm(false);
+              setShowNonListedOptions(false);
+            }}
+          >
+            <Text style={{ color: customText, fontWeight: '700', fontSize: 12 }}>Annuler</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{ 
+              flex: 1, 
+              backgroundColor: colors.primary, 
+              paddingVertical: 12,
+              borderRadius: 14,
+              alignItems: 'center',
+            }}
+            onPress={() => {
+              if (productSelectOnConfirm) {
+                let usedProduct: { id: string; name: string; price: number } | undefined = undefined;
+                if (modalSelectedProductIds.length > 0) {
+                  const selectedProducts = bathroomProducts.filter(bp => modalSelectedProductIds.includes(bp.id));
+                  const ids = selectedProducts.map(p => p.id).join(',');
+                  const names = selectedProducts.map(p => p.name).join(' + ');
+                  const totalCost = selectedProducts.reduce((sum, p) => sum + (p.price || 0), 0);
+                  usedProduct = { id: ids, name: names, price: totalCost };
+                }
+                productSelectOnConfirm(usedProduct);
+              }
+              setShowProductSelectModal(false);
+              setProductSelectTargetCare(null);
+              setProductSelectOnConfirm(null);
+              setShowQuickAddForm(false);
+              setShowNonListedOptions(false);
+            }}
+          >
+            <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 12 }}>Confirmer</Text>
+          </TouchableOpacity>
+        </View>
+
+      </View>
+    );
+  };
 
   // Helper date conversions
   const year = currentDate.getFullYear();
@@ -921,13 +1949,40 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
                         ]}>
                           {item.category}
                         </Text>
-                        <Text style={[
-                          styles.taskProduct, 
-                          { color: customTextSec },
-                          isCompleted && { opacity: 0.7, fontStyle: 'italic' }
-                        ]}>
-                          {item.product}
-                        </Text>
+                        {(() => {
+                          if (item.selectedProductId === 'none') {
+                            return (
+                              <Text style={[
+                                styles.taskProduct, 
+                                { color: colors.danger, fontWeight: '700' },
+                                isCompleted && { opacity: 0.7, fontStyle: 'italic' }
+                              ]}>
+                                ❌ Aucun produit
+                              </Text>
+                            );
+                          }
+                          const matchingBathroomProduct = getSelectedProductForCare(item);
+                          if (matchingBathroomProduct) {
+                            return (
+                              <Text style={[
+                                styles.taskProduct, 
+                                { color: isLight ? '#4D735F' : '#9CCCAE', fontWeight: '700' },
+                                isCompleted && { opacity: 0.7, fontStyle: 'italic' }
+                              ]}>
+                                🧼 {matchingBathroomProduct.brand} • {matchingBathroomProduct.name}
+                              </Text>
+                            );
+                          }
+                          return (
+                            <Text style={[
+                              styles.taskProduct, 
+                              { color: customTextSec },
+                              isCompleted && { opacity: 0.7, fontStyle: 'italic' }
+                            ]}>
+                              {item.product}
+                            </Text>
+                          );
+                        })()}
                         
                         <Text style={{ fontSize: 9.5, color: colors.secondary, fontWeight: '700', marginTop: 4 }}>
                           ⚡ Freq : {item.recurrence}
@@ -953,7 +2008,19 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
                             justifyContent: 'center',
                           }
                         ]}
-                        onPress={() => toggleRoutineCompleted(item.id)}
+                        onPress={() => {
+                          if (item.completed) {
+                            toggleRoutineCompleted(item.id);
+                          } else {
+                            setProductSelectTargetCare(item);
+                            const initialProd = getSelectedProductForCare(item);
+                            setModalSelectedProductIds(initialProd ? [initialProd.id] : []);
+                            setProductSelectOnConfirm(() => (usedProduct?: { id: string; name: string; price: number }) => {
+                              toggleRoutineCompleted(item.id, usedProduct);
+                            });
+                            setShowProductSelectModal(true);
+                          }
+                        }}
                       >
                         {isCompleted && (
                           <Text style={{ 
@@ -1168,7 +2235,12 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
         }}
       >
         <View style={[styles.modalOverlay, { backgroundColor: isLight ? 'rgba(0, 0, 0, 0.4)' : colors.overlay }]}>
-          <View style={[styles.guideCard, { backgroundColor: customCard, borderColor: customBorder }]}>
+          {showProductSelectModal && productSelectTargetCare ? (
+            renderProductSelectionModalContent()
+          ) : showAssignModal ? (
+            renderAssignModalContent()
+          ) : (
+            <View style={[styles.guideCard, { backgroundColor: customCard, borderColor: customBorder }]}>
             <View style={styles.detailHeader}>
               <Text style={[styles.detailTitle, { color: customText, fontSize: 18 }]}>📖 Guide Pratique de Soin</Text>
               <TouchableOpacity 
@@ -1202,6 +2274,104 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
                   *Personnalisé pour vos cheveux {activeProfile.diagnostic.texture} ({activeProfile.diagnostic.porosity || 'porosité non définie'}, épaisseur {activeProfile.diagnostic.thickness.toLowerCase()}).
                 </Text>
               </View>
+
+              {/* Produit prévu pour ce soin */}
+              {activeCareItem && !activeCareItem.completed && (
+                <View style={[styles.guideSectionBox, { borderColor: customBorder, marginTop: 4, padding: 14 }]}>
+                  <Text style={styles.guideSectionHeader}>🧴 Produit prévu pour ce soin :</Text>
+                  {(() => {
+                    const associatedProduct = getSelectedProductForCare(activeCareItem);
+                    if (associatedProduct) {
+                      const isOcclusive = associatedProduct.ingredients.some(i => 
+                        i.toLowerCase().includes('mineral oil') || 
+                        i.toLowerCase().includes('petrolatum') || 
+                        i.toLowerCase().includes('cire') || 
+                        i.toLowerCase().includes('wax')
+                      );
+                      const isLowPoro = activeProfile.diagnostic.porosity === 'Faible';
+                      const hasWarning = associatedProduct.compatibility === 'Attention' || (isOcclusive && isLowPoro);
+
+                      return (
+                        <View style={{ gap: 8, marginTop: 4 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: customText, flex: 1, marginRight: 8 }}>
+                              🧼 {associatedProduct.brand} • {associatedProduct.name}
+                            </Text>
+                            {associatedProduct.price !== undefined && (
+                              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+                                {associatedProduct.price.toFixed(2)} €
+                              </Text>
+                            )}
+                          </View>
+
+                          {hasWarning ? (
+                            <Text style={{ fontSize: 10.5, color: colors.danger, fontStyle: 'italic', marginTop: 2 }}>
+                              ⚠️ Attention : ce produit contient des cires occlusives ou ingrédients lourds peu adaptés à ta porosité faible.
+                            </Text>
+                          ) : (
+                            <Text style={{ fontSize: 10.5, color: isLight ? '#4D735F' : '#9CCCAE', fontStyle: 'italic', marginTop: 2 }}>
+                              ✓ Produit compatible et idéal présent dans votre Salle de Bain.
+                            </Text>
+                          )}
+
+                          <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                            <TouchableOpacity 
+                              style={{ backgroundColor: 'rgba(229, 169, 130, 0.1)', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8 }}
+                              onPress={() => {
+                                setAssignTargetCareId(activeCareItem.id);
+                                setAssignTargetCategory(activeCareItem.category);
+                                setAssignAddCategory(activeCareItem.category);
+                                setAssignAddName('');
+                                setAssignAddBrand('');
+                                setAssignAddPrice('');
+                                setAssignAddPriceNR(false);
+                                setAssignAddImage(undefined);
+                                setShowAssignAddForm(false);
+                                setShowAssignModal(true);
+                              }}
+                            >
+                              <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700' }}>Remplacer</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                              style={{ backgroundColor: 'rgba(217, 83, 79, 0.08)', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8 }}
+                              onPress={() => {
+                                updateRoutineItemProduct(activeCareItem.id, 'none');
+                              }}
+                            >
+                              <Text style={{ color: colors.danger, fontSize: 11, fontWeight: '700' }}>Retirer</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    } else {
+                      return (
+                        <View style={{ marginTop: 4 }}>
+                          <Text style={{ fontSize: 11, color: customTextSec, fontStyle: 'italic', marginBottom: 8 }}>
+                            Aucun produit spécifique prévu (vous pourrez en sélectionner un lors de la validation).
+                          </Text>
+                          <TouchableOpacity 
+                            style={{ backgroundColor: 'rgba(229, 169, 130, 0.1)', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, alignSelf: 'flex-start' }}
+                            onPress={() => {
+                              setAssignTargetCareId(activeCareItem.id);
+                              setAssignTargetCategory(activeCareItem.category);
+                              setAssignAddCategory(activeCareItem.category);
+                              setAssignAddName('');
+                              setAssignAddBrand('');
+                              setAssignAddPrice('');
+                              setAssignAddPriceNR(false);
+                              setAssignAddImage(undefined);
+                              setShowAssignAddForm(false);
+                              setShowAssignModal(true);
+                            }}
+                          >
+                            <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700' }}>Associer un produit</Text>
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    }
+                  })()}
+                </View>
+              )}
 
               {/* Individual Care Reminder Hour Picker Row */}
               {activeCareItem && (
@@ -1255,11 +2425,17 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
                 }
                 onPress={() => {
                   if (activeCareItem) {
-                    toggleRoutineCompleted(activeCareItem.id);
+                    setProductSelectTargetCare(activeCareItem);
+                    const initialProd = getSelectedProductForCare(activeCareItem);
+                    setModalSelectedProductIds(initialProd ? [initialProd.id] : []);
+                    setProductSelectOnConfirm(() => (usedProduct?: { id: string; name: string; price: number }) => {
+                      toggleRoutineCompleted(activeCareItem.id, usedProduct);
+                      setShowCareGuide(false);
+                      setSelectedGuideCategory('');
+                      setSelectedCareId('');
+                    });
+                    setShowProductSelectModal(true);
                   }
-                  setShowCareGuide(false);
-                  setSelectedGuideCategory('');
-                  setSelectedCareId('');
                 }}
                 disabled={!activeCareItem || activeCareItem.completed}
                 variant="primary"
@@ -1277,6 +2453,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
               />
             </View>
           </View>
+          )}
 
           {/* ⏰ INDIVIDUAL TIME PICKER OVERLAY */}
           {activeCareItem && (
@@ -1293,6 +2470,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ autoOpenAddModal
           )}
         </View>
       </Modal>
+
     </View>
   );
 };
@@ -1787,5 +2965,27 @@ const styles = StyleSheet.create({
   closeDetailIconText: {
     fontSize: 14,
     fontWeight: '700',
+  },
+  detailCard: {
+    backgroundColor: colors.card,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    padding: 24,
+    width: '100%',
+    maxWidth: 420,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  productSelectCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
 });

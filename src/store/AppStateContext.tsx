@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { NotificationService } from './NotificationService';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { onAuthStateChanged, signOut, updateEmail, updatePassword } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
 
 // Types
@@ -14,6 +16,277 @@ export const getLocalDateString = (d: Date = new Date()) => {
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
+
+const formatFrenchDateLocal = (dateStr: string) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length < 3) return dateStr;
+  const day = parseInt(parts[2], 10);
+  const months = [
+    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+  ];
+  const monthIndex = parseInt(parts[1], 10) - 1;
+  return `${day} ${months[monthIndex]}`;
+};
+
+const matchesCategoryLocal = (prodCat: string, agendaCat: string, prodName?: string): boolean => {
+  const pc = prodCat.toLowerCase().trim();
+  const ac = agendaCat.toLowerCase().trim();
+  const name = prodName ? prodName.toLowerCase() : '';
+
+  if (pc === 'autre' || pc === '') return false;
+
+  const isHeavyGel = name.includes('cire') || name.includes('wax') || name.includes('petrolatum') || name.includes('pétrolatum') || name.includes('gel') || name.includes('gelée') || name.includes('jelly');
+
+  if (ac.includes('bain') || ac.includes('huile')) {
+    if (isHeavyGel) return false;
+    return pc === "bain d'huile";
+  }
+
+  if (ac.includes('lavage') || ac.includes('shampoing') || ac.includes('clarif') || ac.includes('détox')) {
+    return pc === 'lavage' || pc === 'clarification';
+  }
+
+  if (ac.includes('masque') || ac.includes('profond')) {
+    if (isHeavyGel) return false;
+    return pc === 'masque hydratant';
+  }
+
+  if (ac.includes('retwist')) {
+    return pc === 'retwist';
+  }
+
+  if (ac.includes('sans rinç') || ac.includes('sans rinc') || ac.includes('leave') ||
+      ac.includes('lait') || ac.includes('crème') || ac.includes('creme') ||
+      ac.includes('cream') || ac.includes('coiffage') || ac.includes('hydratation')) {
+    if (pc === 'retwist' || pc === 'lavage' || pc === 'clarification') return false;
+    return pc === 'soin sans rinçage';
+  }
+
+  return false;
+};
+
+export interface CompatibilityResult {
+  score: number;
+  title: string;
+  color: string;
+  description: string;
+  compatibility: 'Compatible' | 'Attention';
+}
+
+export const evaluateProductCompatibility = (
+  brand: string,
+  name: string,
+  category: string,
+  ingredients: string[],
+  diagnostic: HairDiagnostic
+): CompatibilityResult => {
+  const texture = diagnostic.texture || 'Crépus';
+  const porosity = diagnostic.porosity || 'Moyenne';
+  const thickness = diagnostic.thickness || 'Moyens';
+  const sensitivity = diagnostic.sensitivity || [];
+  
+  const bLower = brand.toLowerCase();
+  const nLower = name.toLowerCase();
+  const catLower = category.toLowerCase();
+  
+  const ingText = ingredients.map(i => i.toLowerCase()).join(' ');
+  const fullText = `${brand} ${name} ${category} ${ingText}`.toLowerCase();
+  
+  const colors = {
+    success: '#10B981',
+    warning: '#F59E0B',
+    danger: '#EF4444'
+  };
+
+  if (nLower.includes('resistant formula locking gel') || nLower.includes('jamaican mango')) {
+    if (texture === 'Locksés') {
+      return {
+        score: 92,
+        title: 'Excellent pour tes locks ! 🔒',
+        color: colors.success,
+        description: 'Ce gel de locking est formulé sans cire lourde ni vaseline occlusive. Il est soluble dans l\'eau, ce qui évite les accumulations blanches résiduelles (build-ups) à l\'intérieur de tes locks. Un excellent choix pour former tes départs ou resserrer tes racines !',
+        compatibility: 'Compatible'
+      };
+    } else {
+      return {
+        score: 55,
+        title: 'Hold trop rigide pour cheveux libres ⚠️',
+        color: colors.warning,
+        description: 'Bien que très propre et soluble pour les locks, ce gel a un effet carton extrêmement rigide sur cheveux libres (crépus, bouclés). Il risque d\'assécher tes boucles libres à cause des agents fixateurs forts. Privilégie un lait ou une crème hydratante douce.',
+        compatibility: 'Attention'
+      };
+    }
+  }
+
+  if (nLower.includes('extra hold styling wax') || (nLower.includes('cantu shea butter') && nLower.includes('wax'))) {
+    if (texture === 'Locksés') {
+      return {
+        score: 15,
+        title: 'DANGEREUX / RÉSIDUS SOLIDES 🚨',
+        color: colors.danger,
+        description: 'AVERTISSEMENT : Ce produit contient de la cire microcristalline et de l\'huile minérale (paraffine). Ces cires occlusives lourdes sont insolubles à l\'eau et s\'accumulent au cœur des locks sans jamais s\'en aller au lavage. Cela crée des résidus blancs disgracieux et peut emprisonner l\'humidité, causant de la moisissure interne (dread rot). À fuir absolument pour ton profil Locks !',
+        compatibility: 'Attention'
+      };
+    } else {
+      return {
+        score: 45,
+        title: 'Lourd & Occlusif ⚠️',
+        color: colors.warning,
+        description: 'Ce produit contient beaucoup d\'huiles minérales lourdes. Sur cheveux libres, il étouffe les cuticules et empêche l\'eau d\'y entrer. Idéal uniquement pour des tresses très temporaires mais nécessite une clarification forte immédiatement après.',
+        compatibility: 'Attention'
+      };
+    }
+  }
+
+  if (texture === 'Locksés') {
+    const hasShea = fullText.includes('shea') || fullText.includes('karite') || fullText.includes('karité');
+    const hasCocoa = fullText.includes('cocoa') || fullText.includes('cacao');
+    const hasButter = fullText.includes('butter') || fullText.includes('beurre');
+    const hasWax = fullText.includes('wax') || fullText.includes('cire') || fullText.includes('beeswax') || fullText.includes('ozokerite');
+    const hasMineral = fullText.includes('mineral oil') || fullText.includes('petrolatum') || fullText.includes('paraffin') || fullText.includes('paraffine') || fullText.includes('microcrystalline') || fullText.includes('vaseline') || fullText.includes('pétrolatum');
+    const hasCastor = fullText.includes('castor') || fullText.includes('ricin') || fullText.includes('carapate');
+
+    if (hasShea || hasCocoa || hasButter || hasWax || hasMineral || hasCastor) {
+      return {
+        score: 15,
+        title: 'DANGEREUX / RÉSIDUS SOLIDES 🚨',
+        color: colors.danger,
+        description: `EXCLUSION absolue : Vos cheveux étant Locksés, tout produit contenant des corps gras solides (beurres, cires, huiles lourdes non solubles) est rigoureusement exclu car ils créent des résidus indélogeables (build-ups) au cœur de la lock. Utilisez uniquement des sprays hydratants légers à base d'eau de rose ou de glycérine.`,
+        compatibility: 'Attention'
+      };
+    }
+  }
+
+  if (porosity === 'Faible') {
+    const hasCoco = fullText.includes('coconut oil') || fullText.includes('huile de coco') || (fullText.includes('coconut') && !fullText.includes('water') && !fullText.includes('eau'));
+    const hasShea = fullText.includes('shea') || fullText.includes('karite') || fullText.includes('karité');
+    const hasProtein = fullText.includes('protein') || fullText.includes('protéin') || fullText.includes('keratin') || fullText.includes('kératine') || fullText.includes('collagen') || fullText.includes('collagène') || fullText.includes('elastin') || fullText.includes('élastine') || fullText.includes('silk') || fullText.includes('soie');
+
+    if (hasCoco || hasShea || hasProtein) {
+      let excludedList = [];
+      if (hasCoco) excludedList.push("l'Huile de Coco");
+      if (hasShea) excludedList.push("le Beurre de Karité brut");
+      if (hasProtein) excludedList.push("les protéines lourdes");
+      return {
+        score: 48,
+        title: 'Risque de saturation (Porosité Faible) ⚠️',
+        color: colors.warning,
+        description: `Vos cheveux ayant une Porosité Faible, nous avons rigoureusement exclu ${excludedList.join(', ')} de vos soins. Ils saturent la surface de vos cuticules fermées sans y pénétrer. Privilégiez des produits fluides à base d'eau, de gel d'Aloe Vera, d'huile de Jojoba ou de Pépins de Raisin.`,
+        compatibility: 'Attention'
+      };
+    }
+  }
+
+  if (thickness === 'Fins' && (catLower.includes('sans rinçage') || catLower.includes('leave') || nLower.includes('leave') || nLower.includes('lait') || nLower.includes('crème') || nLower.includes('creme') || nLower.includes('cream') || nLower.includes('smoothie'))) {
+    const hasShea = fullText.includes('shea') || fullText.includes('karite') || fullText.includes('karité');
+    const hasAvocado = fullText.includes('avocado') || fullText.includes('avocat');
+    const hasCastor = fullText.includes('castor') || fullText.includes('ricin') || fullText.includes('carapate');
+
+    if (hasShea || hasAvocado || hasCastor) {
+      let ingredientsFound = [];
+      if (hasShea) ingredientsFound.push("Beurre de Karité");
+      if (hasAvocado) ingredientsFound.push("Avocat");
+      if (hasCastor) ingredientsFound.push("Huile de Ricin");
+      return {
+        score: 50,
+        title: 'Trop lourd pour cheveux fins ⚠️',
+        color: colors.warning,
+        description: `Vos cheveux étant Fins, nous excluons les beurres lourds (${ingredientsFound.includes("Beurre de Karité") ? 'Karité' : ''}${ingredientsFound.includes("Beurre de Karité") && ingredientsFound.includes("Avocat") ? '/' : ''}${ingredientsFound.includes("Avocat") ? 'Avocat' : ''}) et les huiles visqueuses (Ricin) en soin sans rinçage pour éviter d'écraser le volume. Privilégiez des laits fluides ou des sprays aqueux.`,
+        compatibility: 'Attention'
+      };
+    }
+  }
+
+  if (porosity === 'Forte') {
+    const hasShea = fullText.includes('shea') || fullText.includes('karite') || fullText.includes('karité');
+    const hasCastor = fullText.includes('castor') || fullText.includes('ricin') || fullText.includes('carapate');
+    const hasAvocado = fullText.includes('avocado') || fullText.includes('avocat');
+
+    if (hasShea || hasCastor || hasAvocado) {
+      let friends = [];
+      if (hasShea) friends.push("Beurre de Karité");
+      if (hasCastor) friends.push("Huile de Ricin");
+      if (hasAvocado) friends.push("Avocat");
+      return {
+        score: 95,
+        title: 'Soin Scellant Parfait (Porosité Forte) 🏆',
+        color: colors.success,
+        description: `Génial ! Vos cuticules étant très ouvertes (Porosité Forte), ce produit riche en ${friends.join(', ')} est idéal pour combler les brèches et sceller l'hydratation de vos fibres.`,
+        compatibility: 'Compatible'
+      };
+    }
+  }
+
+  if (sensitivity.includes('Traités chimiquement')) {
+    const hasProtein = fullText.includes('protein') || fullText.includes('protéin') || fullText.includes('keratin') || fullText.includes('kératine') || fullText.includes('silk') || fullText.includes('soie');
+    if (hasProtein) {
+      return {
+        score: 96,
+        title: 'Fortifiant Cheveux Traités Chimiquement 🏆',
+        color: colors.success,
+        description: `Parfait ! Vos cheveux étant Traités Chimiquement, ce soin hautement protéiné (Protéines de Soie / Kératine) est idéal pour reconstruire la structure de vos fibres capillaires endommagées.`,
+        compatibility: 'Compatible'
+      };
+    }
+  }
+
+  return {
+    score: 85,
+    title: 'Très Compatible 🌿',
+    color: colors.success,
+    description: `Ce produit est parfaitement adapté à ton profil capillaire. Il respecte tes caractéristiques (cheveux ${texture.toLowerCase()}, épaisseur ${thickness.toLowerCase()}, porosité ${porosity?.toLowerCase() || 'moyenne'}).`,
+    compatibility: 'Compatible'
+  };
+};
+
+export const getEducationalExplanationForCare = (category: string, diagnostic: HairDiagnostic): string => {
+  const texture = diagnostic.texture || 'Crépus';
+  const porosity = diagnostic.porosity || 'Moyenne';
+  const thickness = diagnostic.thickness || 'Moyens';
+  const sensitivity = diagnostic.sensitivity || [];
+  const cat = category.toLowerCase().trim();
+
+  if (texture === 'Locksés') {
+    if (cat.includes('lavage') || cat.includes('clarif') || cat.includes('retwist') || cat.includes('rinçage') || cat.includes('leave')) {
+      return "Vos cheveux étant Locksés, nous avons strictement exclu tout corps gras solide (beurres, cires, huiles lourdes non solubles) pour privilégier la légèreté de sprays aqueux (ex: Rose/Glycérine) et éviter les résidus blancs (build-ups) au cœur de la lock.";
+    }
+  }
+
+  if (porosity === 'Faible' && thickness === 'Fins') {
+    if (cat.includes('sans rinçage') || cat.includes('leave') || cat.includes('masque') || cat.includes('bain')) {
+      return "Vos cheveux étant Fins et à Faible Porosité, nous avons rigoureusement exclu le Karité, l'Avocat et l'huile de Ricin pour privilégier la légèreté du gel d'Aloe Vera, du Jojoba et des Pépins de Raisin.";
+    }
+  }
+
+  if (porosity === 'Faible') {
+    if (cat.includes('sans rinçage') || cat.includes('leave') || cat.includes('masque') || cat.includes('bain') || cat.includes('lavage')) {
+      return "Vos cuticules étant serrées (Porosité Faible), nous avons exclu l'huile de Coco et le Karité brut pour privilégier la fluidité de l'Aloe Vera et du Jojoba, permettant au soin de pénétrer sans saturer la surface.";
+    }
+  }
+
+  if (thickness === 'Fins') {
+    if (cat.includes('sans rinçage') || cat.includes('leave')) {
+      return "Vos cheveux étant Fins, nous avons rigoureusement exclu les beurres lourds (Karité, Avocat) et l'huile de Ricin en soin sans rinçage pour préserver le volume et éviter d'alourdir vos longueurs.";
+    }
+  }
+
+  if (porosity === 'Forte') {
+    if (cat.includes('sans rinçage') || cat.includes('leave') || cat.includes('masque') || cat.includes('bain')) {
+      return "Vos cuticules étant très ouvertes (Porosité Forte), nous avons enrichi ce soin en Beurre de Karité, Ricin et Avocat afin de colmater les brèches et sceller l'hydratation durablement.";
+    }
+  }
+
+  if (sensitivity.includes('Traités chimiquement')) {
+    if (cat.includes('masque') || cat.includes('protéin')) {
+      return "Vos cheveux étant Traités chimiquement, nous avons intégré des soins hautement protéinés (Protéines de Soie ou Kératine) pour reconstruire la structure endommagée de vos fibres.";
+    }
+  }
+
+  return `Soin adapté à votre profil capillaire (cheveux ${texture.toLowerCase()}, épaisseur ${thickness.toLowerCase()}, porosité ${porosity?.toLowerCase() || 'moyenne'}).`;
+};
+
 
 export interface HairDiagnostic {
   texture: 'Ondulés' | 'Bouclés' | 'Frisés' | 'Crépus' | 'Locksés' | 'Raides';
@@ -58,6 +331,11 @@ export interface ActionLog {
   category: string; // 'Lavage' | 'Bain d'huile' | etc.
   feedback?: 'Secs' | 'Top' | 'Lourds';
   completed: boolean;
+  usedProduct?: {
+    id: string;
+    name: string;
+    price: number;
+  };
 }
 
 export interface RoutineItem {
@@ -72,6 +350,7 @@ export interface RoutineItem {
   enableNotificationReminder?: boolean;
   reminderTime?: string; // "HH:MM"
   isCustom?: boolean;
+  selectedProductId?: string;
 }
 
 export interface BathroomProduct {
@@ -83,11 +362,14 @@ export interface BathroomProduct {
   compatibility: 'Compatible' | 'Attention';
   score: number;
   image?: string;
+  price?: number;
   inciReport?: {
     good: string[];
     neutral: string[];
     avoid: string[];
   };
+  compatibilityExplanation?: string;
+  aiAnalyzed?: boolean;
 }
 
 export interface ScanHistoryItem {
@@ -118,12 +400,14 @@ interface AppStateContextType {
   showFeedbackQuiz: boolean;
   catchUpTask: RoutineItem | null;
   bathroomProducts: BathroomProduct[];
-  addBathroomProduct: (product: Omit<BathroomProduct, 'id'>) => void;
+  addBathroomProduct: (product: Omit<BathroomProduct, 'id'>, promptAssociation?: boolean) => BathroomProduct;
   deleteBathroomProduct: (id: string) => void;
+  updateBathroomProduct: (id: string, updatedProduct: Partial<BathroomProduct>) => void;
   scanHistory: ScanHistoryItem[];
   addScanHistoryItem: (item: Omit<ScanHistoryItem, 'id' | 'timestamp' | 'profileId'>) => void;
   deleteScanHistoryItem: (id: string) => void;
   themeMode: 'dark' | 'light';
+  tempUnit: 'C' | 'F';
   masterEmail: string;
   isLoading: boolean;
   lastValidatedCare: { category: string; date: string } | null;
@@ -133,6 +417,8 @@ interface AppStateContextType {
   regularityScore: number;
   isPremium: boolean;
   setPremiumStatus: (status: boolean) => void;
+  freeScansLeft: number;
+  consumeScanCredit: () => boolean;
   addProfile: (
     name: string,
     diagnostic: HairDiagnostic,
@@ -142,7 +428,7 @@ interface AppStateContextType {
     history?: HairHistory
   ) => void;
   selectProfile: (id: string) => void;
-  completeTodayAction: (category: string) => void;
+  completeTodayAction: (category: string, usedProduct?: { id: string; name: string; price: number }) => void;
   submitFeedback: (feedback: 'Secs' | 'Top' | 'Lourds') => void;
   closeFeedbackQuiz: () => void;
   closeCareSummary: () => void;
@@ -150,10 +436,11 @@ interface AppStateContextType {
   updateDiagnostic: (diagnostic: HairDiagnostic) => void;
   addCustomRoutineItem: (category: string, product: string, date: string, enableNotification?: boolean, reminderTime?: string) => void;
   completePorosity: (porosity: 'Faible' | 'Moyenne' | 'Forte') => void;
-  toggleRoutineCompleted: (id: string) => void;
+  toggleRoutineCompleted: (id: string, usedProduct?: { id: string; name: string; price: number }) => void;
   deleteRoutineItem: (id: string) => void;
   updateRoutineItemTime: (id: string, time: string) => void;
   updateRoutineItemDate: (id: string, date: string, time?: string) => void;
+  updateRoutineItemProduct: (id: string, selectedProductId?: string) => void;
   shiftRoutineDates: (profileId: string, daysToShift: number, targetCareId?: string, targetTime?: string) => void;
   
   // Settings & Profile Management Methods
@@ -163,6 +450,7 @@ interface AppStateContextType {
   setPrimaryProfile: (id: string) => void;
   updateNotificationsSetting: (enabled: boolean, time: string, tone: ProfileNotifications['tone']) => void;
   toggleThemeMode: () => void;
+  toggleTempUnit: () => void;
   updateMasterAccount: (email: string, pass: string) => void;
   deleteMasterAccount: (onComplete: () => void) => void;
   logout: (onComplete: () => void) => void;
@@ -179,7 +467,7 @@ interface AppStateContextType {
   stopActiveSession: () => void;
   startStepTimer: (durationSeconds: number) => void;
   pauseStepTimer: () => void;
-  completeCurrentStep: () => void;
+  completeCurrentStep: (usedProduct?: { id: string; name: string; price: number }) => void;
   isSessionSuspended: boolean;
   setIsSessionSuspended: (val: boolean) => void;
 }
@@ -254,29 +542,47 @@ const getHairCareColumn = (diagnostic: HairDiagnostic): 'naturel' | 'chimique' |
   return 'naturel';
 };
 
-const getProductForTask = (category: string, column: 'naturel' | 'chimique' | 'locks' | 'crepus' | 'raides'): string => {
+const getProductForTask = (category: string, column: 'naturel' | 'chimique' | 'locks' | 'crepus' | 'raides', diagnostic: HairDiagnostic): string => {
+  const texture = diagnostic.texture;
+  const porosity = diagnostic.porosity;
+  const thickness = diagnostic.thickness;
+  const sensitivity = diagnostic.sensitivity || [];
+
   if (category === 'Lavage') {
+    if (texture === 'Locksés') return 'Shampoing clarifiant sans résidus (ex: Eau de Rose / Glycérine) 🫧';
+    if (porosity === 'Faible') return 'Shampoing Doux Clarifiant (Lavage eau tiède/chaude) 🚿';
     if (column === 'raides') return 'Shampoing Léger Sébo-Régulateur (sébum voyage vite)';
-    if (column === 'locks') return 'Shampoing clarifiant sans résidus';
     return 'Shampoing Doux Hydratant Capillaire';
   }
   if (category === 'Bain d\'huile') {
+    if (texture === 'Locksés') return 'Soin Aqueux Léger (Eau de Rose & Glycérine) - Corps Gras Exclus 🚫';
+    if (porosity === 'Faible') return 'Huile Légère de Jojoba ou de Pépins de Raisin (Beurres/Coco exclus) 🍇';
     if (column === 'raides') return 'Huile Légère de Jojoba (soin mensuel très léger)';
+    if (porosity === 'Forte') return 'Huile de Ricin ou d\'Avocat (Bain scellant riche) 🥑';
     return 'Huile de Coco, Avocat & Ricin (soin riche)';
   }
-  if (category === 'Masque hydratant') {
+  if (category === 'Masque hydratant' || category === 'Masque protéiné') {
+    if (texture === 'Locksés') return 'Spray Hydratant Léger aux Plantes (Eau de Rose / Glycérine) 🌿';
+    if (sensitivity.includes('Traités chimiquement') || category === 'Masque protéiné') return 'Masque Reconstructeur Fortifiant aux Protéines de Soie & Kératine 💪';
+    if (porosity === 'Faible') return 'Gel d\'Aloe Vera Bio (Hydratation légère sans protéine ni coco) 🌵';
     if (column === 'raides') return 'Gel d\'Aloe Vera Purifié (hydratation mensuelle ultra-légère)';
     return 'Masque Nourrissant au Beurre de Karité & Miel';
   }
   if (category === 'Soin sans rinçage') {
+    if (texture === 'Locksés') return 'Brumisation Légère (Eau de Rose / Glycérine végétale) 💧';
+    if (porosity === 'Faible' && thickness === 'Fins') return 'Lait Capillaire Hydratant Ultra-Léger à l\'eau et gel d\'Aloe Vera 🌵';
+    if (thickness === 'Fins') return 'Lait Fluide Léger ou Spray Hydratant Aqueux (Beurres lourds & Ricin exclus) 💧';
+    if (porosity === 'Forte') return 'Lait Capillaire Riche scellé au Beurre de Karité ou Avocat 🥑';
+    if (sensitivity.includes('Traités chimiquement')) return 'Lait Hydratant Fortifiant aux Protéines de Soie ou Kératine 🧵';
     if (column === 'raides') return 'Pre-poo Spray Hydratant Léger aux Protéines de Soie';
     return 'Lait Capillaire Hydratant à l\'Hibiscus';
   }
   if (category === 'Clarification') {
+    if (texture === 'Locksés') return 'Bain de Clarification détox (Bicarbonate & Vinaigre de cidre) 🔬';
     return 'Soin détox à l\'Argile Bentonite naturelle';
   }
   if (category === 'Retwist') {
-    return 'Gel d\'Aloe Vera Bio & Cire d\'abeille';
+    return 'Gel d\'Aloe Vera Bio purifié (Cire exclue) 👑';
   }
   if (category === 'Coupe/Dusting') {
     return 'Ciseaux de coiffure professionnels (retirer pointes abîmées)';
@@ -324,7 +630,7 @@ const generateRoutineCalendar = (profileId: string, diagnostic: HairDiagnostic, 
     masqueInterval = 7;
     dustingInterval = 90;
   } else if (column === 'raides') {
-    lavageInterval = 3;
+    lavageInterval = 7; // Passe la fréquence de lavage à 7 jours au lieu de 3
     bainInterval = 30;
     masqueInterval = 30;
     dustingInterval = 105;
@@ -332,7 +638,8 @@ const generateRoutineCalendar = (profileId: string, diagnostic: HairDiagnostic, 
 
   // 2. Porosity adjustments
   if (diagnostic.porosity === 'Faible') {
-    lavageInterval = Math.round(lavageInterval * 1.3);
+    // Inversion Faible Porosité : Ne pas espacer les lavages. Fixe le lavage à une fréquence régulière
+    // lavageInterval reste inchangé
   } else if (diagnostic.porosity === 'Forte') {
     masqueInterval = Math.max(3, Math.round(masqueInterval * 0.7));
   }
@@ -383,7 +690,7 @@ const generateRoutineCalendar = (profileId: string, diagnostic: HairDiagnostic, 
 
   // 3. Loop over 30 days
   for (let day = 0; day < 30; day++) {
-    const dateStr = getLocalDateString(new Date(todayMs + (day + 1) * 86400000));
+    const dateStr = getLocalDateString(new Date(todayMs + day * 86400000));
     const dayTasks: { category: string; product?: string; recurrence: string }[] = [];
 
     if (day === 0 || day === 30) {
@@ -392,14 +699,45 @@ const generateRoutineCalendar = (profileId: string, diagnostic: HairDiagnostic, 
 
     // Gentle starting soin sans rinçage if they washed yesterday
     if (day === 0 && history?.lastWash === 'hier') {
-      dayTasks.push({ category: 'Soin sans rinçage', product: getProductForTask('Soin sans rinçage', column), recurrence: 'Hydratation de départ' });
+      dayTasks.push({ category: 'Soin sans rinçage', product: getProductForTask('Soin sans rinçage', column, diagnostic), recurrence: 'Hydratation de départ' });
     }
 
     // Wash day logic (with offset)
     const isWashDay = (day - lavageOffset) % lavageInterval === 0 && (day - lavageOffset) >= 0;
     if (isWashDay) {
-      dayTasks.push({ category: 'Lavage', recurrence: `Tous les ${lavageInterval} jours` });
-      dayTasks.push({ category: 'Soin sans rinçage', recurrence: 'Après chaque lavage' });
+      const isLowPoro = diagnostic.porosity === 'Faible';
+      dayTasks.push({
+        category: 'Lavage',
+        product: isLowPoro 
+          ? 'Shampoing Doux Clarifiant (Lavage eau tiède/chaude) 🚿' 
+          : getProductForTask('Lavage', column, diagnostic),
+        recurrence: isLowPoro
+          ? "Lavage régulier à l'eau tiède ou chaude pour ouvrir artificiellement les écailles closes avant d'hydrater."
+          : `Tous les ${lavageInterval} jours`
+      });
+      dayTasks.push({
+        category: 'Soin sans rinçage',
+        product: getProductForTask('Soin sans rinçage', column, diagnostic),
+        recurrence: 'Après chaque lavage'
+      });
+    }
+
+    // Régulation Cheveux Raides : massage à sec (soin purifiant/sébo-régulateur) à mi-semaine
+    if (column === 'raides' && day % 7 === 3) {
+      dayTasks.push({
+        category: 'Massage cuir chevelu',
+        product: 'Soin Purifiant / Sébo-régulateur (Massage à sec) 💆‍♀️',
+        recurrence: 'Toutes les semaines (à mi-chemin) pour réguler le sébum sans agresser'
+      });
+    }
+
+    // Régulation Forte Porosité : hydratation tous les 2 jours max
+    if (diagnostic.porosity === 'Forte' && day % 2 === 0) {
+      dayTasks.push({
+        category: 'Soin sans rinçage',
+        product: getProductForTask('Soin sans rinçage', column, diagnostic),
+        recurrence: 'Hydratation porosité forte (tous les 2 jours max)'
+      });
     }
 
     // Bain d'huile logic (with offset)
@@ -416,7 +754,12 @@ const generateRoutineCalendar = (profileId: string, diagnostic: HairDiagnostic, 
         ? (day === 5) 
         : ((day - masqueOffset) % masqueInterval === 0 && (day - masqueOffset) >= 0);
       if (isMasqueDay) {
-        dayTasks.push({ category: 'Masque hydratant', recurrence: `Tous les ${masqueInterval} jours` });
+        const isChimic = diagnostic.sensitivity.includes('Traités chimiquement');
+        dayTasks.push({
+          category: isChimic ? 'Masque protéiné' : 'Masque hydratant',
+          product: getProductForTask(isChimic ? 'Masque protéiné' : 'Masque hydratant', column, diagnostic),
+          recurrence: `Tous les ${masqueInterval} jours`
+        });
       }
     }
 
@@ -436,7 +779,7 @@ const generateRoutineCalendar = (profileId: string, diagnostic: HairDiagnostic, 
           id: uuid(),
           profileId,
           category: task.category,
-          product: task.product ? task.product : getProductForTask(task.category, column),
+          product: task.product ? task.product : getProductForTask(task.category, column, diagnostic),
           recurrence: task.recurrence,
           date: dateStr,
           completed: false,
@@ -463,11 +806,32 @@ const generateRoutineCalendar = (profileId: string, diagnostic: HairDiagnostic, 
   return sortRoutineItems(items);
 };
 
+const sanitizeForFirestore = (obj: any): any => {
+  if (obj === null) return null;
+  if (obj === undefined) return null;
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeForFirestore);
+  }
+  if (typeof obj === 'object') {
+    const sanitized: any = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        const val = obj[key];
+        if (val !== undefined) {
+          sanitized[key] = sanitizeForFirestore(val);
+        }
+      }
+    }
+    return sanitized;
+  }
+  return obj;
+};
+
 export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Theme & Master Account credentials
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
+  const [tempUnit, setTempUnit] = useState<'C' | 'F'>('C');
   const [masterEmail, setMasterEmail] = useState('');
-  const [masterPassword, setMasterPassword] = useState('');
 
   // Premium status state
   const [isPremium, setIsPremium] = useState<boolean>(false);
@@ -510,91 +874,124 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [bathroomProducts, setBathroomProducts] = useState<BathroomProduct[]>([]);
   const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([]);
 
-  // Startup session lock to prevent race conditions
-  const [isSavedCredentialsLoaded, setIsSavedCredentialsLoaded] = useState(false);
-
   // Firestore loading/sync locks to prevent race conditions during initialization
   const [isLoading, setIsLoading] = useState(true);
+  const [hasLoadedFromFirestore, setHasLoadedFromFirestore] = useState(false);
 
-  // 0. Load saved credentials from local storage on app startup to persist session
+  // Quota tracking states
+  const [freeScansLeft, setFreeScansLeft] = useState<number>(5);
+  const [lastScanResetDate, setLastScanResetDate] = useState<string>('');
+
+  // 0. Listen to Firebase Auth state change and load user data from Firestore
   useEffect(() => {
-    const loadSavedCredentials = async () => {
-      try {
-        const savedEmail = await AsyncStorage.getItem('masterEmail');
-        const savedPassword = await AsyncStorage.getItem('masterPassword');
-        if (savedEmail) {
-          setMasterEmail(savedEmail);
-          if (savedPassword) {
-            setMasterPassword(savedPassword);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const email = user.email || '';
+        setMasterEmail(email);
+        setIsLoading(true);
+        setHasLoadedFromFirestore(false);
+        try {
+          const docRef = doc(db, 'accounts', email.toLowerCase().trim());
+          const docSnap = await getDoc(docRef);
+          
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.profiles) setProfiles(data.profiles);
+            if (data.routine) setRoutine(data.routine);
+            if (data.logs) {
+              const todayStr = getLocalDateString();
+              const sanitizedLogs = data.logs.map((log: any) => {
+                if (log.completed && log.date > todayStr) {
+                  return { ...log, date: todayStr };
+                }
+                return log;
+              });
+              setLogs(sanitizedLogs);
+            }
+            if (data.activeProfileId) setActiveProfileId(data.activeProfileId);
+            if (data.themeMode) setThemeMode(data.themeMode);
+            if (data.tempUnit) setTempUnit(data.tempUnit);
+            if (data.isPremium !== undefined) setIsPremium(data.isPremium);
+            if (data.bathroomProducts) setBathroomProducts(data.bathroomProducts);
+            if (data.scanHistory) setScanHistory(data.scanHistory);
+
+            // Quota auto-reset logic on 30-day cycle
+            const now = new Date();
+            const lastReset = data.lastScanResetDate ? new Date(data.lastScanResetDate) : null;
+            const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
+            
+            if (!lastReset || (now.getTime() - lastReset.getTime()) >= thirtyDaysInMs) {
+              setFreeScansLeft(5);
+              setLastScanResetDate(now.toISOString());
+            } else {
+              setFreeScansLeft(data.freeScansLeft !== undefined ? data.freeScansLeft : 5);
+              setLastScanResetDate(data.lastScanResetDate || now.toISOString());
+            }
+          } else {
+            // Document does not exist in Cloud, initialize it with current local state
+            const nowIso = new Date().toISOString();
+            await setDoc(docRef, {
+              masterEmail: email.toLowerCase().trim(),
+              themeMode: 'dark',
+              tempUnit: 'C',
+              activeProfileId: '',
+              profiles: [],
+              routine: [],
+              logs: [],
+              isPremium: false,
+              bathroomProducts: [],
+              scanHistory: [],
+              freeScansLeft: 5,
+              lastScanResetDate: nowIso,
+              updatedAt: nowIso
+            });
+            // Reset local states to empty since it is a brand new account
+            setProfiles([]);
+            setActiveProfileId('');
+            setRoutine([]);
+            setLogs([]);
+            setIsPremium(false);
+            setBathroomProducts([]);
+            setScanHistory([]);
+            setFreeScansLeft(5);
+            setLastScanResetDate(nowIso);
           }
+          setHasLoadedFromFirestore(true);
+        } catch (error) {
+          console.warn("Erreur de chargement Firestore :", error);
+        } finally {
+          setIsLoading(false);
         }
-      } catch (error) {
-        console.error("Error loading saved credentials from AsyncStorage:", error);
-      } finally {
-        setIsSavedCredentialsLoaded(true);
+      } else {
+        // Reset everything if user logs out
+        setMasterEmail('');
+        setProfiles([]);
+        setActiveProfileId('');
+        setRoutine([]);
+        setLogs([]);
+        setIsPremium(false);
+        setBathroomProducts([]);
+        setScanHistory([]);
+        setIsLoading(false);
+        setHasLoadedFromFirestore(false);
+        setFreeScansLeft(5);
+        setLastScanResetDate('');
       }
-    };
-    loadSavedCredentials();
+    });
+
+    return () => unsubscribe();
   }, []);
-
-  // 1. Load entire account data from Firestore when masterEmail changes
-  useEffect(() => {
-    if (!isSavedCredentialsLoaded) return; // Wait until stored credentials check completes!
-
-    const loadFromFirestore = async () => {
-      if (!masterEmail) {
-        setIsLoading(false);
-        return;
-      }
-      setIsLoading(true);
-      try {
-        const docRef = doc(db, 'accounts', masterEmail.toLowerCase().trim());
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (data.profiles) setProfiles(data.profiles);
-          if (data.routine) setRoutine(data.routine);
-          if (data.logs) setLogs(data.logs);
-          if (data.activeProfileId) setActiveProfileId(data.activeProfileId);
-          if (data.themeMode) setThemeMode(data.themeMode);
-          if (data.isPremium !== undefined) setIsPremium(data.isPremium);
-          if (data.bathroomProducts) setBathroomProducts(data.bathroomProducts);
-          if (data.scanHistory) setScanHistory(data.scanHistory);
-        } else {
-          // Document does not exist in Cloud, initialize it with current local state
-          await setDoc(docRef, {
-            masterEmail: masterEmail.toLowerCase().trim(),
-            themeMode,
-            activeProfileId,
-            profiles,
-            routine,
-            logs,
-            isPremium,
-            bathroomProducts,
-            scanHistory: [],
-            updatedAt: new Date().toISOString()
-          });
-        }
-      } catch (error) {
-        console.warn("Erreur de chargement Firestore :", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadFromFirestore();
-  }, [masterEmail, isSavedCredentialsLoaded]);
 
   // 2. Automatically sync all local state changes back to Firestore
   useEffect(() => {
-    if (isLoading || !masterEmail) return;
+    if (isLoading || !masterEmail || !hasLoadedFromFirestore) return;
 
     const syncToFirestore = async () => {
       try {
         const docRef = doc(db, 'accounts', masterEmail.toLowerCase().trim());
-        await setDoc(docRef, {
+        const dataToSync = sanitizeForFirestore({
           themeMode,
+          tempUnit,
           activeProfileId,
           profiles,
           routine,
@@ -602,15 +999,18 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           isPremium,
           bathroomProducts,
           scanHistory,
+          freeScansLeft,
+          lastScanResetDate,
           updatedAt: new Date().toISOString()
-        }, { merge: true });
+        });
+        await setDoc(docRef, dataToSync, { merge: true });
       } catch (error) {
         console.warn("Erreur de synchronisation Firestore :", error);
       }
     };
 
     syncToFirestore();
-  }, [profiles, routine, logs, activeProfileId, themeMode, isLoading, masterEmail, isPremium, bathroomProducts, scanHistory]);
+  }, [profiles, routine, logs, activeProfileId, themeMode, isLoading, masterEmail, isPremium, bathroomProducts, scanHistory, hasLoadedFromFirestore, freeScansLeft, lastScanResetDate]);
 
   // Derived active properties
   const activeProfile = profiles.find(p => p.id === activeProfileId);
@@ -691,7 +1091,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setRoutine(prev => [...prev, ...generatedRoutine]);
   };
 
-  const completeTodayAction = (category: string) => {
+  const completeTodayAction = (category: string, usedProduct?: { id: string; name: string; price: number }) => {
     const todayStr = getLocalDateString();
     
     // Find if the routine item for today that is being completed is custom
@@ -715,6 +1115,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       date: todayStr,
       category,
       completed: true,
+      usedProduct,
     };
     setLogs(prev => [...prev, newLog]);
     setLastLoggedCategory(category);
@@ -952,7 +1353,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const closeCareSummary = () => setShowCareSummary(false);
 
-  const toggleRoutineCompleted = (id: string) => {
+  const toggleRoutineCompleted = (id: string, usedProduct?: { id: string; name: string; price: number }) => {
     let targetItem: RoutineItem | undefined;
     
     setRoutine(prev => prev.map(item => {
@@ -997,12 +1398,15 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       // Also log the retroactive completion in logs
       if (wasNowCompleted) {
+        const todayStr = getLocalDateString();
+        const logDate = targetDate > todayStr ? todayStr : targetDate;
         const newLog: ActionLog = {
           id: uuid(),
           profileId: targetProfileId,
-          date: targetDate,
+          date: logDate,
           category: targetCategory,
           completed: true,
+          usedProduct,
         };
         setLogs(prev => [...prev, newLog]);
 
@@ -1010,7 +1414,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         // Open feedback popup for any completed care item!
         setLastLoggedCategory(targetCategory);
-        setLastValidatedCare({ category: targetCategory, date: targetDate });
+        setLastValidatedCare({ category: targetCategory, date: logDate });
 
         if (!isCustom) {
           setTimeout(() => {
@@ -1088,15 +1492,54 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return p;
     }));
 
-    const todayStr = getLocalDateString();
-    // Remove all future non-completed routine items for this profile
-    setRoutine(prev => prev.filter(r => !(r.profileId === activeProfileId && r.date > todayStr && !r.completed)));
+    // Recalculate compatibility and score for all bathroom products
+    setBathroomProducts(prev => prev.map(p => {
+      const evaluation = evaluateProductCompatibility(p.brand, p.name, p.category, p.ingredients, newDiagnostic);
+      return {
+        ...p,
+        compatibility: evaluation.compatibility,
+        score: evaluation.score
+      };
+    }));
 
-    // Generate new future routine items starting from today
+    const todayStr = getLocalDateString();
+    
+    // Determine which categories are already completed today to prevent duplicate recreation
+    let completedTodayCategories: string[] = [];
+    setRoutine(prev => {
+      completedTodayCategories = prev
+        .filter(r => r.profileId === activeProfileId && r.date === todayStr && r.completed)
+        .map(r => r.category);
+      
+      // Remove all future and today's non-completed routine items for this profile
+      return prev.filter(r => !(r.profileId === activeProfileId && r.date >= todayStr && !r.completed));
+    });
+
+    // Generate new routine items starting from today
     const generatedRoutine = generateRoutineCalendar(activeProfileId, newDiagnostic);
-    // Filter generated to only keep items that are in the future
-    const futureGenerated = generatedRoutine.filter(r => r.date > todayStr);
-    setRoutine(prev => [...prev, ...futureGenerated]);
+    // Keep items starting from today, and filter out today's generated items that are already completed
+    const futureOrTodayGenerated = generatedRoutine.filter(r => {
+      if (r.date < todayStr) return false;
+      if (r.date === todayStr && completedTodayCategories.includes(r.category)) return false;
+      return true;
+    });
+
+    setRoutine(prev => [...prev, ...futureOrTodayGenerated]);
+
+    // Update active session if currently active on screen
+    if (isSessionActive) {
+      const todayCares = futureOrTodayGenerated.filter(r => r.date === todayStr);
+      if (todayCares.length > 0) {
+        const sortedCares = sortRoutineItems(todayCares);
+        setActiveSessionCares(sortedCares);
+        setCurrentStepIndex(0);
+      } else {
+        setIsSessionActive(false);
+        setIsSessionSuspended(false);
+        setActiveSessionCares([]);
+        setCurrentStepIndex(0);
+      }
+    }
   };
 
   const addCustomRoutineItem = (
@@ -1144,6 +1587,15 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }));
   };
 
+  const updateRoutineItemProduct = (id: string, selectedProductId?: string) => {
+    setRoutine(prev => prev.map(item => {
+      if (item.id === id) {
+        return { ...item, selectedProductId };
+      }
+      return item;
+    }));
+  };
+
   const shiftRoutineDates = (profileId: string, daysToShift: number, targetCareId?: string, targetTime?: string) => {
     const clampedShift = Math.max(-30, Math.min(30, daysToShift));
 
@@ -1179,7 +1631,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }));
   };
 
-  const addBathroomProduct = (productData: Omit<BathroomProduct, 'id'>) => {
+  const addBathroomProduct = (productData: Omit<BathroomProduct, 'id'>, promptAssociation = false) => {
     const newId = uuid();
     const newProduct: BathroomProduct = {
       ...productData,
@@ -1196,87 +1648,123 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     // Proactive agenda script:
     // Update future uncompleted routine items where category matches
-    setRoutine(prev => prev.map(item => {
-      if (
+    if (newProduct.compatibility !== 'Attention') {
+      setRoutine(prev => prev.map(item => {
+        if (
+          item.profileId === activeProfileId &&
+          !item.completed &&
+          item.date >= getLocalDateString()
+        ) {
+          if (matchesCategoryLocal(newProduct.category, item.category, newProduct.name)) {
+            // Check for conflicts / bad interactions
+            const isOcclusive = newProduct.ingredients.some(i => 
+              i.toLowerCase().includes('mineral oil') || 
+              i.toLowerCase().includes('petrolatum') || 
+              i.toLowerCase().includes('cire') || 
+              i.toLowerCase().includes('wax')
+            );
+            
+            const profile = profiles.find(p => p.id === activeProfileId);
+            const isLowPoro = profile?.diagnostic?.porosity === 'Faible';
+            
+            let suggestion = `Tu peux faire ce soin avec ${newProduct.brand} - ${newProduct.name} de ta salle de bain.`;
+            
+            if (isOcclusive && isLowPoro) {
+              suggestion += ` ⚠️ Attention : ce produit est lourd et occlusif, peu conseillé pour ta porosité faible.`;
+            }
+            
+            return {
+              ...item,
+              product: `${newProduct.brand} - ${newProduct.name} 🧴`,
+              recurrence: suggestion
+            };
+          }
+        }
+        return item;
+      }));
+    }
+
+    // Prompt association logic if requested
+    if (promptAssociation) {
+      const todayStr = getLocalDateString();
+      const nextMatchingCare = routine.find(item => 
         item.profileId === activeProfileId &&
         !item.completed &&
-        item.date >= getLocalDateString()
-      ) {
-        // Map product categories to agenda categories
-        const matchesCategory = (prodCat: string, agendaCat: string, prodName?: string): boolean => {
-          const pc = prodCat.toLowerCase();
-          const ac = agendaCat.toLowerCase();
-          const name = prodName ? prodName.toLowerCase() : '';
+        item.date >= todayStr &&
+        matchesCategoryLocal(newProduct.category, item.category, newProduct.name)
+      );
 
-          // Règle absolue: Interdiction totale de proposer un produit de type 'Gel', 'Gelée' ou 'Cire' pour du soin profond (Masque) ou Bain d'huile
-          const isGel = pc.includes('retwist') || pc.includes('gel') || name.includes('gel') || name.includes('gelée') || name.includes('jelly') || name.includes('cire') || name.includes('wax');
-
-          if (ac.includes('bain') || ac.includes('huile')) {
-            if (isGel) return false;
-            // Bain d'huile: uniquement des produits de la catégorie Huiles pures, Beurres ou Sérums huileux (Bain d'huile)
-            return pc === "bain d'huile";
-          }
-
-          if (ac.includes('lavage') || ac.includes('shampoing') || ac.includes('clarif') || ac.includes('détox')) {
-            // Shampoing / Clarification: uniquement des Shampoings (Lavage) ou Argiles/Détox (Clarification)
-            return pc === 'lavage' || pc === 'clarification';
-          }
-
-          if (ac.includes('masque') || ac.includes('profond')) {
-            if (isGel) return false;
-            // Masque / Soin Profond: uniquement des Masques capillaires (Masque hydratant)
-            return pc === 'masque hydratant';
-          }
-
-          if (
-            ac.includes('sans rinçage') || 
-            ac.includes('leave') || 
-            ac.includes('lait') || 
-            ac.includes('crème') || 
-            ac.includes('creme') || 
-            ac.includes('cream') || 
-            ac.includes('coiffage') || 
-            ac.includes('hydratation') || 
-            ac.includes('retwist')
-          ) {
-            // Hydratation / Coiffage: uniquement des Leave-in, Crèmes, Laits (Soin sans rinçage) ou Gels, Gelées (Retwist)
-            return pc === 'soin sans rinçage' || pc === 'retwist';
-          }
-
-          return false;
+      if (nextMatchingCare) {
+        const careName = nextMatchingCare.category;
+        const careDate = formatFrenchDateLocal(nextMatchingCare.date);
+        const productName = `${newProduct.brand} - ${newProduct.name}`;
+        
+        const performAssociation = () => {
+          updateRoutineItemProduct(nextMatchingCare.id, newProduct.id);
         };
 
-        if (matchesCategory(newProduct.category, item.category, newProduct.name)) {
-          // Check for conflicts / bad interactions
-          const isOcclusive = newProduct.ingredients.some(i => 
-            i.toLowerCase().includes('mineral oil') || 
-            i.toLowerCase().includes('petrolatum') || 
-            i.toLowerCase().includes('cire') || 
-            i.toLowerCase().includes('wax')
-          );
-          
-          const profile = profiles.find(p => p.id === activeProfileId);
-          const isLowPoro = profile?.diagnostic?.porosity === 'Faible';
-          
-          let suggestion = `Tu peux faire ce soin avec ${newProduct.brand} - ${newProduct.name} de ta salle de bain.`;
-          
-          if (isOcclusive && isLowPoro) {
-            suggestion += ` ⚠️ Attention : ce produit est lourd et occlusif, peu conseillé pour ta porosité faible.`;
+        const isAttention = newProduct.compatibility === 'Attention';
+        const title = isAttention ? "Associer quand même ? ⚠️" : "Associer à un soin prévu ? 📅";
+        const message = isAttention 
+          ? `Ce produit n'est pas idéalement compatible avec ton profil. Souhaites-tu tout de même planifier l'utilisation de "${productName}" pour ton soin "${careName}" du ${careDate} ?`
+          : `Souhaitez-vous planifier l'utilisation de "${productName}" pour votre soin "${careName}" du ${careDate} ?`;
+
+        if (Platform.OS === 'web') {
+          const confirm = window.confirm(message);
+          if (confirm) {
+            performAssociation();
           }
-          
-          return {
-            ...item,
-            product: `${newProduct.brand} - ${newProduct.name} 🧴`,
-            recurrence: suggestion
-          };
+        } else {
+          Alert.alert(
+            title,
+            message,
+            [
+              { text: "Non", style: "cancel" },
+              { text: isAttention ? "Oui, associer quand même" : "Oui, associer", onPress: performAssociation }
+            ]
+          );
         }
       }
-      return item;
-    }));
+    }
+
+    return newProduct;
   };
 
   const deleteBathroomProduct = (id: string) => {
     setBathroomProducts(prev => prev.filter(p => p.id !== id));
+  };
+
+  const updateBathroomProduct = (id: string, updatedProduct: Partial<BathroomProduct>) => {
+    setBathroomProducts(prev => prev.map(p => {
+      if (p.id === id) {
+        return { ...p, ...updatedProduct };
+      }
+      return p;
+    }));
+
+    // Propagate changes to care logs
+    setLogs(prev => prev.map(log => {
+      if (log.usedProduct && log.usedProduct.id === id) {
+        return {
+          ...log,
+          usedProduct: {
+            ...log.usedProduct,
+            ...(updatedProduct.name !== undefined ? { name: updatedProduct.name } : {}),
+            ...(updatedProduct.price !== undefined ? { price: updatedProduct.price! } : {}),
+          }
+        };
+      }
+      return log;
+    }));
+  };
+
+  const consumeScanCredit = (): boolean => {
+    if (isPremium) return true;
+    if (freeScansLeft > 0) {
+      setFreeScansLeft(prev => prev - 1);
+      return true;
+    }
+    return false;
   };
 
   const addScanHistoryItem = (itemData: Omit<ScanHistoryItem, 'id' | 'timestamp' | 'profileId'>) => {
@@ -1319,15 +1807,54 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }));
 
     if (updatedDiag) {
-      const todayStr = getLocalDateString();
-      // Remove all future non-completed routine items for this profile
-      setRoutine(prev => prev.filter(r => !(r.profileId === activeProfileId && r.date > todayStr && !r.completed)));
+      const diagObj = updatedDiag as HairDiagnostic;
+      setBathroomProducts(prev => prev.map(p => {
+        const evaluation = evaluateProductCompatibility(p.brand, p.name, p.category, p.ingredients, diagObj);
+        return {
+          ...p,
+          compatibility: evaluation.compatibility,
+          score: evaluation.score
+        };
+      }));
 
-      // Generate new future routine items starting from today
+      const todayStr = getLocalDateString();
+      
+      // Determine which categories are already completed today to prevent duplicate recreation
+      let completedTodayCategories: string[] = [];
+      setRoutine(prev => {
+        completedTodayCategories = prev
+          .filter(r => r.profileId === activeProfileId && r.date === todayStr && r.completed)
+          .map(r => r.category);
+        
+        // Remove all future and today's non-completed routine items for this profile
+        return prev.filter(r => !(r.profileId === activeProfileId && r.date >= todayStr && !r.completed));
+      });
+
+      // Generate new routine items starting from today
       const generatedRoutine = generateRoutineCalendar(activeProfileId, updatedDiag);
-      // Filter generated to only keep items that are in the future
-      const futureGenerated = generatedRoutine.filter(r => r.date > todayStr);
-      setRoutine(prev => [...prev, ...futureGenerated]);
+      // Keep items starting from today, and filter out today's generated items that are already completed
+      const futureOrTodayGenerated = generatedRoutine.filter(r => {
+        if (r.date < todayStr) return false;
+        if (r.date === todayStr && completedTodayCategories.includes(r.category)) return false;
+        return true;
+      });
+
+      setRoutine(prev => [...prev, ...futureOrTodayGenerated]);
+
+      // Update active session if currently active on screen
+      if (isSessionActive) {
+        const todayCares = futureOrTodayGenerated.filter(r => r.date === todayStr);
+        if (todayCares.length > 0) {
+          const sortedCares = sortRoutineItems(todayCares);
+          setActiveSessionCares(sortedCares);
+          setCurrentStepIndex(0);
+        } else {
+          setIsSessionActive(false);
+          setIsSessionSuspended(false);
+          setActiveSessionCares([]);
+          setCurrentStepIndex(0);
+        }
+      }
     }
   };
 
@@ -1390,67 +1917,73 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setThemeMode(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
+  const toggleTempUnit = () => {
+    setTempUnit(prev => prev === 'C' ? 'F' : 'C');
+  };
+
   const updateMasterAccount = async (email: string, pass: string) => {
-    setIsLoading(true); // Set isLoading to true immediately to lock routing during async Firestore fetch
-    setMasterEmail(email);
-    setMasterPassword(pass);
-    try {
-      await AsyncStorage.setItem('masterEmail', email);
-      await AsyncStorage.setItem('masterPassword', pass);
-    } catch (e) {
-      console.error("Error saving credentials to AsyncStorage:", e);
+    setIsLoading(true);
+    const user = auth.currentUser;
+    if (user) {
+      try {
+        const oldEmail = user.email || '';
+        const newEmailNormalized = email.toLowerCase().trim();
+        
+        if (newEmailNormalized !== oldEmail.toLowerCase().trim()) {
+          await updateEmail(user, newEmailNormalized);
+          setMasterEmail(newEmailNormalized);
+        }
+        
+        if (pass && pass !== '••••••••') {
+          if (pass.length < 6) {
+            throw new Error('Le mot de passe doit contenir au moins 6 caractères.');
+          }
+          await updatePassword(user, pass);
+        }
+      } catch (error) {
+        setIsLoading(false);
+        throw error;
+      }
     }
+    setIsLoading(false);
   };
 
   const deleteMasterAccount = async (onComplete: () => void) => {
-    if (masterEmail) {
+    setIsLoading(true);
+    const user = auth.currentUser;
+    if (user) {
       try {
-        const docRef = doc(db, 'accounts', masterEmail.toLowerCase().trim());
-        await deleteDoc(docRef);
-        console.log("Master account deleted from Firestore successfully.");
+        const email = user.email || '';
+        if (email) {
+          const docRef = doc(db, 'accounts', email.toLowerCase().trim());
+          await deleteDoc(docRef);
+          console.log("Master account deleted from Firestore successfully.");
+        }
       } catch (error) {
         console.error("Error deleting document from Firestore:", error);
       }
+      try {
+        await user.delete();
+      } catch (error) {
+        console.error("Error deleting user from Firebase Auth:", error);
+      }
     }
-
-    try {
-      await AsyncStorage.removeItem('masterEmail');
-      await AsyncStorage.removeItem('masterPassword');
-    } catch (e) {
-      console.error("Error removing credentials from AsyncStorage:", e);
-    }
-    // Reset state completely
-    setMasterEmail('');
-    setMasterPassword('');
     setIsLoading(false);
-    setProfiles([]);
-    setActiveProfileId('');
-    setRoutine([]);
-    setLogs([]);
-    setIsPremium(false);
-    setScanHistory([]);
-    onComplete(); // callback to redirect to auth screen
+    onComplete();
   };
 
   const logout = async (onComplete: () => void) => {
+    setIsLoading(true);
     try {
-      await AsyncStorage.removeItem('masterEmail');
-      await AsyncStorage.removeItem('masterPassword');
+      await signOut(auth);
     } catch (e) {
-      console.error("Error removing credentials from AsyncStorage:", e);
+      console.error("Error signing out:", e);
+    } finally {
+      setIsLoading(false);
+      onComplete();
     }
-    // Reset state completely
-    setMasterEmail('');
-    setMasterPassword('');
-    setIsLoading(false);
-    setProfiles([]);
-    setActiveProfileId('');
-    setRoutine([]);
-    setLogs([]);
-    setIsPremium(false);
-    setScanHistory([]);
-    onComplete(); // callback to redirect to auth screen
   };
+
 
   const deleteRoutineItem = (id: string) => {
     setRoutine(prev => prev.filter(item => item.id !== id));
@@ -1559,6 +2092,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             title: "My Root'In 🌿 Étape Suivante",
             body: bodyText,
             sound: 'two_pshit.mp3',
+            priority: Notifications.AndroidNotificationPriority.MAX,
             data: {
               isNextStepNotification: true,
               nextStepIndex: currentStepIndex + 1
@@ -1598,7 +2132,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  const completeCurrentStep = async () => {
+  const completeCurrentStep = async (usedProduct?: { id: string; name: string; price: number }) => {
     const currentCare = activeSessionCares[currentStepIndex];
     if (!currentCare) return;
 
@@ -1609,16 +2143,19 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return item;
     }));
 
+    const todayStr = getLocalDateString();
+    const logDate = currentCare.date > todayStr ? todayStr : currentCare.date;
     const newLog: ActionLog = {
       id: uuid(),
       profileId: activeProfileId,
-      date: currentCare.date,
+      date: logDate,
       category: currentCare.category,
       completed: true,
+      usedProduct,
     };
     setLogs(prev => [...prev, newLog]);
     setLastLoggedCategory(currentCare.category);
-    setLastValidatedCare({ category: currentCare.category, date: currentCare.date });
+    setLastValidatedCare({ category: currentCare.category, date: logDate });
 
     if (Platform.OS !== 'web') {
       try {
@@ -1701,6 +2238,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       bathroomProducts,
       addBathroomProduct,
       deleteBathroomProduct,
+      updateBathroomProduct,
       scanHistory,
       addScanHistoryItem,
       deleteScanHistoryItem,
@@ -1714,6 +2252,8 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       regularityScore,
       isPremium,
       setPremiumStatus: setIsPremium,
+      freeScansLeft,
+      consumeScanCredit,
       addProfile,
       selectProfile,
       completeTodayAction,
@@ -1728,6 +2268,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       deleteRoutineItem,
       updateRoutineItemTime,
       updateRoutineItemDate,
+      updateRoutineItemProduct,
       shiftRoutineDates,
       
       renameProfile,
@@ -1736,6 +2277,8 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setPrimaryProfile,
       updateNotificationsSetting,
       toggleThemeMode,
+      tempUnit,
+      toggleTempUnit,
       updateMasterAccount,
       deleteMasterAccount,
       logout,

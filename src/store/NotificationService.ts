@@ -31,6 +31,7 @@ export interface RoutineItem {
   completed: boolean;
   reminderTime?: string;
   isCustom?: boolean;
+  selectedProductId?: string;
 }
 
 const getMorningNotificationBody = (categories: string[]): string => {
@@ -189,6 +190,7 @@ export const NotificationService = {
               title: "My Root'In 🌿",
               body: bodyText,
               sound: 'two_pshit.mp3',
+              priority: Notifications.AndroidNotificationPriority.MAX,
               data: {
                 isMorningNotification: true,
                 date: dateStr,

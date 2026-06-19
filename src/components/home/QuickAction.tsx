@@ -16,9 +16,13 @@ export const QuickAction: React.FC<QuickActionProps> = ({ onPress }) => {
   if (!activeProfile) return null;
 
   const isLight = themeMode === 'light';
-  const customCard = isLight ? '#FFFFFF' : colors.card;
-  const customText = isLight ? '#1C1E26' : colors.textPrimary;
-  const customTextSec = isLight ? '#6A6F82' : colors.textSecondary;
+  // Cozy Cream / Beige Theme for this block
+  const cardBg = '#FAF5EC';
+  const cardBorder = '#F1E4D0';
+  const titleColor = '#3E2723';      // Marron très foncé
+  const subtitleColor = '#6D4C41';   // Marron chaud moyen
+  // Cozy icon container bg (slightly darker warm beige/cream)
+  const iconBg = '#EADCC8';
 
   const handlePress = () => {
     // Micro-animation scale-down and scale-up spring
@@ -43,16 +47,21 @@ export const QuickAction: React.FC<QuickActionProps> = ({ onPress }) => {
           style={[
             styles.actionButton,
             { 
-              backgroundColor: customCard,
-              borderColor: isLight ? 'rgba(0, 0, 0, 0.08)' : colors.cardBorder,
+              backgroundColor: cardBg,
+              borderColor: cardBorder,
             }
           ]}
           onPress={handlePress}
         >
-          <Text style={[styles.actionTitle, { color: customText }]}>Soin Express !</Text>
-          <Text style={[styles.actionSubtitle, { color: customTextSec }]}>
-            Planifier un soin libre 📆
-          </Text>
+          <View style={[styles.actionIconContainer, { backgroundColor: iconBg }]}>
+            <Text style={styles.actionIcon}>⚡</Text>
+          </View>
+          <View style={styles.actionContent}>
+            <Text style={[styles.actionTitle, { color: titleColor }]}>Soin express</Text>
+            <Text style={[styles.actionSubtitle, { color: subtitleColor }]}>
+              Planifier un soin libre
+            </Text>
+          </View>
         </TouchableOpacity>
       </Animated.View>
     </View>
@@ -72,9 +81,9 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     borderRadius: 16,
     borderWidth: 1.2,
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
     alignItems: 'center',
     // Standard subtle card shadow
     shadowColor: '#000000',
@@ -83,15 +92,29 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 1,
   },
+  actionIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  actionIcon: {
+    fontSize: 22,
+  },
+  actionContent: {
+    flex: 1,
+    justifyContent: 'center',
+  },
   actionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '800',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    marginBottom: 4,
+    letterSpacing: 0.5,
+    marginBottom: 2,
   },
   actionSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
   },
 });

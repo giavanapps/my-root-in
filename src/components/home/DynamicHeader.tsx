@@ -2,12 +2,20 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Modal, Animated, Easing, Image } from 'react-native';
 import { colors } from '../../theme/colors';
 import { useAppState } from '../../store/AppStateContext';
+import * as Location from 'expo-location';
 
 interface DynamicHeaderProps {
   onPriorityPress?: () => void;
 }
 
 const isNight = () => { const h = new Date().getHours(); return h >= 20 || h < 6; };
+
+const convertTemp = (tempC: number, unit: 'C' | 'F') => {
+  if (unit === 'F') {
+    return Math.round((tempC * 9 / 5) + 32);
+  }
+  return tempC;
+};
 
 const getMockedWeather = (dateStr: string) => {
   if (isNight()) return { condition: 'Nuit calme 🌙', icon: '🌙', humidity: 60, temp: 17 };
@@ -105,7 +113,7 @@ const getMarqueeText = (weatherIcon: string, humidity: number, cityName: string,
 
 
 export const DynamicHeader: React.FC<DynamicHeaderProps> = ({ onPriorityPress }) => {
-  const { activeProfile, routine, themeMode, regularityScore, isPremium, setPremiumStatus } = useAppState();
+  const { activeProfile, routine, themeMode, tempUnit, regularityScore, isPremium, setPremiumStatus } = useAppState();
   const [showWeatherModal, setShowWeatherModal] = useState(false);
 
   if (!activeProfile) return null;
@@ -174,7 +182,7 @@ export const DynamicHeader: React.FC<DynamicHeaderProps> = ({ onPriorityPress })
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch real weather: 3 HTTPS-only fallbacks → open-meteo (no permissions needed)
+  // Fetch real weather: GPS with IP-based fallbacks
   useEffect(() => {
     let active = true;
     const fetchWeather = async () => {
@@ -183,39 +191,82 @@ export const DynamicHeader: React.FC<DynamicHeaderProps> = ({ onPriorityPress })
         let longitude: number | null = null;
         let city = '';
 
-        // Attempt 1: ipapi.co (HTTPS)
+        // Attempt 0: GPS via expo-location (with fallback to IP if denied or failed)
         try {
-          const r = await fetch('https://ipapi.co/json/');
-          if (r.ok) {
-            const d = await r.json();
-            if (d.latitude && d.longitude) {
-              latitude = d.latitude; longitude = d.longitude; city = d.city || '';
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === 'granted') {
+            const loc = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            });
+            if (loc && loc.coords) {
+              latitude = loc.coords.latitude;
+              longitude = loc.coords.longitude;
+              try {
+                const geo = await Location.reverseGeocodeAsync({
+                  latitude,
+                  longitude,
+                });
+                if (geo && geo.length > 0) {
+                  city = geo[0].city || geo[0].subregion || geo[0].region || '';
+                }
+              } catch (geoErr) {
+                console.warn('Reverse geocoding failed:', geoErr);
+              }
             }
           }
-        } catch {}
+        } catch (gpsErr) {
+          console.warn('GPS location request failed:', gpsErr);
+        }
 
-        // Attempt 2: ipwho.is (HTTPS, no key, works on mobile)
-        if (!latitude || !longitude) {
+        // Attempt 1: ipapi.co (HTTPS) - Fallback for coordinates if GPS failed, or for city if geocode failed
+        if (!latitude || !longitude || !city) {
           try {
-            const r = await fetch('https://ipwho.is/');
+            const r = await fetch('https://ipapi.co/json/');
             if (r.ok) {
               const d = await r.json();
-              if (d.latitude && d.longitude) {
-                latitude = d.latitude; longitude = d.longitude; city = d.city || '';
+              if (!latitude || !longitude) {
+                latitude = d.latitude;
+                longitude = d.longitude;
+              }
+              if (!city) {
+                city = d.city || '';
               }
             }
           } catch {}
         }
 
-        // Attempt 3: ipinfo.io (HTTPS)
-        if (!latitude || !longitude) {
+        // Attempt 2: ipwho.is (HTTPS, no key) - Fallback
+        if (!latitude || !longitude || !city) {
+          try {
+            const r = await fetch('https://ipwho.is/');
+            if (r.ok) {
+              const d = await r.json();
+              if (!latitude || !longitude) {
+                latitude = d.latitude;
+                longitude = d.longitude;
+              }
+              if (!city) {
+                city = d.city || '';
+              }
+            }
+          } catch {}
+        }
+
+        // Attempt 3: ipinfo.io (HTTPS) - Fallback
+        if (!latitude || !longitude || !city) {
           try {
             const r = await fetch('https://ipinfo.io/json');
             if (r.ok) {
               const d = await r.json();
-              if (d.loc) {
-                const [lat, lon] = d.loc.split(',').map(Number);
-                latitude = lat; longitude = lon; city = d.city || '';
+              if (!latitude || !longitude) {
+                if (d.loc) {
+                  const [lat, lon] = d.loc.split(',').map(Number);
+                  latitude = lat;
+                  longitude = lon;
+                }
+              }
+              if (!city) {
+                city = d.city || '';
               }
             }
           } catch {}
@@ -297,7 +348,7 @@ export const DynamicHeader: React.FC<DynamicHeaderProps> = ({ onPriorityPress })
           <Text style={styles.weatherHumidityBig}>{weather.humidity}%<Text style={styles.weatherHumidityUnit}> hum</Text></Text>
           <View style={[styles.weatherDivider, { backgroundColor: 'rgba(255,255,255,0.18)' }]} />
           {/* Temp */}
-          <Text style={styles.weatherTemp}>{weather.temp}°C</Text>
+          <Text style={styles.weatherTemp}>{convertTemp(weather.temp, tempUnit)}°{tempUnit}</Text>
         </View>
 
         {/* ── Infinite marquee band ─────────────────────────────── */}
@@ -365,7 +416,7 @@ export const DynamicHeader: React.FC<DynamicHeaderProps> = ({ onPriorityPress })
                   {weather.condition} — {displayCity}
                 </Text>
                 <Text style={[styles.statusDetails, { color: customTextSec }]}>
-                  Température : {weather.temp}°C | Humidité : {weather.humidity}%
+                  Température : {convertTemp(weather.temp, tempUnit)}°{tempUnit} | Humidité : {weather.humidity}%
                 </Text>
               </View>
             </View>

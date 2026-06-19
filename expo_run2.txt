@@ -1,0 +1,80 @@
+﻿env: load .env.local
+env: export VERCEL_OIDC_TOKEN
+ÔÇ║ Building app...
+Starting a Gradle Daemon, 1 incompatible and 1 stopped Daemons could not be reused, use --status for details
+Configuration on demand is an incubating feature.
+> Task :expo-gradle-plugin:expo-autolinking-plugin-shared:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle-plugin:settings-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle-plugin:shared:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:pluginDescriptors UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:pluginDescriptors UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:processResources UP-TO-DATE
+> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:processResources UP-TO-DATE
+> Task :gradle-plugin:shared:compileKotlin UP-TO-DATE
+> Task :expo-gradle-plugin:expo-autolinking-plugin-shared:compileKotlin UP-TO-DATE
+> Task :expo-gradle-plugin:expo-autolinking-plugin-shared:compileJava NO-SOURCE
+> Task :gradle-plugin:shared:compileJava NO-SOURCE
+> Task :expo-gradle-plugin:expo-autolinking-plugin-shared:processResources NO-SOURCE
+> Task :gradle-plugin:shared:processResources NO-SOURCE
+> Task :gradle-plugin:shared:classes UP-TO-DATE
+> Task :expo-gradle-plugin:expo-autolinking-plugin-shared:classes UP-TO-DATE
+> Task :gradle-plugin:shared:jar UP-TO-DATE
+> Task :expo-gradle-plugin:expo-autolinking-plugin-shared:jar UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:compileKotlin UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:compileJava NO-SOURCE
+> Task :gradle-plugin:settings-plugin:classes UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:jar UP-TO-DATE
+
+> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:compileKotlin FAILED
+node.exe : e: file:///C:/Users/ladyv/.gemini/antigravity/scratch/my-root-in/node_modules/expo-modules-autolinking/andro
+id/expo-gradle-plugin/expo-autolinking-settings-plugin/src/main/kotlin/expo/modules/plugin/SettingsManager.kt:24:28 
+Unresolved reference 'extensions'.
+Au caractère C:\Program Files\nodejs\npx.ps1:29 : 3
++   & $NODE_EXE $NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (e: file:///C:/U...e 'extensions'.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+e: file:///C:/Users/ladyv/.gemini/antigravity/scratch/my-root-in/node_modules/expo-modules-autolinking/android/expo-gra
+dle-plugin/expo-autolinking-settings-plugin/src/main/kotlin/expo/modules/plugin/SettingsManager.kt:112:15 Unresolved 
+reference 'extra'.
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':expo-gradle-plugin:expo-autolinking-settings-plugin:compileKotlin'.
+> A failure occurred while executing 
+org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 20s
+11 actionable tasks: 1 executed, 10 up-to-date
+Error: C:\Users\ladyv\.gemini\antigravity\scratch\my-root-in\android\gradlew.bat app:assembleDebug -x lint -x test 
+--configure-on-demand --build-cache -PreactNativeDevServerPort=8081 -PreactNativeArchitectures=x86_64,arm64-v8a exited 
+with non-zero code: 1
+Error: C:\Users\ladyv\.gemini\antigravity\scratch\my-root-in\android\gradlew.bat app:assembleDebug -x lint -x test 
+--configure-on-demand --build-cache -PreactNativeDevServerPort=8081 -PreactNativeArchitectures=x86_64,arm64-v8a exited 
+with non-zero code: 1
+    at ChildProcess.completionListener 
+(C:\Users\ladyv\.gemini\antigravity\scratch\my-root-in\node_modules\@expo\spawn-async\src\spawnAsync.ts:167:13)
+    at Object.onceWrapper (node:events:633:26)
+    at ChildProcess.emit (node:events:518:28)
+    at ChildProcess.cp.emit 
+(C:\Users\ladyv\.gemini\antigravity\scratch\my-root-in\node_modules\cross-spawn\lib\enoent.js:34:29)
+    at Process.ChildProcess._handle.onexit (node:internal/child_process:293:12)
+    ...
+    at spawnAsync 
+(C:\Users\ladyv\.gemini\antigravity\scratch\my-root-in\node_modules\@expo\spawn-async\src\spawnAsync.ts:39:21)
+    at spawnGradleAsync (C:\Users\ladyv\.gemini\antigravity\scratch\my-root-in\node_modules\expo\node_modules\@expo\cli
+\src\start\platforms\android\gradle.ts:134:28)
+    at assembleAsync (C:\Users\ladyv\.gemini\antigravity\scratch\my-root-in\node_modules\expo\node_modules\@expo\cli\sr
+c\start\platforms\android\gradle.ts:83:16)
+    at runAndroidAsync (C:\Users\ladyv\.gemini\antigravity\scratch\my-root-in\node_modules\expo\node_modules\@expo\cli\
+src\run\android\runAndroidAsync.ts:62:24)
