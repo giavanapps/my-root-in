@@ -943,6 +943,23 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
     }
   };
 
+  const handleSwitchToPhotoMode = () => {
+    setFrontPhoto(null);
+    setBackPhoto(null);
+    setCaptureStep('front');
+    frontPhotoRef.current = null;
+    setScanned(false);
+    cameraKey.current += 1;
+    scanAllowedTime.current = Date.now() + 1000;
+    setRealProductError(null);
+    setScannerMode('photo');
+    setScanStep('idle');
+    
+    if (Platform.OS === 'web') {
+      setTimeout(() => capturePhoto('front'), 100);
+    }
+  };
+
   const launchNativeSystemScanner = async () => {
     if ((Platform.OS as string) === 'web') {
       showAppAlert("Non pris en charge", "Le scanner natif n'est pas disponible sur le web. Veuillez saisir le code manuellement.");
@@ -1217,24 +1234,9 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
       }
 
       // ══════════════════════════════════════════════════════════════
-      // 3. Gemini direct — Fallback final par base de connaissances IA
+      // 3. Gemini direct — Fallback par base de connaissances désactivé
+      // pour éviter les hallucinations d'identification de code-barres.
       // ══════════════════════════════════════════════════════════════
-      if (!analysisResult) {
-        try {
-          const result = await callScanAPI({
-            barcode: code,
-            texture: activeProfile?.diagnostic?.texture || 'Crépus',
-            porosity: activeProfile?.diagnostic?.porosity || 'Moyenne'
-          });
-          // Guard: if Gemini explicitly says it doesn't recognize the barcode, don't use it
-          if (result && !result.error && result.recognized !== false) {
-            analysisResult = result;
-          }
-        } catch (geminiErr: any) {
-          if (geminiErr.message?.startsWith('QUOTA_EXCEEDED:')) throw geminiErr;
-          console.log('Gemini direct barcode lookup failed:', geminiErr);
-        }
-      }
 
       // After all 3 sources: if still nothing found, show "not recognized" form
       if (!analysisResult) {
@@ -2574,10 +2576,26 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                   Produit non reconnu
                 </Text>
                 <Text style={[styles.errorDesc, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-                  Ce produit n'a pas pu être identifié avec certitude. L'application ne devine jamais — plutôt que d'inventer un faux résultat, elle te demande de confirmer.
+                  {scannerMode === 'barcode'
+                    ? "Ce code-barres n'est pas répertorié dans notre base de données. Plutôt que d'inventer un faux résultat, nous te proposons de scanner le produit en le prenant en photo !"
+                    : "Ce produit n'a pas pu être identifié avec certitude. L'application ne devine jamais — plutôt que d'inventer un faux résultat, elle te demande de confirmer."
+                  }
                 </Text>
 
                 <View style={styles.errorDivider} />
+
+                {/* Option alternative : Passer en mode photo (si on vient du code-barres) */}
+                {scannerMode === 'barcode' && (
+                  <TouchableOpacity
+                    style={[styles.errorOptionButton, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                    activeOpacity={0.88}
+                    onPress={handleSwitchToPhotoMode}
+                  >
+                    <Text style={[styles.errorOptionButtonText, { color: '#FFFFFF' }]}>
+                      📸 Prendre le produit en photo
+                    </Text>
+                  </TouchableOpacity>
+                )}
 
                 {/* Option 1 : Saisie manuelle */}
                 <TouchableOpacity
@@ -2585,7 +2603,7 @@ export const ProductScannerModal: React.FC<ProductScannerModalProps> = ({ visibl
                   activeOpacity={0.8}
                   onPress={() => setScanStep('manual_express')}
                 >
-                  <Text style={styles.errorOptionButtonText}>✍️ Ajouter manuellement</Text>
+                  <Text style={styles.errorOptionButtonText}>✍️ Saisir les ingrédients manuellement</Text>
                 </TouchableOpacity>
 
                 {/* Option 2 : Recommencer le scan */}
