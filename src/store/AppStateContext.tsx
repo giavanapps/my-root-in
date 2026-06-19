@@ -593,7 +593,8 @@ const getProductForTask = (category: string, column: 'naturel' | 'chimique' | 'l
 const generateRoutineCalendar = (profileId: string, diagnostic: HairDiagnostic, history?: HairHistory): RoutineItem[] => {
   const column = getHairCareColumn(diagnostic);
   const items: RoutineItem[] = [];
-  const todayMs = Date.now();
+  // La routine commence le lendemain pour laisser le temps aux utilisateurs d'acheter leurs produits
+  const todayMs = Date.now() + 24 * 60 * 60 * 1000;
 
   // Frequencies (in days)
   let lavageInterval = 7;
